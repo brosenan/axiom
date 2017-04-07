@@ -1,5 +1,5 @@
-# cloudlog
-![build status](https://travis-ci.org/brosenan/cloudlog.clj.svg?branch=master)
+# Axiom
+![build status](https://travis-ci.org/brosenan/axiom.svg?branch=master)
 
-This is an implementation of the Cloudlog data langauge as a Clojure DSL.
+This is the implementation of the axiom application platform
 See [our documentation](https://brosenan.github.io/cloudlog.clj/core.html) for details.
