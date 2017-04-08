@@ -6,4 +6,6 @@
   :dependencies [[org.clojure/clojure "1.8.0"]]
   :plugins [[lein-monolith "0.3.2"]
             [lein-cprint "1.2.0"]]
-  :monolith {:project-dirs ["libs/*"]})
+  :aliases {"foo" ["do" ["midje"] ["install"]]}
+  :monolith {:project-dirs ["libs/*"]
+             :inherit [:aliases]})
