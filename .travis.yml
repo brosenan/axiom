@@ -1,2 +1,4 @@
 language: clojure
-script: lein monolith each midje
+script: lein monolith each im
+lein: 2.7
+
