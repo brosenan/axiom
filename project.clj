@@ -19,7 +19,7 @@
                        :url "https://github.com/brosenan/cloudlog.clj"}
             :output "docs"
             :files {"index"
-                    {:input "index.clj"
+                    {:input "libs/cloudlog/test/index.clj"
                      :title "Axiom"
                      :subtitle "An Application Platform"}
                     "cloudlog.core"
