@@ -18,7 +18,11 @@
                        :email  "brosenan@gmail.com"
                        :url "https://github.com/brosenan/cloudlog.clj"}
             :output "docs"
-            :files {"cloudlog.core"
+            :files {"index"
+                    {:input "index.clj"
+                     :title "Axiom"
+                     :subtitle "An Application Platform"}
+                    "cloudlog.core"
                     {:input "libs/cloudlog/test/cloudlog/core_test.clj"
                      :title "cloudlog.core"
                      :subtitle "Rule semantics"}
