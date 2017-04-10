@@ -1,0 +1,4 @@
+language: clojure
+script: lein monolith each im
+lein: 2.7.1
+
