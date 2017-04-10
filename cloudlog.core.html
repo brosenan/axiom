@@ -1,0 +1,251 @@
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+
+  <!-- Enable responsiveness on mobile devices-->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <link rel="shortcut icon" href="favicon.ico">
+  <title>axiom.cloudlog.core - Rule semantics</title>
+  <script src="js/highlight.min.js"></script>
+  <script src="js/gumshoe.min.js"></script>
+  <script src="js/smooth-scroll.min.js"></script>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/poole.css">
+  <link rel="stylesheet" href="css/syntax.css">
+  <link rel="stylesheet" href="css/lanyon.css">
+  <link rel="stylesheet" href="css/bolton.css">
+  <link rel="stylesheet" href="css/bolton-api.css">
+  <link rel="stylesheet" href="css/bolton-highlight.css">
+  <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=PT+Serif:400,400italic,700|PT+Sans:400">
+  
+</head>
+
+  <body class="theme-base-08">
+    <span id="page-top"></span>
+
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+     styles, `#sidebar-checkbox` for behavior. -->
+<input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox">
+
+<!-- Toggleable sidebar -->
+<div class="sidebar" id="sidebar">
+  <nav class="sidebar-nav">
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item active" href="cloudlog.core.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a>
+    <span class="sidebar-nav-item">&nbsp;</span>
+    <span class="sidebar-nav-item">&nbsp;</span>
+  </nav>
+</div>
+
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          <h3 class="masthead-title">
+            <span>axiom.cloudlog.core</span>
+            <small>Rule semantics</small>
+          </h3>
+        </div>
+      </div>
+
+      <div class="container content">
+        <div class="page">
+          <div class="heading">
+            <div>
+              <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
+              <h5>Date: 10 April 2017</h5>
+              <h5>Repository: <a href="https://github.com/brosenan/cloudlog.clj">https://github.com/brosenan/cloudlog.clj</a></h5>
+              <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
+          <hr/>
+          <div class="outline">
+            <div class="toc">
+              <nav data-gumshoe-header>
+                <ul data-gumshoe>
+                  <a data-scroll class="top" href="#page-top">TOP</a>
+                  <li><a class="chapter" data-scroll="" href="#defrule-rule-definition-macro"><h4>1 &nbsp; defrule: Rule Definition Macro</h4></a><a class="section" data-scroll="" href="#simple-rules"><h5><i>1.1 &nbsp; Simple Rules</i></h5></a><a class="section" data-scroll="" href="#guards"><h5><i>1.2 &nbsp; Guards</i></h5></a><a class="section" data-scroll="" href="#joins"><h5><i>1.3 &nbsp; Joins</i></h5></a><a class="section" data-scroll="" href="#derived-facts"><h5><i>1.4 &nbsp; Derived Facts</i></h5></a><a class="section" data-scroll="" href="#integrity"><h5><i>1.5 &nbsp; Integrity</i></h5></a></li><li><a class="chapter" data-scroll="" href="#defclause"><h4>2 &nbsp; defclause: Top-Down Logic</h4></a></li><li><a class="chapter" data-scroll="" href="#f"><h4>3 &nbsp; f: A Convenience Function to Create Facts</h4></a></li><li><a class="chapter" data-scroll="" href="#simulate-with"><h4>4 &nbsp; simulate-with: Evaluate a Rule based on facts</h4></a><a class="section" data-scroll="" href="#simulate-with-0"><h5><i>4.1 &nbsp; simulate-with</i></h5></a><a class="section" data-scroll="" href="#under-the-hood"><h5><i>4.2 &nbsp; Under the Hood</i></h5></a></li><li><a class="chapter" data-scroll="" href="#simulate-rules-with"><h4>5 &nbsp; simulate-rules-with: Perform a simulation Based on a Complete Namespace</h4></a><a class="section" data-scroll="" href="#under-the-hood-0"><h5><i>5.1 &nbsp; Under the Hood</i></h5></a></li><li><a class="chapter" data-scroll="" href="#run-query"><h4>6 &nbsp; run-query: Applies a Clause on the Facts</h4></a></li><li><a class="chapter" data-scroll="" href="#fact-table-get-a-fully-qualified-name-for-a-fact"><h4>7 &nbsp; fact-table: Get a Fully-Qualified Name for a Fact</h4></a></li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+
+          <div class="toc">
+              <nav>
+                <ul>
+                  <li><a class="chapter" data-scroll="" href="#defrule-rule-definition-macro"><h4>1 &nbsp; defrule: Rule Definition Macro</h4></a><a class="section" data-scroll="" href="#simple-rules"><h5><i>1.1 &nbsp; Simple Rules</i></h5></a><a class="section" data-scroll="" href="#guards"><h5><i>1.2 &nbsp; Guards</i></h5></a><a class="section" data-scroll="" href="#joins"><h5><i>1.3 &nbsp; Joins</i></h5></a><a class="section" data-scroll="" href="#derived-facts"><h5><i>1.4 &nbsp; Derived Facts</i></h5></a><a class="section" data-scroll="" href="#integrity"><h5><i>1.5 &nbsp; Integrity</i></h5></a></li><li><a class="chapter" data-scroll="" href="#defclause"><h4>2 &nbsp; defclause: Top-Down Logic</h4></a></li><li><a class="chapter" data-scroll="" href="#f"><h4>3 &nbsp; f: A Convenience Function to Create Facts</h4></a></li><li><a class="chapter" data-scroll="" href="#simulate-with"><h4>4 &nbsp; simulate-with: Evaluate a Rule based on facts</h4></a><a class="section" data-scroll="" href="#simulate-with-0"><h5><i>4.1 &nbsp; simulate-with</i></h5></a><a class="section" data-scroll="" href="#under-the-hood"><h5><i>4.2 &nbsp; Under the Hood</i></h5></a></li><li><a class="chapter" data-scroll="" href="#simulate-rules-with"><h4>5 &nbsp; simulate-rules-with: Perform a simulation Based on a Complete Namespace</h4></a><a class="section" data-scroll="" href="#under-the-hood-0"><h5><i>5.1 &nbsp; Under the Hood</i></h5></a></li><li><a class="chapter" data-scroll="" href="#run-query"><h4>6 &nbsp; run-query: Applies a Clause on the Facts</h4></a></li><li><a class="chapter" data-scroll="" href="#fact-table-get-a-fully-qualified-name-for-a-fact"><h4>7 &nbsp; fact-table: Get a Fully-Qualified Name for a Fact</h4></a></li>
+                </ul>
+              </nav>
+          </div>
+          <div><span id="defrule-rule-definition-macro"></span><h2><b>1 &nbsp;&nbsp; defrule: Rule Definition Macro</b></h2></div><div><p>Definition:</p></div><div class="code"><a id="source-of-icloudlog-core--defrule--i"></a><pre><code class="clojure">MISSING REFERENCE {:mode :source, :refer cloudlog.core/defrule}</code></pre></div><div><span id="simple-rules"></span><h3>1.1 &nbsp;&nbsp; Simple Rules</h3></div><div><p><code>defrule</code> defines a Cloudlog rule.  Such a rule always starts with a <strong>fact pattern</strong>:  a vector for which the first element is a keyword representing the fact name, and the rest of the elements are <strong>bindings</strong>, as we explain later.</p><p>The following rule &ndash; <code>foo-yx</code>, matches facts of the form <code>&#91;:test/foo x y&#93;</code> (facts named <code>:test/foo</code> with two arguments we call <code>x</code> and <code>y</code>), and for each such fact it creates a new fact of the form <code>&#91;foo-yz y x&#93;</code>.</p></div><div class="code"><pre><code class="clojure">(defrule foo-yx [y x]
+  [:test/foo x y] (by-anyone))</code></pre></div><div><p>The <code>&#40;by-anyone&#41;</code> guard means that we do not care on behalf of whom this fact was published. Typically, we will care about this, but we delay discussion on this to our discussion of <a href='#integrity'>data integrity</a>.</p></div><div><p>What <code>defrule</code> actually does is define a Clojure function that, when given the arguments for the source fact (in our case, <code>:test/foo</code>), it returns a sequence of bindings for the target fact (<code>foo-yx</code>).</p></div><div class="code"><pre><code class="clojure">(foo-yx [1 2]) =&gt; [[2 1]]</code></pre></div><div><p>The function contains metadata regarding the identity of the source fact.</p></div><div class="code"><pre><code class="clojure">(-&gt; foo-yx meta :source-fact) =&gt; [:test/foo 2]</code></pre></div><div><p>The name and arity of the target fact is also metadata of the function.</p></div><div class="code"><pre><code class="clojure">(-&gt; foo-yx meta :target-fact) =&gt; [::foo-yx 2]</code></pre></div><div><p>The arguments of both the rule and the source fact are not limited to being variables. They can also be <strong>values</strong>.</p><p>When a fact is introduced to a rule, it is <a href='https://en.wikipedia.org/wiki/Unification_%28computer_science%29'>unified</a>  with source-fact part of the rule's body.  Variables in the source-fact are bound to the corresponding values in the input fact, and values are compared.  If the values differ, the rule is not applied to this fact.</p><p>For example, the following rule is similar to <code>foo-yx</code>, only that it assumes that <code>x == 1</code>.</p></div><div class="code"><pre><code class="clojure">(defrule foo-unify [x 1]
+  [:test/foo 1 x] (by-anyone))</code></pre></div><div><p>For <code>&#91;1 2&#93;</code>, we will get the same result as before:</p></div><div class="code"><pre><code class="clojure">(foo-unify [1 2]) =&gt; [[2 1]]</code></pre></div><div><p>But if we introduce a fact in which <code>x != 1</code>, the rule will not be applied, and the result sequence will be empty.</p></div><div class="code"><pre><code class="clojure">(foo-unify [2 3]) =&gt; empty?</code></pre></div><div><span id="guards"></span><h3>1.2 &nbsp;&nbsp; Guards</h3></div><div><p>While simple rules are useful in some cases, they are limited to reordering or restructuring the fields in the source fact,  but cannot do more.  <strong>Guards</strong> fix this by allowing (purely-functional) Clojure functions to be used inside rules.</p><p>Guards are Clojure forms such as <code>let</code>, <code>for</code> or <code>when</code>.  The example below uses <code>let</code> to create a new binding (variable <code>z</code>), calculated as the sum of <code>x</code> and <code>y</code>:</p></div><div class="code"><pre><code class="clojure">(defrule foo-let [z]
+     [:test/foo x y] (by-anyone)
+     (let [z (+ x y)]))</code></pre></div><div><p>The result is as you would expect.</p></div><div class="code"><pre><code class="clojure">(foo-let [1 2]) =&gt; [[3]]</code></pre></div><div><p>Below is a more elaborate example.  Here we index text documents by:</p><ol><li>Extracting all the words from a document, and iterating over them using a <code>for</code> guard</li><li>Converting each word to lower-case (so that indexing becomes case-insensitive) using a <code>let</code> guard, and</li><li>Filterring out "stopwords", using a <code>when-not</code> guard</li></ol></div><div class="code"><pre><code class="clojure">(def stop-words #{&quot;a&quot; &quot;is&quot; &quot;to&quot; &quot;the&quot;})
+(defrule index-docs [word id]
+     [:test/doc id text] (by-anyone)
+     (for [word (clojure.string/split text #&quot;[,!.? ]+&quot;)])
+     (let [word (clojure.string/lower-case word)])
+     (when-not (contains? stop-words word)))</code></pre></div><div><p>Now, if we index a document, we will get index entries with the words it contains, lower-case, excluding stopwords.</p></div><div class="code"><pre><code class="clojure">(index-docs [1234 &quot;Hello, to the  worlD!&quot;]) =&gt; [[&quot;hello&quot; 1234] [&quot;world&quot; 1234]]</code></pre></div><div><p>Cloudlog guards differ from the corresponding Clojure forms in that they do not have a body. In the above code, the <code>for</code> form ends after the bindings have been established, and the same goes for the <code>let</code> and <code>when-not</code> forms.  A corresponding Clojure implementation could look like this:</p></div><div class="code"><pre><code class="clojure">(for [word (clojure.string/split text #&quot;[,!.? ]+&quot;)]
+  (let [word (clojure.string/lower-case word)]
+    (when-not (contains? stop-words word)
+      (emit some result))))</code></pre></div><div><p>with each form <em>containing</em> the following forms.  However, Cloudlog is a logic programming language, like Prolog or core.logic.  Cloudlog guards are just like predicates.  Bindings in <code>let</code> and <code>for</code> forms assert a certain relationship between the bound variable and the expression to its right. A <code>when</code> or <code>when-not</code> guards are just like predicates that pass or fail depending on the  (Clojure-level) predicate given to them.</p></div><div><span id="joins"></span><h3>1.3 &nbsp;&nbsp; Joins</h3></div><div><p>Even with guards, rules are still limited to considering only a single fact. Sometimes we need to draw a conclusion based on a combination of facts. A classical example is applications such as <a href='https://twitter.com'>Twitter</a>, in which users can:</p><ol><li>Follow other users,</li><li>Post tweets,</li><li>View their <strong>timelines</strong>, consisting of all the tweets made by users they follow.</li></ol><p>To successfully generate a timeline, a rule needs to take into consideration both who follows whom, and tweets &ndash; two different kinds of facts.  Moreover, there is a data dependency between the two.  We are only interested in tweets made by users we follow.</p><p>Cloudlog rules can depend on more than just the source-fact.</p></div><div class="code"><pre><code class="clojure">(defrule timeline [user tweet]
+     [:test/follows user author] (by-anyone)
+     [:test/tweeted author tweet] (by-anyone))</code></pre></div><div><p>In such cases, the rule function cannot produce the result right away. The above rule's source fact is <code>:test/follows</code>:</p></div><div class="code"><pre><code class="clojure">(-&gt; timeline meta :source-fact) =&gt; [:test/follows 2]</code></pre></div><div><p>However, from a <code>:test/follows</code> fact alone we cannot create a timeline entry. To create such an entry, we need to match it with a <code>:test/tweeted</code> fact.</p><p>To allow this, functions that represent rules that depend on more than one fact have <strong>continuations</strong>.</p><p>Continuations are functions, provided as metadata on the rule function.</p></div><div class="code"><pre><code class="clojure">(-&gt; timeline meta :continuation) =&gt; fn?</code></pre></div><div><p>The continuation function itself has metadata, indicating what its source-fact is.</p></div><div class="code"><pre><code class="clojure">(-&gt; timeline meta :continuation meta :source-fact) =&gt; [:test/tweeted 2]</code></pre></div><div><p>As in the case of simple rules, in case of a join, the rule function also returns a sequence of tuples, only that this time these tuples are not results, but rather continuations. Each tuple contains the information that the continuation function needs in order to resume the rule.</p><p>For example, the <code>timeline</code> rule above will emit the information it learned from the <code>:test/follows</code> fact it encountered.</p></div><div class="code"><pre><code class="clojure">(timeline [&quot;alice&quot; &quot;bob&quot;]) ; Alice follows Bob
+ =&gt; [[&quot;bob&quot; &quot;alice&quot; &quot;bob&quot;]]</code></pre></div><div><p>Notice that <code>&quot;bob&quot;</code> appears twice in the tuple.  Its second appearance is as the value for variable <code>author</code>. Its first appearance is as the <strong>key</strong> for the <code>:test/tweeted</code> fact.  We'll discuss keys in more detail below.</p><p>This tuple can be used to construct a new rule function based on the continuation.</p></div><div class="code"><pre><code class="clojure">(let [cont (-&gt; timeline meta :continuation) ; The continuation function we got as meta
+     rule-func (cont [&quot;bob&quot; &quot;alice&quot; &quot;bob&quot;])] ; The new rule function
+ (rule-func [&quot;bob&quot; &quot;Hi, Alice!&quot;]) ; :test/tweeted fact
+ ) =&gt; [[&quot;alice&quot; &quot;Hi, Alice!&quot;]]</code></pre></div><div><p>Cloudlog tries to be true to its logic-programming nature, but since it is intended to work with large amounts of data, some restrictions need to be applied.  In our case, the main restriction is that in any fact, the first argument is considered the <strong>key</strong>, and there are some restrictions and recommendations regarding keys.  Generally, choosing the correct key has a significant impact on the performance of the application. A key must be specific enough so that all facts with the same key can be stored in memory at the same time.</p><p>When writing rules with joins, we need to make sure the key parameter for the joined fact is bound. For example, in the <code>timeline</code> rule, we chose the order of facts for a reason. <code>:test/tweeted</code> is keyed by <code>author</code>, and <code>:test/follows</code> is keyed by <code>user</code>.  If we get the <code>:test/follows</code> first, we learn about the <code>author</code> who's tweets we need to consider.  However, when we consider <code>:test/tweeted</code> first, this does not give us a clue regarding the <code>:test/follows</code> facts we need to consider for this tweet, since it does not provide value for <code>user</code>.</p><p>We provide a compile-time error in such cases.</p></div><div class="code"><pre><code class="clojure">(macroexpand `(defrule timeline [user tweet]
+               [:test/tweeted author tweet] (by-anyone)
+               [:test/follows user author] (by-anyone)))
+ =&gt; (throws &quot;variables #{cloudlog.core_test/user} are unbound in the key for :test/follows&quot;)</code></pre></div><div><p>Of-course, guards are supported with joins.</p></div><div class="code"><pre><code class="clojure">(defrule foobar-range [w]
+     [:test/foo x y] (by-anyone)
+     (let [z (+ x y)])
+     (for [w (range z)])
+     [:test/bar z w] (by-anyone))</code></pre></div><div><p>In the above rule we take <code>x</code> and <code>y</code> from fact <code>:test/foo</code>, sum them to get <code>z</code>, and span the range <code>0..z</code>. We return <code>w</code> values for which there is a fact <code>&#91;:test/bar z w&#93;</code>.</p><p>The rule function for <code>foobar-range</code> will return a tuple based on the guards (and not based on <code>:test/bar</code>, which is to be considered afterwards).  The first element in each tuple is a key to be used against <code>:test/bar</code> (<code>z</code>), followed by the values of <code>w</code> and <code>z</code>:</p></div><div class="code"><pre><code class="clojure">(foobar-range [1 2]) =&gt; [[3 0 3] [3 1 3] [3 2 3]]</code></pre></div><div><p>If a matching <code>:test/bar</code> fact exists, a result will be produced.</p></div><div class="code"><pre><code class="clojure">(let [cont (-&gt; foobar-range meta :continuation)
+     rule-func (cont [3 1 3])]
+ (rule-func [3 1])) =&gt; [[1]]</code></pre></div><div><p>However, if it does not, an empty result will be produced.</p></div><div class="code"><pre><code class="clojure">(let [cont (-&gt; foobar-range meta :continuation)
+     rule-func (cont [3 1 3])]
+ (rule-func [4 1])) =&gt; []</code></pre></div><div><span id="derived-facts"></span><h3>1.4 &nbsp;&nbsp; Derived Facts</h3></div><div><p>Each rule defines a derived fact, i.e., each tuple produced by a rule is stored as a fact. The name of this fact is the fully-quaified name of the rule function. This fact can then be used in other rules.</p><p>For example, if we wish to create a "trending" timeline, aggregating the timelines  of users identified as "influencers", we would probably write a rule of the following form:</p></div><div class="code"><pre><code class="clojure">(defrule trending [tweet]
+  [:test/influencer influencer] (by-anyone)
+  [timeline influencer tweet] (by-anyone))</code></pre></div><div><p>Now we can simulate our rule (using <a href='#simulate-with'>simulate-with</a>):</p></div><div class="code"><pre><code class="clojure">(simulate-with trending :test
+              [:test/influencer &quot;gina&quot;]
+              [:test/influencer &quot;tina&quot;]
+              [::timeline &quot;tina&quot; &quot;purple is the new black!&quot;]
+              [::timeline &quot;gina&quot; &quot;pink is the new purple!&quot;]
+              [::timeline &quot;some-lamo&quot; &quot;orange is the new bananna&quot;])
+ =&gt; #{[&quot;purple is the new black!&quot;]
+    [&quot;pink is the new purple!&quot;]}</code></pre></div><div><span id="integrity"></span><h3>1.5 &nbsp;&nbsp; Integrity</h3></div><div><blockquote><p> Integrity of information refers to protecting information from being modified by unauthorized parties. (<a href='http://security.blogoverflow.com/2012/08/confidentiality-integrity-availability-the-three-components-of-the-cia-triad/'>Confidentiality, Integrity, Availability: The Three Components of the CIA Triad</a>) </p></blockquote><p>Cloudlog takes a liberal approach to integrity.  Any user can publish any fact, as long as he or she is a member of the fact's <em>writers set</em>. We explain writer sets in <a href='events.html#writers'>our discussion of events</a>, but for now we can just say the writer set is a piece of information telling us to whom a certain fact is attributed to. Any user within the fact's writer set can, for example, delete it and replace it with another.</p><p>When a rule is applied to a fact, it takes ownership over the result (see <a href='events.html#writers'>events</a>). This makes the rule responsible for the integrity of the result.</p></div><div><p>To allow rules to specify integrity requirements we introduce the <code>by</code> guard. Look at the <code>timeline</code> rule defined <a href='#joins'>above</a>.  The <code>:test/tweeted</code> fact indicates the user who tweeted. However, there is no guarantee that the user who appears in the fact as the author of the tweet is indeed the user who created that fact. For example, consider the fact:</p></div><div class="code"><pre><code class="clojure">[:test/tweeted &quot;alice&quot; &quot;I hate Bob!&quot;]</code></pre></div><div><p>What guarantee do we have that it is Alice who created this fact, and not Eve, who's been trying to  break up Alice and Bob for years?</p><p>The answer is we don't actually know that, because the Cloudlog is liberal about integrity, and allows any user  (including Eve) to create any fact (including tweets by Alice).</p><p>So what do we do?  Do we allow Eve to succeed in her evil plan? No, we do not.  This is where the <code>by</code> guard comes to save the day (and Alice's love life). Below is a secure version of the <code>timeline</code> rule, that only takes into account tweets made by the advertized user.</p></div><div class="code"><pre><code class="clojure">(defrule secure-timeline [user tweet]
+  [:test/follows user author] (by-anyone)
+  [:test/tweeted author tweet] (by [:user= author]))</code></pre></div><div><p>Now, if both Eve and Alice create tweets alegedly made by Alice,  Bob (who follows Alice) will only see the ones genuinly made by Alice.</p></div><div class="code"><pre><code class="clojure">(simulate-with secure-timeline :test
+              (f [:test/follows &quot;bob&quot; &quot;alice&quot;] :writers #{[:user= &quot;bob&quot;]})
+              (f [:test/tweeted &quot;alice&quot; &quot;Alice loves Bob&quot;] :writers #{[:user= &quot;alice&quot;]})
+              (f [:test/tweeted &quot;alice&quot; &quot;Alice hates Bob&quot;] :writers #{[:user= &quot;eve&quot;]}))
+ =&gt; #{[&quot;bob&quot; &quot;Alice loves Bob&quot;]}</code></pre></div><div><p>Now we come back to <code>by-anyone</code> and why we had to use it all over the place. If we do not use a <code>by</code> guard on one of the source facts in a rule we put our application at risk of having unauthorized updates take effect. For example, in the <code>secure-timeline</code> rule above we checked the integrity of tweets, but "forgot" to check the integrity of following relationships. This mistake can help Eve get messages through to Bob although he does not follow her:</p></div><div class="code"><pre><code class="clojure">(simulate-with secure-timeline :test
+              (f [:test/follows &quot;bob&quot; &quot;eve&quot;] :writers #{[:user= &quot;eve&quot;]})
+              (f [:test/tweeted &quot;eve&quot; &quot;Alice hates Bob&quot;] :writers #{[:user= &quot;eve&quot;]}))
+ =&gt; #{[&quot;bob&quot; &quot;Alice hates Bob&quot;]}</code></pre></div><div><p>Both facts were submitted (legally) by Eve.  The only flaw was in our logic &ndash; we did not protect against this. The <code>by-anyone</code> guard is here to set a warning that we are doing something wrong. Typically we never want to use it, unless we have a really good reason to.</p></div><div><p>But what if we don't use <em>any guard whatsoever</em>? Cloudlog will not allow us to do this.  For example, if we forget to place a <code>by&#42;</code> guard on <code>foo-yx</code>, we get the following error:</p></div><div class="code"><pre><code class="clojure">(macroexpand '(defrule foo-yx [y x]
+               [:test/foo x y]))
+ =&gt; (throws &quot;Rule is insecure. :test/foo is not checked.&quot;)</code></pre></div><div><p>The same goes for rules with joins:</p></div><div class="code"><pre><code class="clojure">(macroexpand '(defrule secure-timeline [user tweet]
+               [:test/follows user author] (by-anyone)
+               [:test/tweeted author tweet]))
+ =&gt; (throws &quot;Rule is insecure. :test/tweeted is not checked.&quot;)</code></pre></div><div><span id="defclause"></span><h2><b>2 &nbsp;&nbsp; defclause: Top-Down Logic</b></h2></div><div><p>Regular rules defined using <code>defrule</code> define <em>bottom-up logic</em>.  Bottom-up logic is applied when facts are added or removed, creating or removing derived facts as needed. Unfortunately, this is often not enough.  One limitation of bottom-up reasoning (logic) is that it cannot take into account a goal &ndash; a clue for what we are trying to find. It tries to build all possible result tuples, but without guidance this can be hard at times. Clauses fix this by performing logic at query time, starting with a provided goal.</p><p>Consider the <code>index-docs</code> example above.  When a new <code>:test/doc</code> fact is created, the <code>index-docs</code> rule creates an index entry for each keyword in the text.  Now imagine we wish to use this index for retrieval. What we want is to allow users to provide a sequence of search keywords, and get the full text of all the document that match <em>all</em> these keywords.</p><p>Doing this with bottom-up reasoning is quite hard.  We need to create index elements for every combination of keywords. Clauses allow us to start with a particular combination, retrieve documents based on one element (say, the first keyword) retrieve full texts and only accept those in which the other keywords appear.</p><p>The following clause does just that.</p></div><div class="code"><pre><code class="clojure">(defclause multi-keyword-search
+  [:test/multi-keyword-search keywords -&gt; text]
+  (let [keywords (map clojure.string/lower-case keywords)
+        first-kw (first keywords)])
+  [index-docs first-kw id] (by :test)
+  [:test/doc id text] (by-anyone)
+  (let [lc-text (clojure.string/lower-case text)])
+  (when (every? #(clojure.string/includes? lc-text %)
+                (rest keywords))))</code></pre></div><div><p><code>multi-keyword-search</code> is the name of the function to be created (similar to a rule function). <code>:test/multi-keyword-search</code> is the <em>predicate</em> to be associated with this clause. Unlike the function name which needs to be unique, the predicate can be shared across clauses. Users will eventually query predicates, not clauses. The vector <code>&#91;keywords&#93;</code> contains the input arguments to the predicate, and <code>&#91;text&#93;</code> is the vector of output arguments.  In either case you can have more than one argument. Following these headers are the body element of the clause.</p></div><div><p>The source-fact for a clause is a question of the form <code>:predicate-keyword?</code>.  For example:</p></div><div class="code"><pre><code class="clojure">(-&gt; multi-keyword-search meta :source-fact) =&gt; [:test/multi-keyword-search? 2]</code></pre></div><div><p>Here, <code>:test/multi-keyword-search?</code> is a <em>question</em>, a fact containing the input arguments, preceded by a <code>$unique$</code> parameter, which identifies a specific question (hence the arity <code>2</code>).</p></div><div><p>The <em>answer</em> is a derived fact of the form <code>:predicate-keyword!</code>:</p></div><div class="code"><pre><code class="clojure">(loop [rulefunc multi-keyword-search]
+ (or (-&gt; rulefunc meta :target-fact)
+     (recur (-&gt; rulefunc meta :continuation))))
+ =&gt; [:test/multi-keyword-search! 2]</code></pre></div><div><p>In this case, the answer's arity is also <code>2</code> &ndash; the unique identifier that matches the question and the output paramter.</p></div><div class="code"><pre><code class="clojure">(simulate-with multi-keyword-search :test
+                   [:test/multi-keyword-search? 1234 [&quot;hello&quot; &quot;world&quot;]]
+                   [:test/multi-keyword-search? 2345 [&quot;foo&quot; &quot;bar&quot;]]
+                   (f [::index-docs &quot;foo&quot; &quot;doc1&quot;] :writers #{:test})
+                   (f [::index-docs &quot;foo&quot; &quot;doc2&quot;] :writers #{:test})
+                   (f [::index-docs &quot;hello&quot; &quot;doc5&quot;] :writers #{:test})
+                   [:test/doc &quot;doc1&quot; &quot;Foo goes into a Bar...&quot;]
+                   [:test/doc &quot;doc2&quot; &quot;Foo goes into a Pub...&quot;]
+                   [:test/doc &quot;doc5&quot; &quot;World peace starts with a small Hello!&quot;])
+    =&gt; #{[1234 &quot;World peace starts with a small Hello!&quot;]
+         [2345 &quot;Foo goes into a Bar...&quot;]}</code></pre></div><div><p>Definition:</p></div><div class="code"><a id="source-of-icloudlog-core--defclause--i"></a><pre><code class="clojure">MISSING REFERENCE {:mode :source, :refer cloudlog.core/defclause}</code></pre></div><div><span id="f"></span><h2><b>3 &nbsp;&nbsp; f: A Convenience Function to Create Facts</b></h2></div><div><p>In the following we will use the <code>fact</code> function, which allows us to create facts.</p></div><div class="code"><pre><code class="clojure">(let [f (f [:test/follows &quot;alice&quot; &quot;bob&quot;] :writers #{[:user= &quot;alice&quot;]} :readers #{&quot;foobar&quot;})]
+ f =&gt; [:test/follows &quot;alice&quot; &quot;bob&quot;]
+ (meta f) =&gt; {:writers #{[:user= &quot;alice&quot;]} :readers #{&quot;foobar&quot;}})</code></pre></div><div><span id="simulate-with"></span><h2><b>4 &nbsp;&nbsp; simulate-with: Evaluate a Rule based on facts</b></h2></div><div><p>We believe in <a href='https://en.wikipedia.org/wiki/Test-driven_development'>TDD</a> as a "way of life" in the software world. The examples in this very document are tests that are written <em>before</em> the corresponding implementation. Regardless of whether we write the tests before or after the implementation, it is well agreed that automated tests are key to successful software projects.  App developers using Cloudlog should be no exception.</p><p>We therefore provide the <code>simulate-with</code> function, which allows rules to be tested independently of the system implementing Cloudlog, without having to load data to databases, launch clusters etc.</p></div><div><span id="simulate-with-0"></span><h3>4.1 &nbsp;&nbsp; simulate-with</h3></div><div><p>The <code>simulate-with</code> function accepts the following arguments:</p><ol><li>A single rule function to be simulated,</li><li>A group identifier to be placed as the <a href='#integrity'>writer-set</a> for derived facts coming out of this rule, and</li><li>Zero or more facts, making up the test environmnet for the simulation.It returns a set of tuples, representing the different values the rule gets given the facts.For example:</li></ol></div><div class="code"><pre><code class="clojure">(simulate-with timeline :test
+              [:test/follows &quot;alice&quot; &quot;bob&quot;]
+              [:test/follows &quot;alice&quot; &quot;charlie&quot;]
+              [:test/tweeted &quot;bob&quot; &quot;hello&quot;]
+              [:test/tweeted &quot;charlie&quot; &quot;hi&quot;]
+              [:test/tweeted &quot;david&quot; &quot;boo&quot;])
+ =&gt; #{[&quot;alice&quot; &quot;hello&quot;]
+    [&quot;alice&quot; &quot;hi&quot;]}</code></pre></div><div><p>Resulting tuples are given a writer-set containing the given group identifier.</p></div><div class="code"><pre><code class="clojure">(-&gt; (simulate-with timeline :test
+                  [:test/follows &quot;alice&quot; &quot;bob&quot;]
+                  [:test/tweeted &quot;bob&quot; &quot;hello&quot;])
+   first meta :writers) =&gt; #{:test}</code></pre></div><div><p>The simulation calculates the reader-set for the result. Generally, this is the <a href='interset.html#intersection'>intersection</a> of the reader sets of all participating facts.</p></div><div class="code"><pre><code class="clojure">(let [X #{:a :b}
+     Y #{:b :c}]
+ (-&gt; (simulate-with timeline :test
+                    (f [:test/follows &quot;alice&quot; &quot;bob&quot;] :readers X)
+                    (f [:test/tweeted &quot;bob&quot; &quot;hello&quot;] :readers Y))
+     first meta :readers) =&gt; (interset/intersection X Y))</code></pre></div><div><span id="under-the-hood"></span><h3>4.2 &nbsp;&nbsp; Under the Hood</h3></div><div><p><code>simulate-with</code> is merely a combination of two lower-level functions: <code>simulate&#42;</code> and <code>with&#42;</code>:</p></div><div><span id="with"></span><h3><i>4.2.1 &nbsp;&nbsp; with*</i></h3></div><div><p>The <code>with</code> is replaced with a call to the <code>with&#42;</code> function, which translates a <em>sequence of facts</em> to a map from fact names and arities to sets of value tuples.  For example:</p></div><div class="code"><pre><code class="clojure">(with* [[:test/follows &quot;alice&quot; &quot;bob&quot;]
+       [:test/tweeted &quot;bob&quot; &quot;hello&quot;]
+       [:test/follows &quot;bob&quot; &quot;charlie&quot;]])
+ =&gt; {[:test/follows 2] #{[&quot;alice&quot; &quot;bob&quot;]
+                       [&quot;bob&quot; &quot;charlie&quot;]}
+   [:test/tweeted 2] #{[&quot;bob&quot; &quot;hello&quot;]}}</code></pre></div><div><p><code>with&#42;</code> moves metadata placed on facts over to the tuples the fact is converted to.</p></div><div class="code"><pre><code class="clojure">(let [with-map (with* [(f [:test/baz 1 2 3] :foo &quot;bar&quot;)])]
+ (-&gt; (with-map [:test/baz 3]) first meta :foo) =&gt; &quot;bar&quot;)</code></pre></div><div><span id="simulate"></span><h3><i>4.2.2 &nbsp;&nbsp; simulate*</i></h3></div><div><p>This map is then given as a parameter to <code>simulate&#42;</code> &ndash; the function that the <code>simulate</code> macro evaluates to, along with the rule function to be simulated.</p><p>A simple rule is simulated by applying tuples from the set corresponding to the rule's source-fact, and then aggregating the results.</p></div><div class="code"><pre><code class="clojure">(simulate* foo-yx {[:test/foo 2] #{[1 2] [3 4]}} :test) =&gt; #{[2 1] [4 3]}</code></pre></div><div><p>In rules with joins, the continuations are followed.</p></div><div class="code"><pre><code class="clojure">(simulate* timeline (with* [[:test/follows &quot;alice&quot; &quot;bob&quot;]
+                           [:test/tweeted &quot;bob&quot; &quot;hello&quot;]]) :test)
+ =&gt; #{[&quot;alice&quot; &quot;hello&quot;]}</code></pre></div><div><span id="simulate-rules-with"></span><h2><b>5 &nbsp;&nbsp; simulate-rules-with: Perform a simulation Based on a Complete Namespace</b></h2></div><div><p><code>simulate-with</code> is useful for testing a single rule. However, sometimes we are interested in testing the integration of several rules together. <code>simulate-rules-with</code> is given a collection of rules (and possibly definitions that are not rules and are ignored), and a set of facts.  It extends this set of facts with derived facts that are produced by applying the rules.</p></div><div><p>For example, consider the <code>trending</code> rule defined (here)[#derived-facts]. This rule aggregates the timelines of certain <em>influencers</em> into a single <em>trending</em> timeline.</p></div><div class="code"><pre><code class="clojure">(let [derived (simulate-rules-with [timeline trending] :test
+                                  [:test/influencer &quot;alice&quot;]
+                                  [:test/follows &quot;alice&quot; &quot;bob&quot;]
+                                  [:test/tweeted &quot;bob&quot; &quot;hello&quot;])]
+ (derived [:cloudlog.core_test/trending 1]) =&gt; #{[&quot;hello&quot;]})</code></pre></div><div><p>We topologically-sort the rules so the order in which they appear in the call to <code>simulate-rules-with</code> does not matter.</p></div><div class="code"><pre><code class="clojure">(let [derived (simulate-rules-with [trending timeline] :test
+                                  [:test/influencer &quot;alice&quot;]
+                                  [:test/follows &quot;alice&quot; &quot;bob&quot;]
+                                  [:test/tweeted &quot;bob&quot; &quot;hello&quot;])]
+ (derived [:cloudlog.core_test/trending 1]) =&gt; #{[&quot;hello&quot;]})</code></pre></div><div><p>The second argument (writer group identifier) has the same meaning as in <code>simulate-with</code>.</p></div><div class="code"><pre><code class="clojure">(let [derived (simulate-rules-with [trending timeline] :test
+                                  [:test/influencer &quot;alice&quot;]
+                                  [:test/follows &quot;alice&quot; &quot;bob&quot;]
+                                  [:test/tweeted &quot;bob&quot; &quot;hello&quot;])]
+ (-&gt; (derived [:cloudlog.core_test/trending 1])
+     first
+     meta
+     :writers) =&gt; #{:test})</code></pre></div><div><p>The rule collection can include elements that are not rules, which are ignored.</p></div><div class="code"><pre><code class="clojure">(let [derived (simulate-rules-with [1 &quot;foo&quot; timeline inc] :test
+                                  [:test/follows &quot;alice&quot; &quot;bob&quot;]
+                                  [:test/tweeted &quot;bob&quot; &quot;hello&quot;])]
+ (derived [:cloudlog.core_test/timeline 2]) =&gt; #{[&quot;alice&quot; &quot;hello&quot;]})</code></pre></div><div><span id="under-the-hood-0"></span><h3>5.1 &nbsp;&nbsp; Under the Hood</h3></div><div><p>The key to what <code>simulate-rules-with</code> is doing is sorting the given rule functions topologically using <a href='graph.html#toposort'>graph/toposort</a>. This is done in the <code>sort-rules</code> function, which takes a collection of rules and sorts them by dependencies.</p></div><div class="code"><pre><code class="clojure">(sort-rules [trending timeline]) =&gt; [timeline trending]</code></pre></div><div><p>Sorting should be arbitrary in the case where two rules (or clauses) have the same target fact, as in the case of clauses sharing a predicate, as follows:</p></div><div class="code"><pre><code class="clojure">(defclause foo-1
+  [:test/foo a -&gt; b]
+  (let [b (inc a)]))
+
+(defclause foo-2
+  [:test/foo a -&gt; b]
+  (let [b (* a 2)]))</code></pre></div><div class="code"><pre><code class="clojure">(set (sort-rules [foo-1 foo-2])) =&gt; #{foo-1 foo-2}</code></pre></div><div><p>Many of the operations here are based on iterating on the continuations of a rule function. These are returned by the <code>rule-cont</code> function.</p></div><div><p>Typically, we are not going to use these functions directly, but rather <code>map</code> them to their meta properties:</p></div><div class="code"><pre><code class="clojure">(let [conts (rule-cont timeline)]
+ (map #(-&gt; % meta :source-fact) conts) =&gt; [[:test/follows 2] [:test/tweeted 2]])</code></pre></div><div><p>The function <code>rule-target-fact</code> returns the target fact of a rule.</p></div><div class="code"><pre><code class="clojure">(rule-target-fact timeline) =&gt; [:cloudlog.core_test/timeline 2]</code></pre></div><div><span id="run-query"></span><h2><b>6 &nbsp;&nbsp; run-query: Applies a Clause on the Facts</b></h2></div><div><p>Eventually, users query the state of the application through <a href='#defclause'>clauses</a>. <code>run-query</code> takes a collection of rule functions, a query, its output arity,  a writer identity (intended to be the identity of the application), a reader set (the identity of whom is making the query), and any number of facts.  It returs a set of tuples returned from this query.</p></div><div class="code"><pre><code class="clojure">(let [rules (map (fn [[k v]] @v) (ns-publics 'cloudlog.core_test))]
+ (run-query rules
+            (f [:test/multi-keyword-search [&quot;rant&quot; &quot;politics&quot;]]) 1 :test #{}
+            (f [:test/doc 100 &quot;This is a song about love.&quot;])
+            (f [:test/doc 200 &quot;This is a rant about politics.&quot;])
+            (f [:test/doc 200 &quot;This is a rant about love.&quot;])
+            (f [:test/doc 300 &quot;This is a doc about nothing.&quot;]))
+ =&gt; #{[&quot;This is a rant about politics.&quot;]})</code></pre></div><div><p>The query result will not include elements the user performing the query is not allowed to see.</p></div><div class="code"><pre><code class="clojure">(let [rules (map (fn [[k v]] @v) (ns-publics 'cloudlog.core_test))]
+ (run-query rules
+            (f [:test/multi-keyword-search [&quot;this&quot; &quot;sentence&quot;]]) 1 :test #{:me}
+            (f [:test/doc 100 &quot;This is a sentence&quot;] :readers interset/universe)
+            (f [:test/doc 200 &quot;This is another sentence&quot;] :readers #{:someone-else}))
+ =&gt; #{[&quot;This is a sentence&quot;]})</code></pre></div><div><p><code>run-query</code> aggregates the results coming from different clauses of the same prediate. For example, the following holds with the above definitions of <code>foo-1</code> and <code>foo-2</code>:</p></div><div class="code"><pre><code class="clojure">(run-query [foo-1 foo-2]
+          (f [:test/foo 2]) 1 :test #{})
+ =&gt; #{[3] [4]}</code></pre></div><div><span id="fact-table-get-a-fully-qualified-name-for-a-fact"></span><h2><b>7 &nbsp;&nbsp; fact-table: Get a Fully-Qualified Name for a Fact</b></h2></div><div><p>In an implementation of a Cloudlog engine it is necessary, given a <code>:source-fact</code> meta of a rule, to know which real-world resources (tables, queues etc) are associated with this fact.  Doing so consistently is important to get different references to the same fact to work against the same resources.</p><p>The function <code>fact-table</code> takes a <code>&#91;name arity&#93;</code> pair that is given as the <code>:source-fact</code> of a rule (or a continuation) and returns a string representing this fact.</p><p>For raw facts (represented by Clojure keywords, e.g., <code>:test/follows</code>), the returned string is simply the  fully qualified name of the keyword:</p></div><div class="code"><pre><code class="clojure">(-&gt; timeline meta :source-fact fact-table) =&gt; &quot;test/follows&quot;</code></pre></div><div><p>For a derived fact, represented as a name of a rule, the returned string is the  fully qualified name of the rule.</p></div><div class="code"><pre><code class="clojure">(-&gt; trending meta :continuation
+   meta :source-fact fact-table) =&gt; &quot;cloudlog.core_test/timeline&quot;</code></pre></div>
+        </div>
+      </div>
+    </div>
+
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+
+  </body>
+
+  <script>
+  if (false) {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', '<@=tracking>', 'caudate.me');
+    ga('send', 'pageview');
+  }
+  </script>
+  
+  <script type="text/javascript">
+    smoothScroll.init();
+    gumshoe.init({});
+  
+    hljs.registerLanguage("clojure",function(e){var t={"builtin-name":"def defonce cond apply if-not if-let if not not= = < > <= >= == + / * - rem quot neg? pos? delay? symbol? keyword? true? false? integer? empty? coll? list? set? ifn? fn? associative? sequential? sorted? counted? reversible? number? decimal? class? distinct? isa? float? rational? reduced? ratio? odd? even? char? seq? vector? string? map? nil? contains? zero? instance? not-every? not-any? libspec? -> ->> .. . inc compare do dotimes mapcat take remove take-while drop letfn drop-last take-last drop-while while intern condp case reduced cycle split-at split-with repeat replicate iterate range merge zipmap declare line-seq sort comparator sort-by dorun doall nthnext nthrest partition eval doseq await await-for let agent atom send send-off release-pending-sends add-watch mapv filterv remove-watch agent-error restart-agent set-error-handler error-handler set-error-mode! error-mode shutdown-agents quote var fn loop recur throw try monitor-enter monitor-exit defmacro defn defn- macroexpand macroexpand-1 for dosync and or when when-not when-let comp juxt partial sequence memoize constantly complement identity assert peek pop doto proxy defstruct first rest cons defprotocol cast coll deftype defrecord last butlast sigs reify second ffirst fnext nfirst nnext defmulti defmethod meta with-meta ns in-ns create-ns import refer keys select-keys vals key val rseq name namespace promise into transient persistent! conj! assoc! dissoc! pop! disj! use class type num float double short byte boolean bigint biginteger bigdec print-method print-dup throw-if printf format load compile get-in update-in pr pr-on newline flush read slurp read-line subvec with-open memfn time re-find re-groups rand-int rand mod locking assert-valid-fdecl alias resolve ref deref refset swap! reset! set-validator! compare-and-set! alter-meta! reset-meta! commute get-validator alter ref-set ref-history-count ref-min-history ref-max-history ensure sync io! new next conj set! to-array future future-call into-array aset gen-class reduce map filter find empty hash-map hash-set sorted-map sorted-map-by sorted-set sorted-set-by vec vector seq flatten reverse assoc dissoc list disj get union difference intersection extend extend-type extend-protocol int nth delay count concat chunk chunk-buffer chunk-append chunk-first chunk-rest max min dec unchecked-inc-int unchecked-inc unchecked-dec-inc unchecked-dec unchecked-negate unchecked-add-int unchecked-add unchecked-subtract-int unchecked-subtract chunk-next chunk-cons chunked-seq? prn vary-meta lazy-seq spread list* str find-keyword keyword symbol gensym force rationalize"},r="a-zA-Z_\\-!.?+*=<>&#'",n="["+r+"]["+r+"0-9/;:]*",a="[-+]?\\d+(\\.\\d+)?",o={b:n,r:0},s={cN:"number",b:a,r:0},i=e.inherit(e.QSM,{i:null}),c=e.C(";","$",{r:0}),d={cN:"literal",b:/\b(true|false|nil)\b/},l={b:"[\\[\\{]",e:"[\\]\\}]"},m={cN:"comment",b:"\\^"+n},p=e.C("\\^\\{","\\}"),u={cN:"symbol",b:"[:]{1,2}"+n},f={b:"\\(",e:"\\)"},h={eW:!0,r:0},y={k:t,l:n,cN:"name",b:n,starts:h},b=[f,i,m,p,c,u,l,s,d,o];return f.c=[e.C("comment",""),y,h],h.c=b,l.c=b,{aliases:["clj"],i:/\S/,c:[f,i,m,p,c,u,l,s,d]}});
+    hljs.initHighlightingOnLoad();
+  </script>
+</html>
