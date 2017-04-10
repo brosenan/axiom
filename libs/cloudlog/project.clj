@@ -11,22 +11,4 @@
                                   [im.chit/hara.string.prose "2.4.8"]
                                   [org.clojure/core.logic "0.8.11"]]
                    :plugins [[lein-midje "3.2.1"]
-                             [permacode/permacode "0.1.0-SNAPSHOT"]]}}
-  :publish {:theme  "bolton"
-            :template {:site   "cloudlog"
-                       :author "Boaz Rosenan"
-                       :email  "brosenan@gmail.com"
-                       :url "https://github.com/brosenan/cloudlog.clj"}
-            :output "docs"
-            :files {"core"
-                    {:input "test/cloudlog/core_test.clj"
-                     :title "core"
-                     :subtitle "Rule semantics"}
-                    "interset"
-                    {:input "test/cloudlog/interset_test.clj"
-                     :title "interset"
-                     :subtitle "Intersection Sets"}
-                    "graph"
-                    {:input "test/cloudlog/graph_test.clj"
-                     :title "graph"
-                     :subtitle "Graph Utilities"}}})
+                             [permacode/permacode "0.1.0-SNAPSHOT"]]}})

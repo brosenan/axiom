@@ -46,7 +46,7 @@ For example:"
      first meta :writers) => #{:test})
 
 "The simulation calculates the reader-set for the result.
-Generally, this is the [intersection](interset.html#intersection) of the reader sets of all participating facts."
+Generally, this is the [intersection](cloudlog.interset.html#intersection) of the reader sets of all participating facts."
 (fact
  (let [X #{:a :b}
        Y #{:b :c}]
@@ -135,7 +135,7 @@ does not matter."
    (derived [:cloudlog.core_test/timeline 2]) => #{["alice" "hello"]}))
 
 [[:section {:title "Under the Hood"}]]
-"The key to what `simulate-rules-with` is doing is sorting the given rule functions topologically using [graph/toposort](graph.html#toposort).
+"The key to what `simulate-rules-with` is doing is sorting the given rule functions topologically using [graph/toposort](cloudlog.graph.html#toposort).
 This is done in the `sort-rules` function, which takes a collection of rules and sorts them by dependencies."
 
 (fact

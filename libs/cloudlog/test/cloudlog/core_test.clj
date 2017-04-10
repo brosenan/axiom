@@ -223,11 +223,11 @@ of users identified as \"influencers\", we would probably write a rule of the fo
 ([Confidentiality, Integrity, Availability: The Three Components of the CIA Triad](http://security.blogoverflow.com/2012/08/confidentiality-integrity-availability-the-three-components-of-the-cia-triad/))
 
 Cloudlog takes a liberal approach to integrity.  Any user can publish any fact, as long as he or she is a member of the fact's *writers set*.
-We explain writer sets in [our discussion of events](events.html#writers), but for now we can just say the writer set is a piece of
+We explain writer sets in [our discussion of events](cloudlog-events.core.html#writers), but for now we can just say the writer set is a piece of
 information telling us to whom a certain fact is attributed to.
 Any user within the fact's writer set can, for example, delete it and replace it with another.
 
-When a rule is applied to a fact, it takes ownership over the result (see [events](events.html#writers)).
+When a rule is applied to a fact, it takes ownership over the result (see [events](cloudlog-events.core.html#writers)).
 This makes the rule responsible for the integrity of the result."
 
 "To allow rules to specify integrity requirements we introduce the `by` guard.
@@ -353,6 +353,6 @@ and the output paramter."
 "Definition:"
 [[:reference {:refer "cloudlog.core/defclause"}]]
 
-[[:file {:src "test/cloudlog/core_test_sim.clj"}]]
-[[:file {:src "test/cloudlog/core_test_facttable.clj"}]]
+[[:file {:src "libs/cloudlog/test/cloudlog/core_test_sim.clj"}]]
+[[:file {:src "libs/cloudlog/test/cloudlog/core_test_facttable.clj"}]]
 
