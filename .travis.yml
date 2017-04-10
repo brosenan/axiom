@@ -1,4 +1,13 @@
 language: clojure
-script: lein monolith each im
 lein: 2.7.1
+
+script:
+- lein monolith each im
+- ./deploy.sh
+
+env:
+	global:
+	- ENCRYPTION_LABEL: "6c4d59159164"
+	- COMMIT_AUTHOR_EMAIL: "brosenan@gmail.com"
+
 
