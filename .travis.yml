@@ -3,7 +3,7 @@ lein: 2.7.1
 
 script:
 - lein monolith each im
-- ./deploy.sh
+- bash ./deploy.sh
 
 env:
   global:
