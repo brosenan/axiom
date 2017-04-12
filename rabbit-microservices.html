@@ -70,7 +70,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#create-service"><h4>2 &nbsp; create-service: Initialization</h4></a></li><li><a class="chapter" data-scroll="" href="#shut-down-service"><h4>3 &nbsp; shut-down-service: Cleanup</h4></a></li><li><a class="chapter" data-scroll="" href="#register-func"><h4>4 &nbsp; register-func: Register an Event Handler</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#event-routing-key"><h5><i>5.1 &nbsp; event-routing-key</i></h5></a><a class="section" data-scroll="" href="#handle-event"><h5><i>5.2 &nbsp; handle-event</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#create-service"><h4>2 &nbsp; create-service: Initialization</h4></a></li><li><a class="chapter" data-scroll="" href="#shut-down-service"><h4>3 &nbsp; shut-down-service: Cleanup</h4></a></li><li><a class="chapter" data-scroll="" href="#register-func"><h4>4 &nbsp; register-func: Register an Event Handler</h4></a></li><li><a class="chapter" data-scroll="" href="#register-service"><h4>5 &nbsp; register-service: Register All Functions in a Module</h4></a></li><li><a class="chapter" data-scroll="" href="#publish-publish-an-event-from-the-outside"><h4>6 &nbsp; publish: Publish an Event from the Outside</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>7 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#event-routing-key"><h5><i>7.1 &nbsp; event-routing-key</i></h5></a><a class="section" data-scroll="" href="#handle-event"><h5><i>7.2 &nbsp; handle-event</i></h5></a></li><li><a class="chapter" data-scroll="" href="#integration-testing"><h4>8 &nbsp; Integration Testing</h4></a></li>
                 </ul>
               </nav>
             </div>
@@ -79,17 +79,20 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#create-service"><h4>2 &nbsp; create-service: Initialization</h4></a></li><li><a class="chapter" data-scroll="" href="#shut-down-service"><h4>3 &nbsp; shut-down-service: Cleanup</h4></a></li><li><a class="chapter" data-scroll="" href="#register-func"><h4>4 &nbsp; register-func: Register an Event Handler</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#event-routing-key"><h5><i>5.1 &nbsp; event-routing-key</i></h5></a><a class="section" data-scroll="" href="#handle-event"><h5><i>5.2 &nbsp; handle-event</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#create-service"><h4>2 &nbsp; create-service: Initialization</h4></a></li><li><a class="chapter" data-scroll="" href="#shut-down-service"><h4>3 &nbsp; shut-down-service: Cleanup</h4></a></li><li><a class="chapter" data-scroll="" href="#register-func"><h4>4 &nbsp; register-func: Register an Event Handler</h4></a></li><li><a class="chapter" data-scroll="" href="#register-service"><h4>5 &nbsp; register-service: Register All Functions in a Module</h4></a></li><li><a class="chapter" data-scroll="" href="#publish-publish-an-event-from-the-outside"><h4>6 &nbsp; publish: Publish an Event from the Outside</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>7 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#event-routing-key"><h5><i>7.1 &nbsp; event-routing-key</i></h5></a><a class="section" data-scroll="" href="#handle-event"><h5><i>7.2 &nbsp; handle-event</i></h5></a></li><li><a class="chapter" data-scroll="" href="#integration-testing"><h4>8 &nbsp; Integration Testing</h4></a></li>
                 </ul>
               </nav>
           </div>
-          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>rabbit-microservices</code> is a library that allows microservices to be defined as Clojure modules. A microservice is attached to a queue, and consists of functions that are applied in response to events on the queue. Functions are associated with AMQP topics according to meta fields provided for them. Each such function is given two arguments when invoked: The event on which it was invoked, and a <code>publish</code> function allowing it to publish events in response.</p></div><div><p>The event structure we refer to here is the one discussed in <a href='cloudlog-events.html'>cloudlog-events</a>.</p></div><div><span id="create-service"></span><h2><b>2 &nbsp;&nbsp; create-service: Initialization</b></h2></div><div><p><code>create-service</code> initializes a connection and a channel to RabbitMQ.</p></div><div class="code"><pre><code class="clojure">(create-service) =&gt; {:conn ..conn..
-                    :chan ..chan..}
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>rabbit-microservices</code> is a library that allows microservices to be defined as Clojure modules. A microservice is attached to a queue, and consists of functions that are applied in response to events on the queue. Functions are associated with AMQP topics according to meta fields provided for them. Each such function is given two arguments when invoked: The event on which it was invoked, and a <code>publish</code> function allowing it to publish events in response.</p></div><div><p>The event structure we refer to here is the one discussed in <a href='cloudlog-events.html'>cloudlog-events</a>.</p></div><div><span id="create-service"></span><h2><b>2 &nbsp;&nbsp; create-service: Initialization</b></h2></div><div><p><code>create-service</code> initializes a connection and a channel to RabbitMQ. It also declares the <code>facts</code> exchange, which is a topic-based AMQP exchange. The returned map contains the connection, the channel and an <code>:alive</code> atom, that defaults to <code>true</code>.</p></div><div class="code"><pre><code class="clojure">(let [srv (create-service)]
+ [(:conn srv) (:chan srv) @(:alive srv)]) =&gt; [..conn.. ..chan.. true]
  (provided
 (rmq/connect) =&gt; ..conn..
-(lch/open ..conn..) =&gt; ..chan..)</code></pre></div><div><p>The dynamic variable <code>langohr.core/&#42;default-config&#42;</code> controls the configuration.  See the <a href='http://clojurerabbitmq.info'>Langohr documentation</a> for more information.</p></div><div><span id="shut-down-service"></span><h2><b>3 &nbsp;&nbsp; shut-down-service: Cleanup</b></h2></div><div><p><code>shut-down-service</code> closes the channel and the connection to RabbitMQ.</p></div><div class="code"><pre><code class="clojure">(shut-down-service {:conn ..conn..
-                   :chan ..chan..}) =&gt; nil
+(lch/open ..conn..) =&gt; ..chan..
+(le/declare ..chan.. facts-exch &quot;topic&quot;) =&gt; irrelevant)</code></pre></div><div><p>The dynamic variable <code>langohr.core/&#42;default-config&#42;</code> controls the configuration.  See the <a href='http://clojurerabbitmq.info'>Langohr documentation</a> for more information.</p></div><div><span id="shut-down-service"></span><h2><b>3 &nbsp;&nbsp; shut-down-service: Cleanup</b></h2></div><div><p><code>shut-down-service</code> closes the channel and the connection to RabbitMQ. To indicate to publishers that the channel is close it <code>reset!</code>s the <code>:alive</code> atom to <code>false</code>.</p></div><div class="code"><pre><code class="clojure">(shut-down-service {:conn ..conn..
+                   :chan ..chan..
+                   :alive ..alive..}) =&gt; nil
  (provided
+(reset! ..alive.. false) =&gt; irrelevant
 (rmq/close ..chan..) =&gt; irrelevant
 (rmq/close ..conn..) =&gt; irrelevant)</code></pre></div><div><span id="register-func"></span><h2><b>4 &nbsp;&nbsp; register-func: Register an Event Handler</b></h2></div><div><p><code>register-func</code> takes a service and a variable that refers to a function, and serves the function as part of the service.</p></div><div><p>The function must have a meta parameter <code>:reg</code> consisting of a partial event map.</p></div><div class="code"><pre><code class="clojure">(defn  my-service
   {:reg {:kind :fact
@@ -108,7 +111,15 @@
  (provided
 (lq/declare-server-named ..chan..) =&gt; ..q..
 (lq/bind ..chan.. ..q.. facts-exch {:routing-key &quot;f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#&quot;}) =&gt; irrelevant
-(lc/subscribe ..chan.. ..q.. irrelevant {:auto-ack false}) =&gt; irrelevant)</code></pre></div><div><span id="under-the-hood"></span><h2><b>5 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="event-routing-key"></span><h3>5.1 &nbsp;&nbsp; event-routing-key</h3></div><div><p>The <code>event-routing-key</code> function returns a AMQP-conforming routing key for a given event map.</p></div><div class="code"><pre><code class="clojure">(event-routing-key {:kind :fact
+(lc/subscribe ..chan.. ..q.. irrelevant {:auto-ack false}) =&gt; irrelevant)</code></pre></div><div><span id="register-service"></span><h2><b>5 &nbsp;&nbsp; register-service: Register All Functions in a Module</b></h2></div><div><p><code>register-service</code> takes a service and a namespace, and registers to that service all the public functions in the namespace that have <code>:reg</code> meta field attached to them.</p></div><div class="code"><pre><code class="clojure">(register-service ..srv.. ..ns..) =&gt; nil
+ (provided
+(ns-publics ..ns..) =&gt; {'my-service #'my-service
+                        'map #'map} ; A function that does not have :reg meta
+(register-func ..srv.. #'my-service) =&gt; nil)</code></pre></div><div><span id="publish-publish-an-event-from-the-outside"></span><h2><b>6 &nbsp;&nbsp; publish: Publish an Event from the Outside</b></h2></div><div><p>The second parameter of a service function is bound to a <code>publish</code> function, allowing services to publish events. However, we sometime need to publish events outside the context of a service (i.e., not in response to an incoming event). The (global) <code>publish</code> function does that. The only difference between the two functions is that the global <code>publish</code> receives the <code>service</code> as its first parameter.</p></div><div class="code"><pre><code class="clojure">(publish {:chan ..chan..} ..ev..) =&gt; nil
+ (provided
+(nippy/freeze ..ev..) =&gt; ..bin..
+(event-routing-key ..ev..) =&gt; ..routing-key..
+(lb/publish ..chan.. facts-exch ..routing-key.. ..bin.. {}) =&gt; irrelevant)</code></pre></div><div><span id="under-the-hood"></span><h2><b>7 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="event-routing-key"></span><h3>7.1 &nbsp;&nbsp; event-routing-key</h3></div><div><p>The <code>event-routing-key</code> function returns a AMQP-conforming routing key for a given event map.</p></div><div class="code"><pre><code class="clojure">(event-routing-key {:kind :fact
                    :name &quot;foo/bar&quot;
                    :key 1234
                    :ts 1000
@@ -154,7 +165,8 @@
                              :change -1
                              :writers #{:me}
                              :readers #{:you}}) base) =&gt; false)</code></pre></div><div><p><code>event-routing-key</code> can handle partial events. If <code>:name</code> is omitted, a pattern that matches all facts is returned.</p></div><div class="code"><pre><code class="clojure">(event-routing-key {:kind :fact}) =&gt; &quot;f.#&quot;</code></pre></div><div><p>If <code>:name</code> is provided, but <code>:key</code> is omitted, a pattern matching all keys with that name is returned.</p></div><div class="code"><pre><code class="clojure">(event-routing-key {:kind :fact
-                   :name &quot;foo/bar&quot;}) =&gt; #&quot;f&#92;.[0-9a-f]+&#92;.#&quot;</code></pre></div><div><span id="handle-event"></span><h3>5.2 &nbsp;&nbsp; handle-event</h3></div><div><p><code>handle-event</code> takes a function to be called when an event arrives along with arguments provided by a subscription to a queue, so that the function <code>&#40;partial handle-event some-func&#41;</code> can be used with <code>lc/subscribe</code>.</p></div><div><p>The wrapped function can take one, two, or three parameters. If it takes one parameter, we pass this parameter a de-serialization of the event.</p></div><div class="code"><pre><code class="clojure">(def received (atom '()))
+                   :name &quot;foo/bar&quot;}) =&gt; #&quot;f&#92;.[0-9a-f]+&#92;.#&quot;</code></pre></div><div><span id="handle-event"></span><h3>7.2 &nbsp;&nbsp; handle-event</h3></div><div><p><code>handle-event</code> takes a function to be called when an event arrives and the <code>:alive</code> atom for the service  along with arguments provided by a subscription to a queue,  so that the function <code>&#40;partial handle-event some-func alive&#41;</code> can be used with <code>lc/subscribe</code>.</p></div><div><p>The wrapped function can take one, two, or three parameters. If it takes one parameter, we pass this parameter a de-serialization of the event.</p></div><div class="code"><pre><code class="clojure">(def alive (atom true))
+ (def received (atom '()))
  (defn my-func
  {:reg {:kind :fact
         :name &quot;foo/bar&quot;}}
@@ -170,7 +182,7 @@
               :readers #{}})
  (def my-event-bin (nippy/freeze my-event))
  ; By running handle-event...
- (handle-event #'my-func :the-channel {:delivery-tag 777} my-event-bin) =&gt; nil
+ (handle-event #'my-func alive :the-channel {:delivery-tag 777} my-event-bin) =&gt; nil
  ; we execute my-func, which adds the event to received
  @received =&gt; [my-event]</code></pre></div><div><p>If the wrapped function accepts two parameters, the second parameter is taken to be a <code>publish</code> function, which publishes events on the facts exchange.</p></div><div class="code"><pre><code class="clojure">(def event2 {:kind :fact
             :name &quot;foo/baz&quot;
@@ -182,16 +194,62 @@
         :name &quot;foo/bar&quot;}}
  [ev publish]
  (publish event2))
- (handle-event #'my-func :the-channel :meta-attrs my-event-bin) =&gt; nil
+ (handle-event #'my-func alive :the-channel :meta-attrs my-event-bin) =&gt; nil
  (provided
-(lb/publish :the-channel facts-exch (event-routing-key event2) irrelevant :meta-attrs) =&gt; irrelevant)</code></pre></div><div><p>If the wrapped function accepts three parameters, the third parameter is taken to be an <code>ack</code> function, that explicitly acknowledges the received event.</p></div><div class="code"><pre><code class="clojure">(defn my-func
+(lb/publish :the-channel facts-exch (event-routing-key event2) irrelevant :meta-attrs) =&gt; irrelevant)</code></pre></div><div><p>When the <code>alive</code> atom evaluates to <code>false</code>, the publish function does nothing.</p></div><div class="code"><pre><code class="clojure">(reset! alive false)
+ (handle-event #'my-func alive :the-channel :meta-attrs my-event-bin) =&gt; nil
+ ; Nothing is published</code></pre></div><div><p>If the wrapped function accepts three parameters, the third parameter is taken to be an <code>ack</code> function, that explicitly acknowledges the received event.</p></div><div class="code"><pre><code class="clojure">(defn my-func
  {:reg {:kind :fact
         :name &quot;foo/bar&quot;}}
  [ev publish ack]
  (ack))
- (handle-event #'my-func :the-channel {:delivery-tag &quot;foo&quot;} my-event-bin) =&gt; nil
+ (handle-event #'my-func alive :the-channel {:delivery-tag &quot;foo&quot;} my-event-bin) =&gt; nil
  (provided
-(lb/ack :the-channel &quot;foo&quot;) =&gt; irrelevant)</code></pre></div>
+(lb/ack :the-channel &quot;foo&quot;) =&gt; irrelevant)</code></pre></div><div><span id="integration-testing"></span><h2><b>8 &nbsp;&nbsp; Integration Testing</b></h2></div><div><p>To demonstrate how the above functions work together we build a small usage example. In our example we have the following service functions:</p><ol><li>Function <code>sum-foo</code> that sums the values in the data of events of name "foo" and emits events named "foo-sum".</li><li>Function <code>count-ev</code> that counts the events of the different names and emits events of type "count" (it does not count "count" events).</li><li>Function <code>foo-from-count</code> that listens on "count" events and emits corresponding "foo" events with the same value.</li></ol></div><div class="code"><pre><code class="clojure">(def foo-sum (atom 0))
+(defn sum-foo
+  {:reg {:kind :fact
+         :name &quot;foo&quot;}}
+  [ev pub]
+  (swap! foo-sum (partial + (:data ev)))
+  (pub {:kind :fact
+        :name &quot;foo-sum&quot;
+        :key 0
+        :data @foo-sum}))
+
+(def ev-count (atom {}))
+(defn count-ev
+  {:reg {:kind :fact}}
+  [ev pub]
+  (let [key (:name ev)]
+    (swap! ev-count (fn [m]
+                      (let [old (or (m key) 0)
+                            new (inc old)]
+                        (assoc m key new))))
+    (pub {:kind :fact
+          :name &quot;count&quot;
+          :key key
+          :data (@ev-count key)})))
+
+
+(defn foo-from-count
+  {:reg {:kind :fact
+         :name &quot;count&quot;}}
+  [ev pub]
+  (pub {:kind :fact
+        :name &quot;foo&quot;
+        :key (:key ev)
+        :data (:data ev)}))</code></pre></div><div><p>We create a service based on this module.</p></div><div class="code"><pre><code class="clojure">:integ ; Integration test.  Does not run during continouts integration
+    (def service (create-service))
+    (register-service service 'rabbit-microservices.core-test)</code></pre></div><div><p>Now our service is ready to roll.<br /> All we need is to get the fire started is a little match &ndash; a single event.</p></div><div class="code"><pre><code class="clojure">:integ ; Integration test.  Does not run during continouts integration
+    (publish service {:kind :fact
+                      :name &quot;foo&quot;
+                      :key 0
+                      :data 1})
+    (println &quot;waiting for the sum to reach ten-milion&quot;)
+    (while (&lt; @foo-sum 10000000)
+      (Thread/sleep 100))
+    (println &quot;done!&quot;)
+    (shut-down-service service)</code></pre></div>
         </div>
       </div>
     </div>

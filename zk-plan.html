@@ -274,7 +274,7 @@
       (.start thread))
     threads))</code></pre></div><div><p>To stop all threads we simply <code>.join</code> them</p></div><div class="code"><pre><code class="clojure">(defn join-stress-workers [threads]
   (doseq [thread threads]
-    (.stop thread)))</code></pre></div><div><p>Puttint this all together:</p><ul><li>Connect to an actual Zookeeper</li><li>Clear the parent: <code>/stress</code> if exists</li><li>(Re) Create the parent</li><li>Start the workers</li><li>Create the plan</li><li>Wait until the plan is complete</li><li>Stop the workers</li></ul><p>(uncomment the block below to make it run)</p></div><div class="code"><pre><code class="clojure">:integ
+    (.stop thread)))</code></pre></div><div><p>Puttint this all together:</p><ul><li>Connect to an actual Zookeeper</li><li>Clear the parent: <code>/stress</code> if exists</li><li>(Re) Create the parent</li><li>Start the workers</li><li>Create the plan</li><li>Wait until the plan is complete</li><li>Stop the workers</li></ul></div><div class="code"><pre><code class="clojure">:integ ; This is an integration test
  (let [zk (zk/connect &quot;127.0.0.1:2181&quot;)
      parent &quot;/stress&quot;]
  (zk/delete-all zk &quot;/stress&quot;)
