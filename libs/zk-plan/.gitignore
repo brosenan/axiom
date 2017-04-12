@@ -1,0 +1,6 @@
+target
+*~
+.lein-repl-history
+.nrepl-*
+docs/
+.#*

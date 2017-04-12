@@ -1,0 +1,8 @@
+language: clojure
+script:
+  - lein midje
+sudo: false
+env:
+  global:
+  - ENCRYPTION_LABEL: "b5532630490b"
+  - COMMIT_AUTHOR_EMAIL: "brosenan@gmail.com"

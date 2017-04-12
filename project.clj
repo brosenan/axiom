@@ -22,7 +22,7 @@
                     {:input "libs/cloudlog/test/index.clj"
                      :title "Axiom"
                      :subtitle "An Application Platform"}
-                    "cloudlog.core"
+                    "cloudlog"
                     {:input "libs/cloudlog/test/cloudlog/core_test.clj"
                      :title "cloudlog.core"
                      :subtitle "Rule semantics"}
@@ -34,7 +34,11 @@
                     {:input "libs/cloudlog/test/cloudlog/graph_test.clj"
                      :title "cloudlog.graph"
                      :subtitle "Graph Utilities"}
-                    "cloudlog-events.core"
+                    "cloudlog-events"
                     {:input "libs/cloudlog-events/test/cloudlog_events/core_test.clj"
                      :title "cloudlog-events.core"
-                     :subtitle "Event Processing"}}})
+                     :subtitle "Event Processing"}
+                    "zk-plan"
+                    {:input "libs/zk_plan/test/zk_plan/core_test.clj"
+                     :title "zk-plan.core"
+                     :subtitle "A batch processing framework"}}})
