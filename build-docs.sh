@@ -1,3 +1,3 @@
 #!/bin/sh
 
-echo "(use 'lucid.publish) (copy-assets) (publish-all)" | lein repl
+echo "(use 'lucid.publish) (load-settings) (copy-assets) (publish-all)" | lein repl
