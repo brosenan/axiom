@@ -41,4 +41,8 @@
                     "rabbit-microservices"
                     {:input "libs/rabbit-microservices/test/rabbit_microservices/core_test.clj"
                      :title "rabbit-microservices.core"
-                     :subtitle "A Microservices Framwork Based on RabbitMQ"}}})
+                     :subtitle "A Microservices Framwork Based on RabbitMQ"}
+                    "dynamo.srv"
+                    {:input "libs/dynamo/test/dynamo/srv_test.clj"
+                     :title "dynamo.srv"
+                     :subtitle "A microservice for Updating DynamoDB Tables"}}})
