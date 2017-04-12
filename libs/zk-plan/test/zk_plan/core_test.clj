@@ -528,10 +528,8 @@ In case of an exception thrown from the worker, we report it, but move on to cal
 - Start the workers
 - Create the plan
 - Wait until the plan is complete
-- Stop the workers
-
-(uncomment the block below to make it run)"
-(fact :integ
+- Stop the workers"
+(fact :integ ; This is an integration test
  (let [zk (zk/connect "127.0.0.1:2181")
        parent "/stress"]
    (zk/delete-all zk "/stress")
