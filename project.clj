@@ -37,4 +37,8 @@
                     "zk-plan"
                     {:input "libs/zk-plan/test/zk_plan/core_test.clj"
                      :title "zk-plan.core"
-                     :subtitle "A batch processing framework"}}})
+                     :subtitle "A batch processing framework"}
+                    "rabbit-microservices"
+                    {:input "libs/rabbit-microservices/test/rabbit_microservices/core_test.clj"
+                     :title "rabbit-microservices.core"
+                     :subtitle "A Microservices Framwork Based on RabbitMQ"}}})
