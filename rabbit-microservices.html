@@ -70,7 +70,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#create-service"><h4>2 &nbsp; create-service: Initialization</h4></a></li><li><a class="chapter" data-scroll="" href="#shut-down-service"><h4>3 &nbsp; shut-down-service: Cleanup</h4></a></li><li><a class="chapter" data-scroll="" href="#register-func"><h4>4 &nbsp; register-func: Register an Event Handler</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#create-service"><h4>2 &nbsp; create-service: Initialization</h4></a></li><li><a class="chapter" data-scroll="" href="#shut-down-service"><h4>3 &nbsp; shut-down-service: Cleanup</h4></a></li><li><a class="chapter" data-scroll="" href="#register-func"><h4>4 &nbsp; register-func: Register an Event Handler</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#event-routing-key"><h5><i>5.1 &nbsp; event-routing-key</i></h5></a></li>
                 </ul>
               </nav>
             </div>
@@ -79,11 +79,11 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#create-service"><h4>2 &nbsp; create-service: Initialization</h4></a></li><li><a class="chapter" data-scroll="" href="#shut-down-service"><h4>3 &nbsp; shut-down-service: Cleanup</h4></a></li><li><a class="chapter" data-scroll="" href="#register-func"><h4>4 &nbsp; register-func: Register an Event Handler</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#create-service"><h4>2 &nbsp; create-service: Initialization</h4></a></li><li><a class="chapter" data-scroll="" href="#shut-down-service"><h4>3 &nbsp; shut-down-service: Cleanup</h4></a></li><li><a class="chapter" data-scroll="" href="#register-func"><h4>4 &nbsp; register-func: Register an Event Handler</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#event-routing-key"><h5><i>5.1 &nbsp; event-routing-key</i></h5></a></li>
                 </ul>
               </nav>
           </div>
-          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>rabbit-microservices</code> is a library that allows microservices to be defined as Clojure modules. A microservice is attached to a queue, and consists of functions that are applied in response to events on the queue. Functions are associated with AMQP topics according to meta fields provided for them. Each such function is given two arguments when invoked: The event on which it was invoked, and a <code>publish</code> function allowing it to publish events in response.</p></div><div><span id="create-service"></span><h2><b>2 &nbsp;&nbsp; create-service: Initialization</b></h2></div><div><p><code>create-service</code> initializes a connection and a channel to RabbitMQ.<br /> It also declares a server-named queue to be associated with the service.</p></div><div class="code"><pre><code class="clojure">(create-service) =&gt; {:conn ..conn..
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>rabbit-microservices</code> is a library that allows microservices to be defined as Clojure modules. A microservice is attached to a queue, and consists of functions that are applied in response to events on the queue. Functions are associated with AMQP topics according to meta fields provided for them. Each such function is given two arguments when invoked: The event on which it was invoked, and a <code>publish</code> function allowing it to publish events in response.</p></div><div><p>The event structure we refer to here is the one discussed in <a href='cloudlog-events.html'>cloudlog-events</a>.</p></div><div><span id="create-service"></span><h2><b>2 &nbsp;&nbsp; create-service: Initialization</b></h2></div><div><p><code>create-service</code> initializes a connection and a channel to RabbitMQ.<br /> It also declares a server-named queue to be associated with the service.</p></div><div class="code"><pre><code class="clojure">(create-service) =&gt; {:conn ..conn..
                     :chan ..chan..
                     :q ..qname..}
  (provided
@@ -93,7 +93,53 @@
                    :chan ..chan..}) =&gt; nil
  (provided
 (rmq/close ..chan..) =&gt; irrelevant
-(rmq/close ..conn..) =&gt; irrelevant)</code></pre></div><div><span id="register-func"></span><h2><b>4 &nbsp;&nbsp; register-func: Register an Event Handler</b></h2></div><div><p><code>register-func</code> </p></div>
+(rmq/close ..conn..) =&gt; irrelevant)</code></pre></div><div><span id="register-func"></span><h2><b>4 &nbsp;&nbsp; register-func: Register an Event Handler</b></h2></div><div><p><code>register-func</code> </p></div><div><span id="under-the-hood"></span><h2><b>5 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="event-routing-key"></span><h3>5.1 &nbsp;&nbsp; event-routing-key</h3></div><div><p>The <code>event-routing-key</code> function returns a AMQP-conforming routing key for a given event map.</p></div><div class="code"><pre><code class="clojure">(event-routing-key {:kind :fact
+                   :name &quot;foo/bar&quot;
+                   :key 1234
+                   :ts 1000
+                   :data [&quot;foo&quot; :bar]
+                   :change 1
+                   :writers #{}
+                   :readers #{}}) =&gt; #&quot;f&#92;.[a-z0-9]+&#92;.[a-z0-9]+&quot;</code></pre></div><div><p>The initial <code>f</code> is derived from <code>:kind :fact</code>.  For <code>:kind :rule</code> an exception is thrown.</p></div><div class="code"><pre><code class="clojure">(event-routing-key {:kind :rule
+                   :name &quot;foo/bar&quot;
+                   :key 1234
+                   :ts 1000
+                   :data [&quot;foo&quot; :bar]
+                   :change 1
+                   :writers #{}
+                   :readers #{}}) =&gt; (throws &quot;Only fact events are supported&quot;)</code></pre></div><div><p>The ony fields that effect the routing key are <code>kind</code>, <code>name</code> and <code>key</code>.</p></div><div class="code"><pre><code class="clojure">(let [base  (event-routing-key {:kind :fact
+                                    :name &quot;foo/bar&quot;
+                                    :key 1234
+                                    :ts 1000
+                                    :data [&quot;foo&quot; :bar]
+                                    :change 1
+                                    :writers #{}
+                                    :readers #{}})]
+      (= (event-routing-key {:kind :fact
+                             :name &quot;foo/bar&quot;
+                             :key 1234
+                             :ts 1001
+                             :data [&quot;fool&quot; :baz]
+                             :change -1
+                             :writers #{:me}
+                             :readers #{:you}}) base) =&gt; true
+      (= (event-routing-key {:kind :fact
+                             :name &quot;foo/baz&quot; ; Different name
+                             :key 1234
+                             :ts 1001
+                             :data [&quot;fool&quot; :baz]
+                             :change -1
+                             :writers #{:me}
+                             :readers #{:you}}) base) =&gt; false
+      (= (event-routing-key {:kind :fact
+                             :name &quot;foo/bar&quot;
+                             :key [:foo :bar] ; Different key
+                             :ts 1001
+                             :data [&quot;fool&quot; :baz]
+                             :change -1
+                             :writers #{:me}
+                             :readers #{:you}}) base) =&gt; false)</code></pre></div><div><p><code>event-routing-key</code> can handle partial events. If <code>:name</code> is omitted, a pattern that matches all facts is returned.</p></div><div class="code"><pre><code class="clojure">(event-routing-key {:kind :fact}) =&gt; &quot;f.#&quot;</code></pre></div><div><p>If <code>:name</code> is provided, but <code>:key</code> is omitted, a pattern matching all keys with that name is returned.</p></div><div class="code"><pre><code class="clojure">(event-routing-key {:kind :fact
+                   :name &quot;foo/bar&quot;}) =&gt; #&quot;f&#92;.[0-9a-f]+&#92;.#&quot;</code></pre></div>
         </div>
       </div>
     </div>
