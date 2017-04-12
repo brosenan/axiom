@@ -531,19 +531,19 @@ In case of an exception thrown from the worker, we report it, but move on to cal
 - Stop the workers
 
 (uncomment the block below to make it run)"
-(comment (fact
-          (let [zk (zk/connect "127.0.0.1:2181")
-                parent "/stress"]
-            (zk/delete-all zk "/stress")
-            (zk/create zk parent :persistent? true)
-            (let [threads (start-stress-workers zk parent)
-                  plan (build-stress-plan zk parent)]
-              (loop []
-                (when-not (plan-completed? zk plan)
-                  (Thread/sleep 100)
-                  (recur)))
-              (doseq [m (range M)]
-                (when-not (contains? @workers-completed m)
-                  (println "Task " m " was not completed")))
-              (join-stress-workers threads)))))
+(fact :integ
+ (let [zk (zk/connect "127.0.0.1:2181")
+       parent "/stress"]
+   (zk/delete-all zk "/stress")
+   (zk/create zk parent :persistent? true)
+   (let [threads (start-stress-workers zk parent)
+         plan (build-stress-plan zk parent)]
+     (loop []
+       (when-not (plan-completed? zk plan)
+         (Thread/sleep 100)
+         (recur)))
+     (doseq [m (range M)]
+       (when-not (contains? @workers-completed m)
+         (println "Task " m " was not completed")))
+     (join-stress-workers threads))))
          
