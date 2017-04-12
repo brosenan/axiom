@@ -61,7 +61,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 12 April 2017</h5>
+              <h5>Date: 13 April 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/cloudlog.clj">https://github.com/brosenan/cloudlog.clj</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -87,16 +87,37 @@
  (provided
 (reset! ddb-config ..config..) =&gt; irrelevant
 (far/list-tables ..config..) =&gt; [&quot;foo&quot; &quot;bar&quot;])
- @curr-tables =&gt; #{&quot;foo&quot; &quot;bar&quot;}</code></pre></div><div><p>For the purpose of the following tests we will assign <code>ddb-config</code> the mock value <code>:config</code>.</p></div><div class="code"><pre><code class="clojure">(reset! ddb-config :config)</code></pre></div><div><span id="store-fact"></span><h2><b>3 &nbsp;&nbsp; store-fact</b></h2></div><div><p><code>store-fact</code> is a microservice function that subscribes to all fact events.</p></div><div class="code"><pre><code class="clojure">(-&gt; #'store-fact meta :reg) =&gt; {:kind :fact}</code></pre></div><div><p><code>store-fact</code> responds to events by storing them in DynamoDB.</p></div><div class="code"><pre><code class="clojure">(store-fact {:kind :fact
+ @curr-tables =&gt; #{&quot;foo&quot; &quot;bar&quot;}</code></pre></div><div><p>For the purpose of the following tests we will assign <code>ddb-config</code> the mock value <code>:config</code>.</p></div><div class="code"><pre><code class="clojure">(reset! ddb-config :config)</code></pre></div><div><p>We will assume the tables "foo" and "bar" exist, and others do not.</p></div><div class="code"><pre><code class="clojure">(reset! curr-tables #{&quot;foo&quot; &quot;bar&quot;})</code></pre></div><div><span id="store-fact"></span><h2><b>3 &nbsp;&nbsp; store-fact</b></h2></div><div><p><code>store-fact</code> is a microservice function that subscribes to all fact events.</p></div><div class="code"><pre><code class="clojure">(-&gt; #'store-fact meta :reg) =&gt; {:kind :fact}</code></pre></div><div><p><code>store-fact</code> responds to events by storing them in DynamoDB.</p></div><div class="code"><pre><code class="clojure">(def my-event {:kind :fact
             :name &quot;foo&quot;
             :key 1234
             :data [1 2 3 4]
             :ts 1000
             :change 1
             :writers #{}
-            :readers #{}}) =&gt; nil
+            :readers #{}})
+ (store-fact my-event) =&gt; nil
  (provided
-)</code></pre></div>
+(nippy/freeze {:data [1 2 3 4]
+               :ts 1000
+               :change 1
+               :writers #{}
+               :readers #{}}) =&gt; ..bin..
+(far/put-item :config &quot;foo&quot; {:key &quot;1234&quot;
+                             :ts 1000
+                             :event ..bin..}) =&gt; irrelevant)</code></pre></div><div><p>If the table does not exist, it is created.</p></div><div class="code"><pre><code class="clojure">(def my-event2 (assoc my-event :name &quot;baz&quot;))
+ (store-fact my-event2) =&gt; nil
+ (provided
+(nippy/freeze {:data [1 2 3 4]
+               :ts 1000
+               :change 1
+               :writers #{}
+               :readers #{}}) =&gt; ..bin..
+(far/ensure-table :config &quot;baz&quot; [:key :s]
+                  :range-keydef [:ts :n]
+                  :throughput default-throughput) =&gt; irrelevant
+(far/put-item :config &quot;baz&quot; {:key &quot;1234&quot;
+                             :ts 1000
+                             :event ..bin..}) =&gt; irrelevant)</code></pre></div><div><p>The new table is then added to the set.</p></div><div class="code"><pre><code class="clojure">@curr-tables =&gt; #{&quot;foo&quot; &quot;bar&quot; &quot;baz&quot;}</code></pre></div>
         </div>
       </div>
     </div>
