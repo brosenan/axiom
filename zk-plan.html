@@ -1,0 +1,318 @@
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+
+  <!-- Enable responsiveness on mobile devices-->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <link rel="shortcut icon" href="favicon.ico">
+  <title>axiom.zk-plan.core - A batch processing framework</title>
+  <script src="js/highlight.min.js"></script>
+  <script src="js/gumshoe.min.js"></script>
+  <script src="js/smooth-scroll.min.js"></script>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/poole.css">
+  <link rel="stylesheet" href="css/syntax.css">
+  <link rel="stylesheet" href="css/lanyon.css">
+  <link rel="stylesheet" href="css/bolton.css">
+  <link rel="stylesheet" href="css/bolton-api.css">
+  <link rel="stylesheet" href="css/bolton-highlight.css">
+  <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=PT+Serif:400,400italic,700|PT+Sans:400">
+  
+</head>
+
+  <body class="theme-base-08">
+    <span id="page-top"></span>
+
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+     styles, `#sidebar-checkbox` for behavior. -->
+<input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox">
+
+<!-- Toggleable sidebar -->
+<div class="sidebar" id="sidebar">
+  <nav class="sidebar-nav">
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item active" href="zk-plan.html">zk-plan.core</a>
+    <span class="sidebar-nav-item">&nbsp;</span>
+    <span class="sidebar-nav-item">&nbsp;</span>
+  </nav>
+</div>
+
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          <h3 class="masthead-title">
+            <span>axiom.zk-plan.core</span>
+            <small>A batch processing framework</small>
+          </h3>
+        </div>
+      </div>
+
+      <div class="container content">
+        <div class="page">
+          <div class="heading">
+            <div>
+              <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
+              <h5>Date: 12 April 2017</h5>
+              <h5>Repository: <a href="https://github.com/brosenan/cloudlog.clj">https://github.com/brosenan/cloudlog.clj</a></h5>
+              <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
+          <hr/>
+          <div class="outline">
+            <div class="toc">
+              <nav data-gumshoe-header>
+                <ul data-gumshoe>
+                  <a data-scroll class="top" href="#page-top">TOP</a>
+                  <li><a class="chapter" data-scroll="" href="#external-api"><h4>1 &nbsp; External API</h4></a><a class="section" data-scroll="" href="#create-plan"><h5><i>1.1 &nbsp; create-plan</i></h5></a><a class="section" data-scroll="" href="#add-task"><h5><i>1.2 &nbsp; add-task</i></h5></a><a class="section" data-scroll="" href="#mark-as-ready"><h5><i>1.3 &nbsp; mark-as-ready</i></h5></a><a class="section" data-scroll="" href="#worker"><h5><i>1.4 &nbsp; worker</i></h5></a><a class="section" data-scroll="" href="#plan-completed"><h5><i>1.5 &nbsp; plan-completed?</i></h5></a></li><li><a class="chapter" data-scroll="" href="#internal-implementation"><h4>2 &nbsp; Internal Implementation</h4></a><a class="section" data-scroll="" href="#get-task"><h5><i>2.1 &nbsp; get-task</i></h5></a><a class="section" data-scroll="" href="#perform-task"><h5><i>2.2 &nbsp; perform-task</i></h5></a><a class="section" data-scroll="" href="#set-initial-clj-data"><h5><i>2.3 &nbsp; set-initial-clj-data</i></h5></a><a class="section" data-scroll="" href="#add-dependency"><h5><i>2.4 &nbsp; add-dependency</i></h5></a><a class="section" data-scroll="" href="#take-ownership"><h5><i>2.5 &nbsp; take-ownership</i></h5></a><a class="section" data-scroll="" href="#execute-function"><h5><i>2.6 &nbsp; execute-function</i></h5></a><a class="section" data-scroll="" href="#propagate-result"><h5><i>2.7 &nbsp; propagate-result</i></h5></a><a class="section" data-scroll="" href="#get-task-from-any-plan"><h5><i>2.8 &nbsp; get-task-from-any-plan</i></h5></a><a class="section" data-scroll="" href="#calc-sleep-time"><h5><i>2.9 &nbsp; calc-sleep-time</i></h5></a></li><li><a class="chapter" data-scroll="" href="#integration-testing"><h4>3 &nbsp; Integration Testing</h4></a><a class="section" data-scroll="" href="#stress-test"><h5><i>3.1 &nbsp; Stress Test</i></h5></a></li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+
+          <div class="toc">
+              <nav>
+                <ul>
+                  <li><a class="chapter" data-scroll="" href="#external-api"><h4>1 &nbsp; External API</h4></a><a class="section" data-scroll="" href="#create-plan"><h5><i>1.1 &nbsp; create-plan</i></h5></a><a class="section" data-scroll="" href="#add-task"><h5><i>1.2 &nbsp; add-task</i></h5></a><a class="section" data-scroll="" href="#mark-as-ready"><h5><i>1.3 &nbsp; mark-as-ready</i></h5></a><a class="section" data-scroll="" href="#worker"><h5><i>1.4 &nbsp; worker</i></h5></a><a class="section" data-scroll="" href="#plan-completed"><h5><i>1.5 &nbsp; plan-completed?</i></h5></a></li><li><a class="chapter" data-scroll="" href="#internal-implementation"><h4>2 &nbsp; Internal Implementation</h4></a><a class="section" data-scroll="" href="#get-task"><h5><i>2.1 &nbsp; get-task</i></h5></a><a class="section" data-scroll="" href="#perform-task"><h5><i>2.2 &nbsp; perform-task</i></h5></a><a class="section" data-scroll="" href="#set-initial-clj-data"><h5><i>2.3 &nbsp; set-initial-clj-data</i></h5></a><a class="section" data-scroll="" href="#add-dependency"><h5><i>2.4 &nbsp; add-dependency</i></h5></a><a class="section" data-scroll="" href="#take-ownership"><h5><i>2.5 &nbsp; take-ownership</i></h5></a><a class="section" data-scroll="" href="#execute-function"><h5><i>2.6 &nbsp; execute-function</i></h5></a><a class="section" data-scroll="" href="#propagate-result"><h5><i>2.7 &nbsp; propagate-result</i></h5></a><a class="section" data-scroll="" href="#get-task-from-any-plan"><h5><i>2.8 &nbsp; get-task-from-any-plan</i></h5></a><a class="section" data-scroll="" href="#calc-sleep-time"><h5><i>2.9 &nbsp; calc-sleep-time</i></h5></a></li><li><a class="chapter" data-scroll="" href="#integration-testing"><h4>3 &nbsp; Integration Testing</h4></a><a class="section" data-scroll="" href="#stress-test"><h5><i>3.1 &nbsp; Stress Test</i></h5></a></li>
+                </ul>
+              </nav>
+          </div>
+          <div><span id="external-api"></span><h2><b>1 &nbsp;&nbsp; External API</b></h2></div><div><span id="create-plan"></span><h3>1.1 &nbsp;&nbsp; create-plan</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>parent:</strong> the parent node for the new plan</li></ul><p><strong>Returns:</strong> the path to the plan It calls zk/createn to create a new zookeeper node</p></div><div class="code"><pre><code class="clojure">(create-plan ..zk.. ..parent..) =&gt; ..node..
+ (provided
+(zk/create ..zk.. ..prefix.. :persistent? true :sequential? true) =&gt; ..node..
+(str ..parent.. &quot;/plan-&quot;) =&gt; ..prefix..)</code></pre></div><div><span id="add-task"></span><h3>1.2 &nbsp;&nbsp; add-task</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>plan:</strong> the path to the plan</li><li><strong>fn:</strong> the function to be executed</li><li><strong>arg-tasks:</strong> a sequence of task paths, which return values are to become arguments for fn</li></ul><p><strong>Returns:</strong> path to the new task</p></div><div><p>It creates a sequential node under the plan</p></div><div class="code"><pre><code class="clojure">(add-task ..zk.. ..plan.. ..fn.. []) =&gt; ..task..
+    (provided
+     (zk/create ..zk.. ..prefix.. :persistent? true :sequential? true) =&gt; ..task..
+     (str ..plan.. &quot;/task-&quot;) =&gt; ..prefix..
+     (set-initial-clj-data irrelevant irrelevant irrelevant) =&gt; irrelevant
+     (mark-as-ready irrelevant irrelevant) =&gt; irrelevant)</code></pre></div><div><p>It sets the task node's data to contain a serialization of fn</p></div><div class="code"><pre><code class="clojure">(add-task ..zk.. ..plan.. ..fn.. []) =&gt; ..task..
+    (provided
+     (zk/create irrelevant irrelevant :persistent? true :sequential? true) =&gt; ..task..
+     (set-initial-clj-data ..zk.. ..task.. ..fn..) =&gt; irrelevant
+     (mark-as-ready irrelevant irrelevant) =&gt; irrelevant)</code></pre></div><div><p>It calls add-dependency for each arg-task</p></div><div class="code"><pre><code class="clojure">(add-task ..zk.. ..plan.. ..fn.. [..arg1.. ..arg2.. ..arg3..]) =&gt; irrelevant
+    (provided
+     (zk/create irrelevant irrelevant :persistent? true :sequential? true) =&gt; ..task..
+     (set-initial-clj-data irrelevant irrelevant irrelevant) =&gt; irrelevant
+     (add-dependency ..zk.. ..arg1.. ..task..) =&gt; irrelevant
+     (add-dependency ..zk.. ..arg2.. ..task..) =&gt; irrelevant
+     (add-dependency ..zk.. ..arg3.. ..task..) =&gt; irrelevant
+     (mark-as-ready irrelevant irrelevant) =&gt; irrelevant)</code></pre></div><div><p>It adds a 'ready' node once definition is complete</p></div><div class="code"><pre><code class="clojure">(add-task ..zk.. ..plan.. ..fn.. []) =&gt; irrelevant
+    (provided
+     (zk/create irrelevant irrelevant :persistent? true :sequential? true) =&gt; ..task..
+     (set-initial-clj-data irrelevant irrelevant irrelevant) =&gt; irrelevant
+     (mark-as-ready ..zk.. ..task..) =&gt; irrelevant)</code></pre></div><div><span id="mark-as-ready"></span><h3>1.3 &nbsp;&nbsp; mark-as-ready</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>task:</strong> the task to be marked as ready</li></ul><p><strong>Returns:</strong> nothing in particular</p></div><div><p>It creates a child node named 'ready'</p></div><div class="code"><pre><code class="clojure">(mark-as-ready ..zk.. &quot;/foo/bar&quot;) =&gt; irrelevant
+    (provided
+     (zk/create ..zk.. &quot;/foo/bar/ready&quot; :persistent? true) =&gt; true)</code></pre></div><div><span id="worker"></span><h3>1.4 &nbsp;&nbsp; worker</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>parent:</strong> the parent node of all plans</li><li><strong>attributes:</strong> a map with attributes for the behavior of the worker</li></ul><p><strong>Returns:</strong> nothing in particular</p></div><div><p>It does the following:</p><ul><li>calls <code>get-task-from-any-plan</code> to get a task to work on</li><li>if a task is returned (we have something to do), it calls <code>perform-task</code> to run it</li></ul></div><div class="code"><pre><code class="clojure">(worker ..zk.. ..parent.. ..attrs..) =&gt; irrelevant
+ (provided
+(get-task-from-any-plan ..zk.. ..parent..) =&gt; &quot;/foo/bar&quot;
+(perform-task ..zk.. &quot;/foo/bar&quot;) =&gt; irrelevant
+(zk/exists irrelevant irrelevant) =&gt; nil)</code></pre></div><div><p>If <code>get-task-from-any-plan</code> returns <code>nil</code>, we call <code>calc-sleep-time</code> to calculate for how long we need to sleep before the next retry. We retry until we get a task.</p></div><div class="code"><pre><code class="clojure">(worker ..zk.. ..parent.. ..attrs..) =&gt; irrelevant
+ (provided
+(get-task-from-any-plan ..zk.. ..parent..) =streams=&gt; [nil nil &quot;/foo/bar&quot;]
+(calc-sleep-time ..attrs.. 0) =&gt; 1
+(calc-sleep-time ..attrs.. 1) =&gt; 2
+(perform-task irrelevant irrelevant) =&gt; irrelevant
+(zk/exists irrelevant irrelevant) =&gt; nil)</code></pre></div><div><p>If <code>perform-task</code> exists (abnomally) before clearing the task node,  we remove the <code>owner</code> node from it to allow another task to complete the job</p></div><div class="code"><pre><code class="clojure">(worker ..zk.. ..parent.. ..attrs..) =&gt; (throws Exception)
+ (provided
+(get-task-from-any-plan ..zk.. ..parent..) =&gt; &quot;/foo/bar&quot;
+(perform-task ..zk.. &quot;/foo/bar&quot;) =throws=&gt; (Exception.)
+(zk/exists ..zk.. &quot;/foo/bar&quot;) =&gt; {:some &quot;thing&quot;}
+(zk/delete ..zk.. &quot;/foo/bar/owner&quot;) =&gt; irrelevant)</code></pre></div><div><span id="plan-completed"></span><h3>1.5 &nbsp;&nbsp; plan-completed?</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>plan:</strong> the path to the plan</li></ul><p><strong>Returns:</strong> whether the plan is completed</p></div><div><p>It returns true if the plan has no tasks in it</p></div><div class="code"><pre><code class="clojure">(plan-completed? ..zk.. ..plan..) =&gt; true
+ (provided
+(zk/children ..zk.. ..plan..) =&gt; '(&quot;foo&quot; &quot;bar&quot;))</code></pre></div><div><p>It returns false if there is at least one <code>task-&#42;</code> child</p></div><div class="code"><pre><code class="clojure">(plan-completed? ..zk.. ..plan..) =&gt; false
+ (provided
+(zk/children ..zk.. ..plan..) =&gt; '(&quot;foo&quot; &quot;task-39893&quot; &quot;bar&quot;))</code></pre></div><div><span id="internal-implementation"></span><h2><b>2 &nbsp;&nbsp; Internal Implementation</b></h2></div><div><span id="get-task"></span><h3>2.1 &nbsp;&nbsp; get-task</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>plan:</strong> the path to the plan</li></ul><p><strong>Returns:</strong> path to the task</p></div><div><p>It returns nil if the plan is empty</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. ..plan..) =&gt; nil
+ (provided
+(zk/children ..zk.. ..plan..) =&gt; nil)</code></pre></div><div><p>It returns a task if it does not have <code>dep-&#42;</code> or owner as children</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. &quot;/foo&quot;) =&gt; &quot;/foo/task-1234&quot;
+ (provided
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;task-1234&quot;)
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;task-2345&quot; &quot;ready&quot; &quot;quux&quot;)
+(take-ownership ..zk.. &quot;/foo/task-1234&quot;) =&gt; true)</code></pre></div><div><p>It does not return tasks that have <code>dep-&#42;</code> children</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. &quot;/foo&quot;) =&gt; nil
+ (provided
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;task-1234&quot;)
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;task-2345&quot; &quot;ready&quot; &quot;quux&quot; &quot;dep-0001&quot;))</code></pre></div><div><p>It does not return tasks that have owner nodes</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. &quot;/foo&quot;) =&gt; nil
+ (provided
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;task-1234&quot;)
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;task-2345&quot; &quot;quux&quot; &quot;ready&quot; &quot;owner&quot;))</code></pre></div><div><p>It does not take tasks that are not marked ready</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. &quot;/foo&quot;) =&gt; nil
+ (provided
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;task-1234&quot;)
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;task-2345&quot; &quot;quux&quot;))</code></pre></div><div><p>It takes ownership over the task by adding an 'owner' node</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. &quot;/foo&quot;) =&gt; &quot;/foo/task-1234&quot;
+ (provided
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;task-1234&quot;)
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;ready&quot;)
+(take-ownership ..zk.. &quot;/foo/task-1234&quot;) =&gt; true)</code></pre></div><div><p>It moves to the next one if it is unable to take ownership</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. &quot;/foo&quot;) =&gt; &quot;/foo/task-2345&quot;
+ (provided
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;task-1234&quot; &quot;task-2345&quot;)
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;ready&quot;)
+(take-ownership ..zk.. &quot;/foo/task-1234&quot;) =&gt; false
+(zk/children ..zk.. &quot;/foo/task-2345&quot;) =&gt; '(&quot;ready&quot;)
+(take-ownership ..zk.. &quot;/foo/task-2345&quot;) =&gt; true)</code></pre></div><div><p>It looks up children lazily</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. &quot;/foo&quot;) =&gt; &quot;/foo/task-1234&quot;
+ (provided
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;task-1234&quot; &quot;task-2345&quot; &quot;bat&quot;)
+(zk/children ..zk.. irrelevant) =&gt; '(&quot;ready&quot;) :times 1
+(take-ownership ..zk.. &quot;/foo/task-1234&quot;) =&gt; true)</code></pre></div><div><p>In case a task is removed before we got the chance to examine it, we move to the next task</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. &quot;/foo&quot;) =&gt; &quot;/foo/task-2345&quot;
+ (provided
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;task-1234&quot; &quot;task-2345&quot;)
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; false
+(zk/children ..zk.. &quot;/foo/task-2345&quot;) =&gt; '(&quot;ready&quot;)
+(take-ownership ..zk.. &quot;/foo/task-2345&quot;) =&gt; true)</code></pre></div><div><p>If it comes across an empty task, it removes it and moves on</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. &quot;/foo&quot;) =&gt; &quot;/foo/task-2345&quot;
+ (provided
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;task-1234&quot; &quot;task-2345&quot;)
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; nil
+(zk/delete ..zk.. &quot;/foo/task-1234&quot;) =&gt; irrelevant
+(zk/children ..zk.. &quot;/foo/task-2345&quot;) =&gt; '(&quot;ready&quot;)
+(take-ownership ..zk.. &quot;/foo/task-2345&quot;) =&gt; true)</code></pre></div><div><p>It ignores children of the plan which are not of the form <code>task-&#42;</code></p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. &quot;/foo&quot;) =&gt; nil
+ (provided
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;bar&quot; &quot;baz&quot; &quot;ready&quot;))</code></pre></div><div><span id="perform-task"></span><h3>2.2 &nbsp;&nbsp; perform-task</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>task:</strong> path to the task to perform</li></ul><p><strong>Returns:</strong> Nothing in particular</p></div><div><p>If the task has a 'result' child and no 'prov-*' children, this means the task completed successfully, and the result has been distributed to all dependent tasks (if any). In such a case we remove the task.</p></div><div class="code"><pre><code class="clojure">(perform-task ..zk.. &quot;/foo/task-1234&quot;) =&gt; irrelevant
+ (provided
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;result&quot;)
+(get-clj-data irrelevant irrelevant) =&gt; 123
+(zk/delete-all ..zk.. &quot;/foo/task-1234&quot;) =&gt; irrelevant)</code></pre></div><div><p>If <code>prov-&#42;</code> children exist, it reads the result and distributes it across the tasks depending on this task (the corresponding dep-* nodes)</p></div><div class="code"><pre><code class="clojure">(perform-task ..zk.. &quot;/foo/task-1234&quot;) =&gt; irrelevant
+ (provided
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;result&quot; &quot;prov-00000&quot; &quot;prov-0001&quot;)
+(get-clj-data ..zk.. &quot;/foo/task-1234/result&quot;) =&gt; 3.1415
+(propagate-result ..zk.. &quot;/foo/task-1234/prov-00000&quot; 3.1415) =&gt; irrelevant
+(propagate-result ..zk.. &quot;/foo/task-1234/prov-0001&quot; 3.1415) =&gt; irrelevant
+(zk/delete-all irrelevant irrelevant) =&gt; irrelevant)</code></pre></div><div><p>If the task does not have a result, we need to calculate the result ourselves. We call execute-function to get the result, and store it as the 'result' child.</p></div><div class="code"><pre><code class="clojure">(perform-task ..zk.. &quot;/foo/task-1234&quot;) =&gt; irrelevant
+ (provided
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '()
+(execute-function ..zk.. &quot;/foo/task-1234&quot;) =&gt; 1234.5
+                                      ; It should create a result child node and store the result to it
+(zk/create ..zk.. &quot;/foo/task-1234/result&quot; :persistent? true) =&gt; true
+(set-initial-clj-data ..zk.. &quot;/foo/task-1234/result&quot; 1234.5) =&gt; irrelevant
+(zk/delete-all irrelevant irrelevant) =&gt; irrelevant)</code></pre></div><div><span id="set-initial-clj-data"></span><h3>2.3 &nbsp;&nbsp; set-initial-clj-data</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>node:</strong> the node</li></ul><p><strong>Returns:</strong> Nothing in particular</p></div><div><p>It calls zk/set-data to update the data</p></div><div class="code"><pre><code class="clojure">(set-initial-clj-data ..zk.. ..node.. ..data..) =&gt; irrelevant
+    (provided
+     (pr-str ..data..) =&gt; ..str..
+     (to-bytes ..str..) =&gt; ..bytes..
+     (zk/set-data ..zk.. ..node.. ..bytes.. irrelevant) =&gt; irrelevant)</code></pre></div><div><p>It derives the version number from the existing version</p></div><div class="code"><pre><code class="clojure">(set-initial-clj-data ..zk.. ..node.. ..data..) =&gt; irrelevant
+    (provided
+     (zk/set-data irrelevant irrelevant irrelevant 0) =&gt; irrelevant)</code></pre></div><div><span id="add-dependency"></span><h3>2.4 &nbsp;&nbsp; add-dependency</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>from:</strong> path of the task that provides the dependency</li><li><strong>to:</strong> path of the task that depends on 'from'</li></ul><p><strong>Returns:</strong> nothing in particular</p></div><div><p>It adds sequential children to both the 'from' and the 'to' tasks</p></div><div class="code"><pre><code class="clojure">(add-dependency ..zk.. &quot;/path/from&quot; &quot;/path/to&quot;) =&gt; irrelevant
+    (provided
+     (zk/create ..zk.. &quot;/path/from/prov-&quot; :persistent? true :sequential? true) =&gt; irrelevant
+     (zk/create ..zk.. &quot;/path/to/dep-&quot; :persistent? true :sequential? true) =&gt; irrelevant
+     (set-initial-clj-data irrelevant irrelevant irrelevant) =&gt; irrelevant)</code></pre></div><div><p>It sets the data of the prov child to be the path to the corresponding dep child</p></div><div class="code"><pre><code class="clojure">(add-dependency ..zk.. &quot;/path/from&quot; &quot;/path/to&quot;) =&gt; irrelevant
+    (provided
+     (zk/create ..zk.. &quot;/path/from/prov-&quot; :persistent? true :sequential? true) =&gt; ..from-link..
+     (zk/create ..zk.. &quot;/path/to/dep-&quot; :persistent? true :sequential? true) =&gt; ..to-link..
+     (set-initial-clj-data ..zk.. ..from-link.. ..to-link..) =&gt; irrelevant)</code></pre></div><div><span id="take-ownership"></span><h3>2.5 &nbsp;&nbsp; take-ownership</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>task:</strong> the task to take ownership over</li></ul><p><strong>Returns:</strong> whether or not we managed to take ownership</p></div><div><p>It tries to add an ephemeral 'owner' node to the task, and return whether it was successful</p></div><div class="code"><pre><code class="clojure">(take-ownership ..zk.. &quot;/foo/task-1234&quot;) =&gt; ..result..
+    (provided
+     (zk/create ..zk.. &quot;/foo/task-1234/owner&quot; :persistent? false) =&gt; ..result..)</code></pre></div><div><span id="execute-function"></span><h3>2.6 &nbsp;&nbsp; execute-function</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>task:</strong> path to the task node containing arguments for the function</li></ul><p><strong>Returns:</strong> the return value from the task's function</p></div><div><p>It reads the function definition from the content of the task node. If no parameters exist in the task it executes the function without parameters.</p></div><div class="code"><pre><code class="clojure">(execute-function ..zk.. ..task..) =&gt; 3
+    (provided
+     (get-clj-data ..zk.. ..task..) =&gt; '(fn [] 3)
+     (zk/children ..zk.. ..task..) =&gt; '(&quot;foo&quot; &quot;task-1234&quot;))</code></pre></div><div><p>It passes the task arguments to the function</p></div><div class="code"><pre><code class="clojure">(execute-function ..zk.. &quot;/foo/task-1234&quot;) =&gt; [1 2 3]
+    (provided
+     (get-clj-data ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(fn [&amp; args] args)
+     (zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;arg-00001&quot; &quot;arg-00002&quot; &quot;arg-00000&quot;)
+     (get-clj-data ..zk.. &quot;/foo/task-1234/arg-00000&quot;) =&gt; 1
+     (get-clj-data ..zk.. &quot;/foo/task-1234/arg-00001&quot;) =&gt; 2
+     (get-clj-data ..zk.. &quot;/foo/task-1234/arg-00002&quot;) =&gt; 3)</code></pre></div><div><span id="propagate-result"></span><h3>2.7 &nbsp;&nbsp; propagate-result</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>prov:</strong> path to the <code>prov-&#42;</code> node to propagate</li><li><strong>value:</strong> the value to be propagated</li></ul><p><strong>Returns:</strong> nothing in particular</p></div><div><p>It does the following:</p><ul><li>reads the path of the <code>dep-&#42;</code> node from the <code>prov-&#42;</code> node</li><li>create an <code>arg-&#42;</code> node at the same task and with the same serial number as the <code>dep-&#42;</code> node</li><li>set the value of the <code>arg-&#42;</code> node to be <code>value</code></li><li>remove the <code>dep-&#42;</code> node</li></ul></div><div class="code"><pre><code class="clojure">(propagate-result ..zk.. ..prov.. ..value..) =&gt; irrelevant
+ (provided
+(get-clj-data ..zk.. ..prov..) =&gt; &quot;/foo/task-1234/dep-01472&quot;
+(zk/create ..zk.. &quot;/foo/task-1234/arg-01472&quot; :persistent? true) =&gt; true
+(set-initial-clj-data ..zk.. &quot;/foo/task-1234/arg-01472&quot; ..value..) =&gt; irrelevant
+(zk/delete ..zk.. &quot;/foo/task-1234/dep-01472&quot;) =&gt; irrelevant)</code></pre></div><div><span id="get-task-from-any-plan"></span><h3>2.8 &nbsp;&nbsp; get-task-from-any-plan</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>parent:</strong> path to the parent of all plans</li></ul><p><strong>Returns:</strong> path to a task, if one is found, or nil if not</p></div><div><p>It starts by getting the list of children (plans).  If this list is empty, it returns nil</p></div><div class="code"><pre><code class="clojure">(get-task-from-any-plan ..zk.. ..parent..) =&gt; nil
+ (provided
+(zk/children ..zk.. ..parent..) =&gt; nil)</code></pre></div><div><p>If a plan exists, we check that it is ready and then call <code>get-task</code> on it</p></div><div class="code"><pre><code class="clojure">(get-task-from-any-plan ..zk.. &quot;/foo&quot;) =&gt; ..task..
+ (provided
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;task-1234&quot;)
+(zk/exists ..zk.. &quot;/foo/task-1234/ready&quot;) =&gt; {:some-key &quot;value&quot;}
+(get-task ..zk.. &quot;/foo/task-1234&quot;) =&gt; ..task..)</code></pre></div><div><p>If a plan is not ready, it should be skipped</p></div><div class="code"><pre><code class="clojure">(get-task-from-any-plan ..zk.. &quot;/foo&quot;) =&gt; ..task..
+ (provided
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;task-1234&quot; &quot;task-2345&quot;)
+(zk/exists ..zk.. &quot;/foo/task-1234/ready&quot;) =&gt; nil
+(zk/exists ..zk.. &quot;/foo/task-2345/ready&quot;) =&gt; {:some-key &quot;value&quot;}
+(get-task ..zk.. &quot;/foo/task-2345&quot;) =&gt; ..task..)</code></pre></div><div><p>If a <code>get-task</code> does not return a task (e.g., no ready tasks), we move on to the next plan. This should be done lazily, so that additional plans must not be queried.</p></div><div class="code"><pre><code class="clojure">(get-task-from-any-plan ..zk.. &quot;/foo&quot;) =&gt; ..task..
+ (provided
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;task-1234&quot; &quot;task-2345&quot; &quot;quux&quot;)
+(zk/exists ..zk.. &quot;/foo/task-1234/ready&quot;) =&gt; {:some-key &quot;value&quot;}
+(get-task ..zk.. &quot;/foo/task-1234&quot;) =&gt; nil
+(zk/exists ..zk.. &quot;/foo/task-2345/ready&quot;) =&gt; {:some-key &quot;value&quot;}
+(get-task ..zk.. &quot;/foo/task-2345&quot;) =&gt; ..task..)</code></pre></div><div><span id="calc-sleep-time"></span><h3>2.9 &nbsp;&nbsp; calc-sleep-time</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>attrs:</strong> a map of attributes based on which we calculate the sleep time, including:<ul><li><code>:initial</code> - the value to be returned for <code>count</code> 0 (default: 100ms)</li><li><code>:increase</code> - the increase factor, by which the value gets multiplied each time (default: 1.5)</li><li><code>:max</code> - the maximum sleep time (default: 10 seconds)</li></ul></li><li><strong>count:</strong> the number of times we already had to wait before getting the last task</li></ul><p><strong>Returns:</strong> the number of milliseconds to sleep</p></div><div><p>For <code>count</code> = 0, returns the <code>:initial</code></p></div><div class="code"><pre><code class="clojure">(calc-sleep-time {:initial 1234} 0) =&gt; 1234</code></pre></div><div><p><code>:initial</code> defaults to 100</p></div><div class="code"><pre><code class="clojure">(calc-sleep-time {} 0) =&gt; 100</code></pre></div><div><p>For <code>count</code> > 0, the <code>:initial</code> value is multiplied by <code>:increase</code> to the power of <code>count</code></p></div><div class="code"><pre><code class="clojure">(calc-sleep-time {:increase 2 :initial 1} 8) =&gt; 256</code></pre></div><div><p><code>:increase</code> defaults to 1.5</p></div><div class="code"><pre><code class="clojure">(calc-sleep-time {} 1) =&gt; 150</code></pre></div><div><p>The value is capped by <code>:max</code></p></div><div class="code"><pre><code class="clojure">(calc-sleep-time {:max 300} 20) =&gt; 300</code></pre></div><div><p><code>:max</code> defaults to 10000</p></div><div class="code"><pre><code class="clojure">(calc-sleep-time {} 20) =&gt; 10000</code></pre></div><div><p><code>:max</code> is applied at any step, such that the function does not overflow even with high <code>count</code> values</p></div><div class="code"><pre><code class="clojure">(calc-sleep-time {:max 1000} 100) =&gt; 1000</code></pre></div><div><span id="integration-testing"></span><h2><b>3 &nbsp;&nbsp; Integration Testing</b></h2></div><div><span id="stress-test"></span><h3>3.1 &nbsp;&nbsp; Stress Test</h3></div><div><p>The idea of this test is to stress zk_plan by launching <code>N</code> parallel worker threads to execute a randomized plan with <code>M</code> tasks, each depending on <code>K</code> preceding tasks (if such exist).</p></div><div class="code"><pre><code class="clojure">(def N 10) ; the number of workers
+(def M 100) ; the number of tasks
+(def K 10) ; the number of dependencies per task</code></pre></div><div><p>The tasks work against a map of <code>M</code> atoms, one atom per each task.  These atoms count the workers working on this task.</p></div><div class="code"><pre><code class="clojure">(def worker-counters (into {} (map (fn [i] [i (atom 0)]) (range M))))</code></pre></div><div><p>Each task will also report it completed its work by adding its ordinal number to this set.</p></div><div class="code"><pre><code class="clojure">(def workers-completed (atom #{}))</code></pre></div><div><p>Each task begins by incrementing the atom, then sleeps for a while, then decrements the atom. After incrementing, it checks that the value is 1, that is, no other worker is working on the same task. The function compares its arguments against the <code>expected</code> vector, and returns its number. The function below creates a task function (s-expression) for task <code>i</code></p></div><div class="code"><pre><code class="clojure">(defn stress-task-func [i expected]
+  `(fn [&amp; ~'args]
+     (let [~'my-atom (worker-counters ~i)]
+       (println ~i)
+       (try
+         (swap! ~'my-atom inc)
+         (if (not= @~'my-atom 1)
+           (throw (Exception. (str &quot;Bad counter value: &quot; @~'my-atom))))
+         (if (not= (vec~'args) ~(vec expected))
+           (throw (Exception. (str &quot;Bad arguments.  Expected: &quot; ~(vec expected) &quot;  Actual: &quot; ~'args))))
+         (Thread/sleep 100)
+         (swap! workers-completed #(conj % ~i))
+         (finally 
+           (swap! ~'my-atom dec)))
+       ~i)))</code></pre></div><div><p>We build the plan.  The first <code>K</code> tasks are built without arguments. The other <code>M-K</code> tasks are built with <code>K</code> arguments each, which are randomly selected from the range <code>&#91;0,i&#41;</code></p></div><div class="code"><pre><code class="clojure">(defn build-stress-plan [zk parent]
+  (let [plan (create-plan zk parent)]
+
+    (loop [tasks {}
+           i 0]
+      (if (&lt; i M)
+        (let [next-task (if (&lt; i K)
+                          (add-task zk plan (stress-task-func i nil) [])
+                                        ; else
+                          (let [selected (take K (shuffle (range i)))]
+                            (add-task zk plan (stress-task-func i selected) (map tasks selected))))]
+          (recur (assoc tasks i next-task) (inc i)))))
+    (mark-as-ready zk plan)
+    plan))</code></pre></div><div><p>We now deploy <code>N</code> workers to execute the plan. Each thread runs the <code>worker</code> function repeatedly. In case of an exception thrown from the worker, we report it, but move on to call <code>worker</code> again.</p></div><div class="code"><pre><code class="clojure">(defn start-stress-workers [zk parent]
+  (let [threads (map (fn [_] (Thread. (fn []
+                                        (loop []
+                                          (try
+                                            (worker zk parent {})
+                                            (catch Exception e
+                                              (.printStackTrace e)))
+                                          (recur))))) (range N))]
+    (doseq [thread threads]
+      (.start thread))
+    threads))</code></pre></div><div><p>To stop all threads we simply <code>.join</code> them</p></div><div class="code"><pre><code class="clojure">(defn join-stress-workers [threads]
+  (doseq [thread threads]
+    (.stop thread)))</code></pre></div><div><p>Puttint this all together:</p><ul><li>Connect to an actual Zookeeper</li><li>Clear the parent: <code>/stress</code> if exists</li><li>(Re) Create the parent</li><li>Start the workers</li><li>Create the plan</li><li>Wait until the plan is complete</li><li>Stop the workers</li></ul><p>(uncomment the block below to make it run)</p></div><div class="code"><pre><code class="clojure">(fact
+        (let [zk (zk/connect &quot;127.0.0.1:2181&quot;)
+              parent &quot;/stress&quot;]
+          (zk/delete-all zk &quot;/stress&quot;)
+          (zk/create zk parent :persistent? true)
+          (let [threads (start-stress-workers zk parent)
+                plan (build-stress-plan zk parent)]
+            (loop []
+              (when-not (plan-completed? zk plan)
+                (Thread/sleep 100)
+                (recur)))
+            (doseq [m (range M)]
+              (when-not (contains? @workers-completed m)
+                (println &quot;Task &quot; m &quot; was not completed&quot;)))
+            (join-stress-workers threads))))</code></pre></div>
+        </div>
+      </div>
+    </div>
+
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+
+  </body>
+
+  <script>
+  if (false) {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', '<@=tracking>', 'caudate.me');
+    ga('send', 'pageview');
+  }
+  </script>
+  
+  <script type="text/javascript">
+    smoothScroll.init();
+    gumshoe.init({});
+  
+    hljs.registerLanguage("clojure",function(e){var t={"builtin-name":"def defonce cond apply if-not if-let if not not= = < > <= >= == + / * - rem quot neg? pos? delay? symbol? keyword? true? false? integer? empty? coll? list? set? ifn? fn? associative? sequential? sorted? counted? reversible? number? decimal? class? distinct? isa? float? rational? reduced? ratio? odd? even? char? seq? vector? string? map? nil? contains? zero? instance? not-every? not-any? libspec? -> ->> .. . inc compare do dotimes mapcat take remove take-while drop letfn drop-last take-last drop-while while intern condp case reduced cycle split-at split-with repeat replicate iterate range merge zipmap declare line-seq sort comparator sort-by dorun doall nthnext nthrest partition eval doseq await await-for let agent atom send send-off release-pending-sends add-watch mapv filterv remove-watch agent-error restart-agent set-error-handler error-handler set-error-mode! error-mode shutdown-agents quote var fn loop recur throw try monitor-enter monitor-exit defmacro defn defn- macroexpand macroexpand-1 for dosync and or when when-not when-let comp juxt partial sequence memoize constantly complement identity assert peek pop doto proxy defstruct first rest cons defprotocol cast coll deftype defrecord last butlast sigs reify second ffirst fnext nfirst nnext defmulti defmethod meta with-meta ns in-ns create-ns import refer keys select-keys vals key val rseq name namespace promise into transient persistent! conj! assoc! dissoc! pop! disj! use class type num float double short byte boolean bigint biginteger bigdec print-method print-dup throw-if printf format load compile get-in update-in pr pr-on newline flush read slurp read-line subvec with-open memfn time re-find re-groups rand-int rand mod locking assert-valid-fdecl alias resolve ref deref refset swap! reset! set-validator! compare-and-set! alter-meta! reset-meta! commute get-validator alter ref-set ref-history-count ref-min-history ref-max-history ensure sync io! new next conj set! to-array future future-call into-array aset gen-class reduce map filter find empty hash-map hash-set sorted-map sorted-map-by sorted-set sorted-set-by vec vector seq flatten reverse assoc dissoc list disj get union difference intersection extend extend-type extend-protocol int nth delay count concat chunk chunk-buffer chunk-append chunk-first chunk-rest max min dec unchecked-inc-int unchecked-inc unchecked-dec-inc unchecked-dec unchecked-negate unchecked-add-int unchecked-add unchecked-subtract-int unchecked-subtract chunk-next chunk-cons chunked-seq? prn vary-meta lazy-seq spread list* str find-keyword keyword symbol gensym force rationalize"},r="a-zA-Z_\\-!.?+*=<>&#'",n="["+r+"]["+r+"0-9/;:]*",a="[-+]?\\d+(\\.\\d+)?",o={b:n,r:0},s={cN:"number",b:a,r:0},i=e.inherit(e.QSM,{i:null}),c=e.C(";","$",{r:0}),d={cN:"literal",b:/\b(true|false|nil)\b/},l={b:"[\\[\\{]",e:"[\\]\\}]"},m={cN:"comment",b:"\\^"+n},p=e.C("\\^\\{","\\}"),u={cN:"symbol",b:"[:]{1,2}"+n},f={b:"\\(",e:"\\)"},h={eW:!0,r:0},y={k:t,l:n,cN:"name",b:n,starts:h},b=[f,i,m,p,c,u,l,s,d,o];return f.c=[e.C("comment",""),y,h],h.c=b,l.c=b,{aliases:["clj"],i:/\S/,c:[f,i,m,p,c,u,l,s,d]}});
+    hljs.initHighlightingOnLoad();
+  </script>
+</html>
