@@ -8,15 +8,15 @@
 "`defrule` and `defclause` allow users to define logic that defines applications.
 These macros actually define *rule functions*, which are Clojure functions with metadata,
 intended to process *facts* and create new facts based on them.
-See [core](cloudlog.core.html) for more details."
+See [core](cloudlog.html) for more details."
 
 "The `cloudlog.events` package provides functions for applying rule functions on events.
 An *event* is a Clojure map, containing a single change in the state of the application.
 This change can be an addition of a fact, a removal of a fact, or the effect of such event
 on the internal state of a rule. Each event contains the following fields:
 - `:kind`: Either `:fact`, if this event represent a change to a fact, or `:rule` if it represents a change to a rule.
-- `:name`: A string representing the name of the stream this event belongs to.  See [fact-table](cloudlog.core.html#fact-table-get-a-fully-qualified-name-for-a-fact) for details.
-- `:key`: The key of the fact or the rule.  See [here](cloudlog.core.html#joins) for more details.
+- `:name`: A string representing the name of the stream this event belongs to.  See [fact-table](cloudlog.html#fact-table-get-a-fully-qualified-name-for-a-fact) for details.
+- `:key`: The key of the fact or the rule.  See [here](cloudlog.html#joins) for more details.
 - `:ts`: The time (in milliseconds since EPOCH) in which this event was created (for facts.  See below for rules).
 - `:data`: The data tuple representing a fact, or the state of a rule, excluding the key.
 - `:change`: A number representing the change.  Typically, `1` represents addition, and `-1` represents removal.
@@ -49,7 +49,7 @@ on the internal state of a rule. Each event contains the following fields:
                                                :readers #{}})
 
 [[:section {:title "Rules"}]]
-"In this module we base our examples on the following rules defined [here](cloudlog.core.html):"
+"In this module we base our examples on the following rules defined [here](cloudlog.html):"
 (cloudlog/defrule foo-yx [y x]
   [:test/foo x y] (cloudlog/by-anyone))
 
@@ -223,7 +223,7 @@ with `:long-time-users`, which Bob is not a member of.  This places Bob outside 
 unable to see the resulting fact (which is what we expect)."
 
 [[:section {:title "Integrity" :tag "integrity"}]]
-"Since rules [take ownership over the resulting events](cloudlog.core.html#integrity), the `:writers` set of events coming out of a multiplier
+"Since rules [take ownership over the resulting events](cloudlog.html#integrity), the `:writers` set of events coming out of a multiplier
 must come from the rule event:"
 (fact
  (let [mult (multiplier timeline 1)]
@@ -272,7 +272,7 @@ and hence tweets will overrun one another.
 
 But what guarantee do we have that if we take the fact's `:ts` we do not get into such a situation?
 There is no hard guarantee for that.  Hoever, the whole point of using rules it to [denormalize](https://en.wikipedia.org/wiki/Denormalization) the data so that it is searchable with different keys.  It is pointless to have a rule that keeps the same `:key`.
-Such rules can be easily converted to [clauses](cloudlog.core.html#defclause), which do not require redundant information to be stored."
+Such rules can be easily converted to [clauses](cloudlog.html#defclause), which do not require redundant information to be stored."
 
 [[:chapter {:title "matcher: Matches Rules and Facts" :tag "matcher"}]]
 "[multipliers](#multiplier) apply rules to facts, and expect to be given both as parameters.  However, in most cases

@@ -4,7 +4,6 @@ jdk: oraclejdk8
 
 script:
 - lein monolith each im
-- bash ./deploy.sh
 
 env:
   global:
