@@ -1,7 +1,8 @@
 (ns dynamo.srv-test
   (:require [midje.sweet :refer :all]
             [dynamo.srv :refer :all]
-            [taoensso.faraday :as far]))
+            [taoensso.faraday :as far]
+            [taoensso.nippy :as nippy]))
 
 [[:chapter {:title "Introduction"}]]
 "This is a simple microservice that subscibes to all facts and stores all events to DynamoDB."
@@ -18,6 +19,8 @@ It then looks up the list of existing tables and stores it in a set."
 
 "For the purpose of the following tests we will assign `ddb-config` the mock value `:config`."
 (reset! ddb-config :config)
+"We will assume the tables \"foo\" and \"bar\" exist, and others do not."
+(reset! curr-tables #{"foo" "bar"})
 
 [[:chapter {:title "store-fact"}]]
 "`store-fact` is a microservice function that subscribes to all fact events."
@@ -26,13 +29,42 @@ It then looks up the list of existing tables and stores it in a set."
 
 "`store-fact` responds to events by storing them in DynamoDB."
 (fact
- (store-fact {:kind :fact
+ (def my-event {:kind :fact
               :name "foo"
               :key 1234
               :data [1 2 3 4]
               :ts 1000
               :change 1
               :writers #{}
-              :readers #{}}) => nil
+              :readers #{}})
+ (store-fact my-event) => nil
  (provided
-  ))
+  (nippy/freeze {:data [1 2 3 4]
+                 :ts 1000
+                 :change 1
+                 :writers #{}
+                 :readers #{}}) => ..bin..
+  (far/put-item :config "foo" {:key "1234"
+                               :ts 1000
+                               :event ..bin..}) => irrelevant))
+
+"If the table does not exist, it is created."
+(fact
+ (def my-event2 (assoc my-event :name "baz"))
+ (store-fact my-event2) => nil
+ (provided
+  (nippy/freeze {:data [1 2 3 4]
+                 :ts 1000
+                 :change 1
+                 :writers #{}
+                 :readers #{}}) => ..bin..
+  (far/ensure-table :config "baz" [:key :s]
+                    :range-keydef [:ts :n]
+                    :throughput default-throughput) => irrelevant
+  (far/put-item :config "baz" {:key "1234"
+                               :ts 1000
+                               :event ..bin..}) => irrelevant))
+
+"The new table is then added to the set."
+(fact
+ @curr-tables => #{"foo" "bar" "baz"})
