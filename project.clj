@@ -39,6 +39,6 @@
                      :title "cloudlog-events.core"
                      :subtitle "Event Processing"}
                     "zk-plan"
-                    {:input "libs/zk_plan/test/zk_plan/core_test.clj"
+                    {:input "libs/zk-plan/test/zk_plan/core_test.clj"
                      :title "zk-plan.core"
                      :subtitle "A batch processing framework"}}})
