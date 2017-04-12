@@ -1,6 +1,8 @@
 #!/bin/bash
 set -ev # Exit with nonzero exit code if anything fails; verbose
 
+cd `dirname $0`
+
 rm -rf docs/
 
 SOURCE_BRANCH="master"
