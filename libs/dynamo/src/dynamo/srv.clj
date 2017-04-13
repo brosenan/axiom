@@ -24,9 +24,12 @@
           nil
           :else
           (let [table-name (core/table-kw (:name ev))]
-            (when-not (@curr-tables name)
-              (far/ensure-table @ddb-config table-name [:key :s] :range-keydef [:ts :n] :throughput default-throughput)
-              (swap! curr-tables #(conj % name)))
+            (when-not (@curr-tables table-name)
+              (far/ensure-table @ddb-config table-name [:key :s]
+                                {:range-keydef [:ts :n]
+                                 :throughput default-throughput
+                                 :block true})
+              (swap! curr-tables #(conj % table-name)))
             (let [bin (nippy/freeze (dissoc ev :kind :name :key :ts))]
               (far/put-item @ddb-config table-name {:key (pr-str (:key ev))
                                                     :ts (:ts ev)

@@ -15,8 +15,8 @@ It then looks up the list of existing tables and stores it in a set."
  (init ..config..) => nil
  (provided
   (reset! ddb-config ..config..) => irrelevant
-  (far/list-tables ..config..) => ["foo" "bar"])
- @curr-tables => #{"foo" "bar"})
+  (far/list-tables ..config..) => [:foo :bar])
+ @curr-tables => #{:foo :bar})
 
 "For the purpose of the following tests we will assign `ddb-config` the mock value `:config`."
 (reset! ddb-config :config)
@@ -56,15 +56,16 @@ It then looks up the list of existing tables and stores it in a set."
                  :writers #{}
                  :readers #{}}) => ..bin..
   (far/ensure-table :config :baz [:key :s] ; :key is the partition key
-                    :range-keydef [:ts :n] ; and :ts is the range key
-                    :throughput default-throughput) => irrelevant
+                    {:range-keydef [:ts :n] ; and :ts is the range key
+                     :throughput default-throughput
+                     :block true}) => irrelevant
   (far/put-item :config :baz {:key "1234"
                                :ts 1000
                                :event ..bin..}) => irrelevant))
 
 "The new table is then added to the set."
 (fact
- @curr-tables => #{"foo" "bar" "baz"})
+ @curr-tables => #{:foo :bar :baz})
 
 "Events with `:name` values that end with \"?\" or \"!\" should not be persisted, and are therefore ignored."
 (fact

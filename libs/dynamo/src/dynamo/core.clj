@@ -13,11 +13,16 @@
 
 
 (defn retriever [config req-chan]
-  (let [[ev res-chan] (async/<!! req-chan)
-        items (far/query config (table-kw (:name ev)) {:key [:eq (pr-str (:key  ev))]})]
-    (doseq [item items]
-      (let [event (-> (nippy/thaw (:event item))
-                      (merge {:ts (:ts item)})
-                      (merge ev))]
-        (async/>!! res-chan event)))
-    (async/close! res-chan)))
+  (let [request (async/<!! req-chan)]
+    (cond (nil? request)
+          false
+          :else
+          (let [[ev res-chan] request
+                items (far/query config (table-kw (:name ev)) {:key [:eq (pr-str (:key  ev))]})]
+            (doseq [item items]
+              (let [event (-> (nippy/thaw (:event item))
+                              (merge {:ts (:ts item)})
+                              (merge ev))]
+                (async/>!! res-chan event)))
+            (async/close! res-chan)
+            true))))
