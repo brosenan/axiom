@@ -42,6 +42,10 @@
                     {:input "libs/rabbit-microservices/test/rabbit_microservices/core_test.clj"
                      :title "rabbit-microservices.core"
                      :subtitle "A Microservices Framwork Based on RabbitMQ"}
+                    "dynamo"
+                    {:input "libs/dynamo/test/dynamo/core_test.clj"
+                     :title "dynamo.core"
+                     :subtitle "DynamoDB Integration"}
                     "dynamo.srv"
                     {:input "libs/dynamo/test/dynamo/srv_test.clj"
                      :title "dynamo.srv"
