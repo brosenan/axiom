@@ -14,19 +14,26 @@
   (swap! curr-tables (partial set/union (set (far/list-tables config))))
   nil)
 
+(defn table-kw [name]
+  (-> name
+      (str/replace \/ \.)
+      (str/replace #"[^0-9a-zA-Z\-.]" "_")
+      keyword))
+
 (defn store-fact
   {:reg {:kind :fact}}
   [ev]
-  (cond (or (str/ends-with? (:name ev) "?")
-            (str/ends-with? (:name ev) "!"))
-        nil
-        :else
-        (do
-          (when-not (@curr-tables (:name ev))
-            (far/ensure-table @ddb-config (:name ev) [:key :s] :range-keydef [:ts :n] :throughput default-throughput)
-            (swap! curr-tables #(conj % (:name ev))))
-          (let [bin (nippy/freeze (dissoc ev :kind :key :name))]
-            (far/put-item @ddb-config (:name ev) {:key (pr-str (:key ev))
-                                                  :ts (:ts ev)
-                                                  :event bin}))))
+  (let [name (:name ev)]
+    (cond (or (str/ends-with? name "?")
+              (str/ends-with? name "!"))
+          nil
+          :else
+          (let [table-name (table-kw (:name ev))]
+            (when-not (@curr-tables name)
+              (far/ensure-table @ddb-config table-name [:key :s] :range-keydef [:ts :n] :throughput default-throughput)
+              (swap! curr-tables #(conj % name)))
+            (let [bin (nippy/freeze (dissoc ev :kind :key :name))]
+              (far/put-item @ddb-config table-name {:key (pr-str (:key ev))
+                                                    :ts (:ts ev)
+                                                    :event bin})))))
   nil)
