@@ -8,7 +8,7 @@
   <!-- Enable responsiveness on mobile devices-->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
   <link rel="shortcut icon" href="favicon.ico">
-  <title>axiom//dynamo.srv - A microservice for Updating DynamoDB Tables</title>
+  <title>axiom//dynamo.core - DynamoDB Integration</title>
   <script src="js/highlight.min.js"></script>
   <script src="js/gumshoe.min.js"></script>
   <script src="js/smooth-scroll.min.js"></script>
@@ -37,7 +37,7 @@
     <span>&nbsp;</span>
     <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
     <span>&nbsp;</span>
-    <a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item active" href="dynamo.srv.html">dynamo.srv</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
+    <a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item active" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="dynamo.srv.html">dynamo.srv</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
     <span class="sidebar-nav-item">&nbsp;</span>
     <span class="sidebar-nav-item">&nbsp;</span>
   </nav>
@@ -50,8 +50,8 @@
       <div class="masthead">
         <div class="container">
           <h3 class="masthead-title">
-            <span>axiom//dynamo.srv</span>
-            <small>A microservice for Updating DynamoDB Tables</small>
+            <span>axiom//dynamo.core</span>
+            <small>DynamoDB Integration</small>
           </h3>
         </div>
       </div>
@@ -70,7 +70,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#init"><h4>2 &nbsp; init</h4></a></li><li><a class="chapter" data-scroll="" href="#store-fact"><h4>3 &nbsp; store-fact</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#table-kw"><h4>1 &nbsp; table-kw</h4></a></li><li><a class="chapter" data-scroll="" href="#retriever"><h4>2 &nbsp; retriever: An Async Retrieval Function</h4></a></li>
                 </ul>
               </nav>
             </div>
@@ -79,51 +79,35 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#init"><h4>2 &nbsp; init</h4></a></li><li><a class="chapter" data-scroll="" href="#store-fact"><h4>3 &nbsp; store-fact</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#table-kw"><h4>1 &nbsp; table-kw</h4></a></li><li><a class="chapter" data-scroll="" href="#retriever"><h4>2 &nbsp; retriever: An Async Retrieval Function</h4></a></li>
                 </ul>
               </nav>
           </div>
-          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p>This is a simple microservice that subscibes to all facts and stores all events to DynamoDB.</p></div><div><span id="init"></span><h2><b>2 &nbsp;&nbsp; init</b></h2></div><div><p><code>init</code> receives a map containing credentials and other configurations and stores it in an atom. It then looks up the list of existing tables and stores it in a set.</p></div><div class="code"><pre><code class="clojure">(reset! curr-tables #{})
- (init ..config..) =&gt; nil
+          <div><span id="table-kw"></span><h2><b>1 &nbsp;&nbsp; table-kw</b></h2></div><div><p>The <code>taoensso.faraday</code> library we use uses keywords to convey names of tables and fields. In axiom, table names (the <code>:name</code> field of an event) originate from keywords, but they may contain characters that do not conform to <a href='http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.NamingRulesDataTypes.html'>DynamoDB's naming policy</a>, and in addition, the names used by axiom are fully qualified, and <code>faraday</code> only takes the <code>name</code>.</p></div><div><p>To overcome this, the function <code>table-kw</code> converts the <code>:name</code> attribute of an event to a <code>faraday</code>-compatible keyword.</p></div><div><p>By default, it simply converts a string to a keyword.</p></div><div class="code"><pre><code class="clojure">(table-kw &quot;foo&quot;) =&gt; :foo</code></pre></div><div><p>If the name contains a '/' it is converted to a '.', so that applying <code>name</code> to it will retain the prefix.</p></div><div class="code"><pre><code class="clojure">(name (table-kw &quot;foo/bar&quot;)) =&gt; &quot;foo.bar&quot;</code></pre></div><div><p>Other illegal characters are converted to an underscore ('_').</p></div><div class="code"><pre><code class="clojure">(table-kw &quot;?,:!@#$%^&amp;*-()&quot;) =&gt; :___________-__</code></pre></div><div><span id="retriever"></span><h2><b>2 &nbsp;&nbsp; retriever: An Async Retrieval Function</b></h2></div><div><p>The in <a href='https://brosenan.github.io/axiom/cloudlog-events.html'>cloudlog-events</a>, the <a href='https://brosenan.github.io/axiom/cloudlog-events.html#matcher'>matcher</a> requires some external entity to accept requests in the form of partial events on one channel,  and respond by providing stored events matching the partial ones on another channel.</p></div><div><p><code>retriever</code> is a function, intended to be used from inside a <code>async/thread</code> block, and listens to requests coming on a given channel. For each such request it performs a query according to the parameters provided in the partial event. Then it translates the results to events and pushes them to an output channel provided with the request.</p></div><div><p>To demonstrate this, let's first create two channels: one for the request and one for the response.</p></div><div class="code"><pre><code class="clojure">(def chan-req (async/chan 1000))
+ (def chan-res (async/chan 1000))</code></pre></div><div><p>Now let's put a request in the request channel.  The request consists of a partial event and the response channel.</p></div><div class="code"><pre><code class="clojure">(async/&gt;!! chan-req [{:kind :fact
+                     :name &quot;foo/bar&quot;
+                     :key 123}
+                    chan-res])</code></pre></div><div><p><code>retriever</code> is supposed to already run in a <code>thread</code> and wait for this request. In this test we simulate this by calling it after the request is already in the queue.</p></div><div><p>We call <code>retriever</code> with a client options map (see <a href='https://github.com/ptaoussanis/faraday'>faraday's documentation</a>), and the request channel.  Once called, it will perform the following:</p><ol><li>Call <code>faraday</code>'s <code>query</code> method, to get a collection of items (maps).</li><li>Call <code>nippy/thaw</code> to deserialize the body of each event.</li></ol></div><div class="code"><pre><code class="clojure">(retriever ..config.. chan-req) =&gt; nil
  (provided
-(reset! ddb-config ..config..) =&gt; irrelevant
-(far/list-tables ..config..) =&gt; [&quot;foo&quot; &quot;bar&quot;])
- @curr-tables =&gt; #{&quot;foo&quot; &quot;bar&quot;}</code></pre></div><div><p>For the purpose of the following tests we will assign <code>ddb-config</code> the mock value <code>:config</code>.</p></div><div class="code"><pre><code class="clojure">(reset! ddb-config :config)</code></pre></div><div><span id="store-fact"></span><h2><b>3 &nbsp;&nbsp; store-fact</b></h2></div><div><p><code>store-fact</code> is a microservice function that subscribes to all fact events.</p></div><div class="code"><pre><code class="clojure">(-&gt; #'store-fact meta :reg) =&gt; {:kind :fact}</code></pre></div><div><p><code>store-fact</code> responds to events by storing them in DynamoDB.</p></div><div class="code"><pre><code class="clojure">(def my-event {:kind :fact
-            :name &quot;foo&quot;
-            :key 1234
-            :data [1 2 3 4]
-            :ts 1000
-            :change 1
-            :writers #{}
-            :readers #{}})
- (store-fact my-event) =&gt; nil
- (provided
-(nippy/freeze {:data [1 2 3 4]
-               :change 1
-               :writers #{}
-               :readers #{}}) =&gt; ..bin..
-(far/put-item :config :foo {:key &quot;1234&quot;
-                             :ts 1000
-                             :event ..bin..}) =&gt; irrelevant)</code></pre></div><div><p>If the table does not exist, it is created.</p></div><div class="code"><pre><code class="clojure">(def my-event2 (assoc my-event :name &quot;baz&quot;))
- (store-fact my-event2) =&gt; nil
- (provided
-(nippy/freeze {:data [1 2 3 4]
-               :change 1
-               :writers #{}
-               :readers #{}}) =&gt; ..bin..
-(far/ensure-table :config :baz [:key :s] ; :key is the partition key
-                  :range-keydef [:ts :n] ; and :ts is the range key
-                  :throughput default-throughput) =&gt; irrelevant
-(far/put-item :config :baz {:key &quot;1234&quot;
-                             :ts 1000
-                             :event ..bin..}) =&gt; irrelevant)</code></pre></div><div><p>The new table is then added to the set.</p></div><div class="code"><pre><code class="clojure">@curr-tables =&gt; #{&quot;foo&quot; &quot;bar&quot; &quot;baz&quot;}</code></pre></div><div><p>Events with <code>:name</code> values that end with "?" or "!" should not be persisted, and are therefore ignored.</p></div><div class="code"><pre><code class="clojure">(store-fact (assoc my-event :name &quot;foo?&quot;)) =&gt; nil
- (provided
-; No side effect
-)
- (store-fact (assoc my-event :name &quot;bar!&quot;)) =&gt; nil
- (provided
-; No side effect
-)</code></pre></div>
+(far/query ..config.. :foo.bar {:key [:eq &quot;123&quot;]})
+=&gt; [{:key &quot;123&quot; :ts 1000 :event ..bin1..}
+    {:key &quot;123&quot; :ts 1001 :event ..bin2..}]
+(nippy/thaw ..bin1..) =&gt; {:data [1 2 3]}
+(nippy/thaw ..bin2..) =&gt; {:data [2 3 4]})</code></pre></div><div><p>The events are reconstructed from the items:</p><ul><li>The <code>:kind</code>, <code>:name</code> and <code>:key</code> fields are taken from the request.</li><li>The <code>:ts</code> field is taken from the item, and</li><li>The rest of the fields are taken from the de-serialized <code>:event</code> field in the item.</li></ul></div><div class="code"><pre><code class="clojure">(async/alts!! [chan-res
+              (async/timeout 100)]) =&gt; [{:kind :fact
+                                         :name &quot;foo/bar&quot;
+                                         :key 123
+                                         :ts 1000
+                                         :data [1 2 3]}
+                                        chan-res]
+(async/alts!! [chan-res
+              (async/timeout 100)]) =&gt; [{:kind :fact
+                                         :name &quot;foo/bar&quot;
+                                         :key 123
+                                         :ts 1001
+                                         :data [2 3 4]}
+                                        chan-res]</code></pre></div><div><p>Eventually <code>retriever</code> closes the response channel.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [chan-res
+              (async/timeout 100)]) =&gt; [nil chan-res]</code></pre></div>
         </div>
       </div>
     </div>
