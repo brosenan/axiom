@@ -87,8 +87,8 @@
  (init ..config..) =&gt; nil
  (provided
 (reset! ddb-config ..config..) =&gt; irrelevant
-(far/list-tables ..config..) =&gt; [&quot;foo&quot; &quot;bar&quot;])
- @curr-tables =&gt; #{&quot;foo&quot; &quot;bar&quot;}</code></pre></div><div><p>For the purpose of the following tests we will assign <code>ddb-config</code> the mock value <code>:config</code>.</p></div><div class="code"><pre><code class="clojure">(reset! ddb-config :config)</code></pre></div><div><span id="store-fact"></span><h2><b>3 &nbsp;&nbsp; store-fact</b></h2></div><div><p><code>store-fact</code> is a microservice function that subscribes to all fact events.</p></div><div class="code"><pre><code class="clojure">(-&gt; #'store-fact meta :reg) =&gt; {:kind :fact}</code></pre></div><div><p><code>store-fact</code> responds to events by storing them in DynamoDB.</p></div><div class="code"><pre><code class="clojure">(def my-event {:kind :fact
+(far/list-tables ..config..) =&gt; [:foo :bar])
+ @curr-tables =&gt; #{:foo :bar}</code></pre></div><div><p>For the purpose of the following tests we will assign <code>ddb-config</code> the mock value <code>:config</code>.</p></div><div class="code"><pre><code class="clojure">(reset! ddb-config :config)</code></pre></div><div><span id="store-fact"></span><h2><b>3 &nbsp;&nbsp; store-fact</b></h2></div><div><p><code>store-fact</code> is a microservice function that subscribes to all fact events.</p></div><div class="code"><pre><code class="clojure">(-&gt; #'store-fact meta :reg) =&gt; {:kind :fact}</code></pre></div><div><p><code>store-fact</code> responds to events by storing them in DynamoDB.</p></div><div class="code"><pre><code class="clojure">(def my-event {:kind :fact
             :name &quot;foo&quot;
             :key 1234
             :data [1 2 3 4]
@@ -112,11 +112,12 @@
                :writers #{}
                :readers #{}}) =&gt; ..bin..
 (far/ensure-table :config :baz [:key :s] ; :key is the partition key
-                  :range-keydef [:ts :n] ; and :ts is the range key
-                  :throughput default-throughput) =&gt; irrelevant
+                  {:range-keydef [:ts :n] ; and :ts is the range key
+                   :throughput default-throughput
+                   :block true}) =&gt; irrelevant
 (far/put-item :config :baz {:key &quot;1234&quot;
                              :ts 1000
-                             :event ..bin..}) =&gt; irrelevant)</code></pre></div><div><p>The new table is then added to the set.</p></div><div class="code"><pre><code class="clojure">@curr-tables =&gt; #{&quot;foo&quot; &quot;bar&quot; &quot;baz&quot;}</code></pre></div><div><p>Events with <code>:name</code> values that end with "?" or "!" should not be persisted, and are therefore ignored.</p></div><div class="code"><pre><code class="clojure">(store-fact (assoc my-event :name &quot;foo?&quot;)) =&gt; nil
+                             :event ..bin..}) =&gt; irrelevant)</code></pre></div><div><p>The new table is then added to the set.</p></div><div class="code"><pre><code class="clojure">@curr-tables =&gt; #{:foo :bar :baz}</code></pre></div><div><p>Events with <code>:name</code> values that end with "?" or "!" should not be persisted, and are therefore ignored.</p></div><div class="code"><pre><code class="clojure">(store-fact (assoc my-event :name &quot;foo?&quot;)) =&gt; nil
  (provided
 ; No side effect
 )

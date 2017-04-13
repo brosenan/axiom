@@ -87,27 +87,85 @@
  (def chan-res (async/chan 1000))</code></pre></div><div><p>Now let's put a request in the request channel.  The request consists of a partial event and the response channel.</p></div><div class="code"><pre><code class="clojure">(async/&gt;!! chan-req [{:kind :fact
                      :name &quot;foo/bar&quot;
                      :key 123}
-                    chan-res])</code></pre></div><div><p><code>retriever</code> is supposed to already run in a <code>thread</code> and wait for this request. In this test we simulate this by calling it after the request is already in the queue.</p></div><div><p>We call <code>retriever</code> with a client options map (see <a href='https://github.com/ptaoussanis/faraday'>faraday's documentation</a>), and the request channel.  Once called, it will perform the following:</p><ol><li>Call <code>faraday</code>'s <code>query</code> method, to get a collection of items (maps).</li><li>Call <code>nippy/thaw</code> to deserialize the body of each event.</li></ol></div><div class="code"><pre><code class="clojure">(retriever ..config.. chan-req) =&gt; nil
+                    chan-res])</code></pre></div><div><p><code>retriever</code> is supposed to already run in a <code>thread</code> and wait for this request. In this test we simulate this by calling it after the request is already in the queue.</p></div><div><p>We call <code>retriever</code> with a client options map (see <a href='https://github.com/ptaoussanis/faraday'>faraday's documentation</a>), and the request channel.  Once called, it will perform the following:</p><ol><li>Call <code>faraday</code>'s <code>query</code> method, to get a collection of items (maps).</li><li>Call <code>nippy/thaw</code> to deserialize the body of each event.</li></ol></div><div class="code"><pre><code class="clojure">(retriever ..config.. chan-req) =&gt; true
  (provided
 (far/query ..config.. :foo.bar {:key [:eq &quot;123&quot;]})
 =&gt; [{:key &quot;123&quot; :ts 1000 :event ..bin1..}
     {:key &quot;123&quot; :ts 1001 :event ..bin2..}]
 (nippy/thaw ..bin1..) =&gt; {:data [1 2 3]}
-(nippy/thaw ..bin2..) =&gt; {:data [2 3 4]})</code></pre></div><div><p>The events are reconstructed from the items:</p><ul><li>The <code>:kind</code>, <code>:name</code> and <code>:key</code> fields are taken from the request.</li><li>The <code>:ts</code> field is taken from the item, and</li><li>The rest of the fields are taken from the de-serialized <code>:event</code> field in the item.</li></ul></div><div class="code"><pre><code class="clojure">(async/alts!! [chan-res
+(nippy/thaw ..bin2..) =&gt; {:data [2 3 4]})</code></pre></div><div><p>The events are reconstructed from the items:</p><ul><li>The <code>:kind</code>, <code>:name</code> and <code>:key</code> fields are taken from the request.</li><li>The <code>:ts</code> field is taken from the item, and</li><li>The rest of the fields are taken from the de-serialized <code>:event</code> field in the item.</li></ul></div><div class="code"><pre><code class="clojure">; First event
+ (async/alts!! [chan-res
               (async/timeout 100)]) =&gt; [{:kind :fact
                                          :name &quot;foo/bar&quot;
                                          :key 123
                                          :ts 1000
                                          :data [1 2 3]}
                                         chan-res]
-(async/alts!! [chan-res
+ ; Second event
+ (async/alts!! [chan-res
               (async/timeout 100)]) =&gt; [{:kind :fact
                                          :name &quot;foo/bar&quot;
                                          :key 123
                                          :ts 1001
                                          :data [2 3 4]}
                                         chan-res]</code></pre></div><div><p>Eventually <code>retriever</code> closes the response channel.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [chan-res
-              (async/timeout 100)]) =&gt; [nil chan-res]</code></pre></div>
+              (async/timeout 100)]) =&gt; [nil chan-res]</code></pre></div><div><p>If the request channel is closed, <code>retriever</code> exits, returning <code>false</code>.</p></div><div class="code"><pre><code class="clojure">(async/close! chan-req)
+ (retriever ..config.. chan-req) =&gt; false</code></pre></div><div class="code"><pre><code class="clojure">[[:chapter &quot;Integration Testing / Usage Example&quot;]]</code></pre></div><div><p>To see that this library can actually connect to DynamoDB we will use <code>dynamo.srv</code> to create a few events in different tables, and then use <code>retriever</code> to retrieve some of them.</p></div><div><p>We will use a <a href='http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html'>local DynamoDB</a> exposed on the local host on port 8006. Our configuration is as follows (we follow <a href='https://github.com/ptaoussanis/faraday#connecting'>these</a> instructions:</p></div><div class="code"><pre><code class="clojure">(def client-opts
+      {:access-key &quot;FOO&quot;
+       :secret-key &quot;BAR&quot;
+       :endpoint &quot;http://localhost:8006&quot;})
+
+    (srv/init client-opts)</code></pre></div><div><p>Now let's create a bunch of events with different <code>:name</code>, <code>:key</code> and <code>:ts</code> values.</p></div><div class="code"><pre><code class="clojure">(def events
+  (for [name [&quot;foo/foo&quot; &quot;foo/bar&quot; &quot;bar/baz&quot;]
+        key [&quot;x&quot; :y [&quot;z&quot;]]
+        ts [1000 2000 3000]]
+    (let [data [name key ts]]
+      {:kind :fact
+       :name name
+       :key key
+       :ts ts
+       :data data
+       :change 1})))</code></pre></div><div><p>Now we use <code>srv/store-fact</code> to store all these events.</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
+ (doseq [ev events]
+ (srv/store-fact ev))</code></pre></div><div><p>Let's fire up a thread to handle retrieval of events.</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
+ (def req-chan (async/chan 1000))
+ (def worker-thread
+ (async/thread
+   (while (retriever client-opts req-chan))))</code></pre></div><div><p>Out of all the events we created, we are interested in the ones with <code>:name = foo/foo</code> and `:key = ["z"]</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
+ (let [res-chan (async/chan 1000)]
+ (async/&gt;!! req-chan [{:kind :fact
+                       :name &quot;foo/foo&quot;
+                       :key [&quot;z&quot;]}
+                      res-chan])
+ (async/alts!! [res-chan
+                (async/timeout 100)]) =&gt; [{:kind :fact
+                                           :name &quot;foo/foo&quot;
+                                           :key [&quot;z&quot;]
+                                           :ts 1000
+                                           :data [&quot;foo/foo&quot; [&quot;z&quot;] 1000]
+                                           :change 1}
+                                          res-chan]
+ (async/alts!! [res-chan
+                (async/timeout 100)]) =&gt; [{:kind :fact
+                                           :name &quot;foo/foo&quot;
+                                           :key [&quot;z&quot;]
+                                           :ts 2000
+                                           :data [&quot;foo/foo&quot; [&quot;z&quot;] 2000]
+                                           :change 1}
+                                          res-chan]
+ (async/alts!! [res-chan
+                (async/timeout 100)]) =&gt; [{:kind :fact
+                                           :name &quot;foo/foo&quot;
+                                           :key [&quot;z&quot;]
+                                           :ts 3000
+                                           :data [&quot;foo/foo&quot; [&quot;z&quot;] 3000]
+                                           :change 1}
+                                          res-chan]
+ (async/alts!! [res-chan
+                (async/timeout 100)]) =&gt; [nil
+                                          res-chan])</code></pre></div><div><p>We shut down the service by closing the request channel, and then waiting for the retriever thread to complete by reading from it.</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
+(async/close! req-chan)
+(async/&lt;!! worker-thread)</code></pre></div>
         </div>
       </div>
     </div>
