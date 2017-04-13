@@ -83,11 +83,12 @@
                 </ul>
               </nav>
           </div>
-          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p>This is a simple microservice that subscibes to all facts and stores all events to DynamoDB.</p></div><div><span id="init"></span><h2><b>2 &nbsp;&nbsp; init</b></h2></div><div><p><code>init</code> receives a map containing credentials and other configurations and stores it in an atom. It then looks up the list of existing tables and stores it in a set.</p></div><div class="code"><pre><code class="clojure">(init ..config..) =&gt; nil
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p>This is a simple microservice that subscibes to all facts and stores all events to DynamoDB.</p></div><div><span id="init"></span><h2><b>2 &nbsp;&nbsp; init</b></h2></div><div><p><code>init</code> receives a map containing credentials and other configurations and stores it in an atom. It then looks up the list of existing tables and stores it in a set.</p></div><div class="code"><pre><code class="clojure">(reset! curr-tables #{})
+ (init ..config..) =&gt; nil
  (provided
 (reset! ddb-config ..config..) =&gt; irrelevant
 (far/list-tables ..config..) =&gt; [&quot;foo&quot; &quot;bar&quot;])
- @curr-tables =&gt; #{&quot;foo&quot; &quot;bar&quot;}</code></pre></div><div><p>For the purpose of the following tests we will assign <code>ddb-config</code> the mock value <code>:config</code>.</p></div><div class="code"><pre><code class="clojure">(reset! ddb-config :config)</code></pre></div><div><p>We will assume the tables "foo" and "bar" exist, and others do not.</p></div><div class="code"><pre><code class="clojure">(reset! curr-tables #{&quot;foo&quot; &quot;bar&quot;})</code></pre></div><div><span id="store-fact"></span><h2><b>3 &nbsp;&nbsp; store-fact</b></h2></div><div><p><code>store-fact</code> is a microservice function that subscribes to all fact events.</p></div><div class="code"><pre><code class="clojure">(-&gt; #'store-fact meta :reg) =&gt; {:kind :fact}</code></pre></div><div><p><code>store-fact</code> responds to events by storing them in DynamoDB.</p></div><div class="code"><pre><code class="clojure">(def my-event {:kind :fact
+ @curr-tables =&gt; #{&quot;foo&quot; &quot;bar&quot;}</code></pre></div><div><p>For the purpose of the following tests we will assign <code>ddb-config</code> the mock value <code>:config</code>.</p></div><div class="code"><pre><code class="clojure">(reset! ddb-config :config)</code></pre></div><div><span id="store-fact"></span><h2><b>3 &nbsp;&nbsp; store-fact</b></h2></div><div><p><code>store-fact</code> is a microservice function that subscribes to all fact events.</p></div><div class="code"><pre><code class="clojure">(-&gt; #'store-fact meta :reg) =&gt; {:kind :fact}</code></pre></div><div><p><code>store-fact</code> responds to events by storing them in DynamoDB.</p></div><div class="code"><pre><code class="clojure">(def my-event {:kind :fact
             :name &quot;foo&quot;
             :key 1234
             :data [1 2 3 4]
@@ -117,7 +118,14 @@
                   :throughput default-throughput) =&gt; irrelevant
 (far/put-item :config &quot;baz&quot; {:key &quot;1234&quot;
                              :ts 1000
-                             :event ..bin..}) =&gt; irrelevant)</code></pre></div><div><p>The new table is then added to the set.</p></div><div class="code"><pre><code class="clojure">@curr-tables =&gt; #{&quot;foo&quot; &quot;bar&quot; &quot;baz&quot;}</code></pre></div>
+                             :event ..bin..}) =&gt; irrelevant)</code></pre></div><div><p>The new table is then added to the set.</p></div><div class="code"><pre><code class="clojure">@curr-tables =&gt; #{&quot;foo&quot; &quot;bar&quot; &quot;baz&quot;}</code></pre></div><div><p>Events with <code>:name</code> values that end with "?" or "!" should not be persisted, and are therefore ignored.</p></div><div class="code"><pre><code class="clojure">(store-fact (assoc my-event :name &quot;foo?&quot;)) =&gt; nil
+ (provided
+; No side effect
+)
+ (store-fact (assoc my-event :name &quot;bar!&quot;)) =&gt; nil
+ (provided
+; No side effect
+)</code></pre></div>
         </div>
       </div>
     </div>
