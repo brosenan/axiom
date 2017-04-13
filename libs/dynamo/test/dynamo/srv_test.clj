@@ -60,7 +60,6 @@ and in addition, the names used by axiom are fully qualified, and `faraday` only
  (store-fact my-event) => nil
  (provided
   (nippy/freeze {:data [1 2 3 4]
-                 :ts 1000
                  :change 1
                  :writers #{}
                  :readers #{}}) => ..bin..
@@ -74,12 +73,11 @@ and in addition, the names used by axiom are fully qualified, and `faraday` only
  (store-fact my-event2) => nil
  (provided
   (nippy/freeze {:data [1 2 3 4]
-                 :ts 1000
                  :change 1
                  :writers #{}
                  :readers #{}}) => ..bin..
-  (far/ensure-table :config :baz [:key :s]
-                    :range-keydef [:ts :n]
+  (far/ensure-table :config :baz [:key :s] ; :key is the partition key
+                    :range-keydef [:ts :n] ; and :ts is the range key
                     :throughput default-throughput) => irrelevant
   (far/put-item :config :baz {:key "1234"
                                :ts 1000

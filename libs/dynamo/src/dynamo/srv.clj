@@ -32,7 +32,7 @@
             (when-not (@curr-tables name)
               (far/ensure-table @ddb-config table-name [:key :s] :range-keydef [:ts :n] :throughput default-throughput)
               (swap! curr-tables #(conj % name)))
-            (let [bin (nippy/freeze (dissoc ev :kind :key :name))]
+            (let [bin (nippy/freeze (dissoc ev :kind :name :key :ts))]
               (far/put-item @ddb-config table-name {:key (pr-str (:key ev))
                                                     :ts (:ts ev)
                                                     :event bin})))))
