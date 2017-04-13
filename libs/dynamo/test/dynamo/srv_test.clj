@@ -11,6 +11,7 @@
 "`init` receives a map containing credentials and other configurations and stores it in an atom.
 It then looks up the list of existing tables and stores it in a set."
 (fact
+ (reset! curr-tables #{})
  (init ..config..) => nil
  (provided
   (reset! ddb-config ..config..) => irrelevant
@@ -19,8 +20,6 @@ It then looks up the list of existing tables and stores it in a set."
 
 "For the purpose of the following tests we will assign `ddb-config` the mock value `:config`."
 (reset! ddb-config :config)
-"We will assume the tables \"foo\" and \"bar\" exist, and others do not."
-(reset! curr-tables #{"foo" "bar"})
 
 [[:chapter {:title "store-fact"}]]
 "`store-fact` is a microservice function that subscribes to all fact events."
@@ -68,3 +67,14 @@ It then looks up the list of existing tables and stores it in a set."
 "The new table is then added to the set."
 (fact
  @curr-tables => #{"foo" "bar" "baz"})
+
+"Events with `:name` values that end with \"?\" or \"!\" should not be persisted, and are therefore ignored."
+(fact
+ (store-fact (assoc my-event :name "foo?")) => nil
+ (provided
+  ; No side effect
+  )
+ (store-fact (assoc my-event :name "bar!")) => nil
+ (provided
+  ; No side effect
+  ))

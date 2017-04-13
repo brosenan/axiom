@@ -1,7 +1,8 @@
 (ns dynamo.srv
   (:require [taoensso.faraday :as far]
             [taoensso.nippy :as nippy]
-            [clojure.set :as set]))
+            [clojure.set :as set]
+            [clojure.string :as str]))
 
 (def default-throughput {:read 1 :write 1})
 
@@ -16,11 +17,16 @@
 (defn store-fact
   {:reg {:kind :fact}}
   [ev]
-  (when-not (@curr-tables (:name ev))
-    (far/ensure-table @ddb-config (:name ev) [:key :s] :range-keydef [:ts :n] :throughput default-throughput)
-    (swap! curr-tables #(conj % (:name ev))))
-  (let [bin (nippy/freeze (dissoc ev :kind :key :name))]
-    (far/put-item @ddb-config (:name ev) {:key (pr-str (:key ev))
-                                          :ts (:ts ev)
-                                          :event bin}))
+  (cond (or (str/ends-with? (:name ev) "?")
+            (str/ends-with? (:name ev) "!"))
+        nil
+        :else
+        (do
+          (when-not (@curr-tables (:name ev))
+            (far/ensure-table @ddb-config (:name ev) [:key :s] :range-keydef [:ts :n] :throughput default-throughput)
+            (swap! curr-tables #(conj % (:name ev))))
+          (let [bin (nippy/freeze (dissoc ev :kind :key :name))]
+            (far/put-item @ddb-config (:name ev) {:key (pr-str (:key ev))
+                                                  :ts (:ts ev)
+                                                  :event bin}))))
   nil)
