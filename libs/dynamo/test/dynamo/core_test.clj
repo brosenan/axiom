@@ -97,18 +97,20 @@ and the request channel.  Once called, it will perform the following:
  (async/close! chan-req)
  (retriever ..config.. chan-req) => false)
 
-[[:chapter "Integration Testing / Usage Example"]]
+[[:chapter {:title "Integration Testing / Usage Example"}]]
 "To see that this library can actually connect to DynamoDB we will use `dynamo.srv` to create a few events in different
 tables, and then use `retriever` to retrieve some of them."
 
 "We will use a [local DynamoDB](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html) exposed on the local host on port 8006.
 Our configuration is as follows (we follow [these](https://github.com/ptaoussanis/faraday#connecting) instructions:"
-(fact (def client-opts
-        {:access-key "FOO"
-         :secret-key "BAR"
-         :endpoint "http://localhost:8006"})
+(fact
+  :integ ; Does not run on usual CI testing
+  (def client-opts
+    {:access-key "FOO"
+     :secret-key "BAR"
+     :endpoint "http://localhost:8006"})
 
-      (srv/init client-opts))
+  (srv/init client-opts))
 
 "Now let's create a bunch of events with different `:name`, `:key` and `:ts` values."
 (def events
