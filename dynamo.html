@@ -110,12 +110,13 @@
                                          :data [2 3 4]}
                                         chan-res]</code></pre></div><div><p>Eventually <code>retriever</code> closes the response channel.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [chan-res
               (async/timeout 100)]) =&gt; [nil chan-res]</code></pre></div><div><p>If the request channel is closed, <code>retriever</code> exits, returning <code>false</code>.</p></div><div class="code"><pre><code class="clojure">(async/close! chan-req)
- (retriever ..config.. chan-req) =&gt; false</code></pre></div><div><span id="integration-testing----usage-example"></span><h2><b>3 &nbsp;&nbsp; Integration Testing / Usage Example</b></h2></div><div><p>To see that this library can actually connect to DynamoDB we will use <code>dynamo.srv</code> to create a few events in different tables, and then use <code>retriever</code> to retrieve some of them.</p></div><div><p>We will use a <a href='http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html'>local DynamoDB</a> exposed on the local host on port 8006. Our configuration is as follows (we follow <a href='https://github.com/ptaoussanis/faraday#connecting'>these</a> instructions:</p></div><div class="code"><pre><code class="clojure">(def client-opts
-      {:access-key &quot;FOO&quot;
-       :secret-key &quot;BAR&quot;
-       :endpoint &quot;http://localhost:8006&quot;})
+ (retriever ..config.. chan-req) =&gt; false</code></pre></div><div><span id="integration-testing----usage-example"></span><h2><b>3 &nbsp;&nbsp; Integration Testing / Usage Example</b></h2></div><div><p>To see that this library can actually connect to DynamoDB we will use <code>dynamo.srv</code> to create a few events in different tables, and then use <code>retriever</code> to retrieve some of them.</p></div><div><p>We will use a <a href='http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html'>local DynamoDB</a> exposed on the local host on port 8006. Our configuration is as follows (we follow <a href='https://github.com/ptaoussanis/faraday#connecting'>these</a> instructions:</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
+(def client-opts
+  {:access-key &quot;FOO&quot;
+   :secret-key &quot;BAR&quot;
+   :endpoint &quot;http://localhost:8006&quot;})
 
-    (srv/init client-opts)</code></pre></div><div><p>Now let's create a bunch of events with different <code>:name</code>, <code>:key</code> and <code>:ts</code> values.</p></div><div class="code"><pre><code class="clojure">(def events
+(srv/init client-opts)</code></pre></div><div><p>Now let's create a bunch of events with different <code>:name</code>, <code>:key</code> and <code>:ts</code> values.</p></div><div class="code"><pre><code class="clojure">(def events
   (for [name [&quot;foo/foo&quot; &quot;foo/bar&quot; &quot;bar/baz&quot;]
         key [&quot;x&quot; :y [&quot;z&quot;]]
         ts [1000 2000 3000]]
