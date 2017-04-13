@@ -1,4 +1,5 @@
 /target
+libs/*/target
 /lib
 /classes
 /checkouts

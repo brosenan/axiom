@@ -2,7 +2,8 @@
   (:require [taoensso.faraday :as far]
             [taoensso.nippy :as nippy]
             [clojure.set :as set]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [dynamo.core :as core]))
 
 (def default-throughput {:read 1 :write 1})
 
@@ -14,12 +15,6 @@
   (swap! curr-tables (partial set/union (set (far/list-tables config))))
   nil)
 
-(defn table-kw [name]
-  (-> name
-      (str/replace \/ \.)
-      (str/replace #"[^0-9a-zA-Z\-.]" "_")
-      keyword))
-
 (defn store-fact
   {:reg {:kind :fact}}
   [ev]
@@ -28,7 +23,7 @@
               (str/ends-with? name "!"))
           nil
           :else
-          (let [table-name (table-kw (:name ev))]
+          (let [table-name (core/table-kw (:name ev))]
             (when-not (@curr-tables name)
               (far/ensure-table @ddb-config table-name [:key :s] :range-keydef [:ts :n] :throughput default-throughput)
               (swap! curr-tables #(conj % name)))

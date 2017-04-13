@@ -21,27 +21,6 @@ It then looks up the list of existing tables and stores it in a set."
 "For the purpose of the following tests we will assign `ddb-config` the mock value `:config`."
 (reset! ddb-config :config)
 
-[[:chapter {:title "table-kw"}]]
-"The `taoensso.faraday` library we use uses keywords to convey names of tables and fields.
-In axiom, table names (the `:name` field of an event) originate from keywords, but they may contain characters
-that do not conform to [DynamoDB's naming policy](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.NamingRulesDataTypes.html),
-and in addition, the names used by axiom are fully qualified, and `faraday` only takes the `name`."
-
-"To overcome this, the function `table-kw` converts the `:name` attribute of an event to a `faraday`-compatible keyword."
-
-"By default, it simply converts a string to a keyword."
-(fact
- (table-kw "foo") => :foo)
-
-"If the name contains a '/' it is converted to a '.', so that applying `name` to it will retain the prefix."
-(fact
- (name (table-kw "foo/bar")) => "foo.bar")
-
-"Other illegal characters are converted to an underscore ('_')."
-(fact
- (table-kw "?,:!@#$%^&*-()") => :___________-__)
-
-
 [[:chapter {:title "store-fact"}]]
 "`store-fact` is a microservice function that subscribes to all fact events."
 (fact
