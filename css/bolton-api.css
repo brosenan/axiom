@@ -3,7 +3,7 @@
 }
 
 .error.version {
-  color: #ac4142;
+  color: rgb(142, 81, 159);
   text-decoration: line-through;
 }
 
@@ -13,7 +13,7 @@
 }
 
 .api .entry pre.error {
-  background-color: #ac4142;
+  background-color: rgb(142, 81, 159);
 }
 .api .entry pre.error h6 {
   color: white;
@@ -75,7 +75,7 @@
   float: right;
   top: -1.9em;
   right: 2em;
-  color: #ac4142;
+  color: rgb(142, 81, 159);
   font-style: italic;
   cursor: pointer;
 }

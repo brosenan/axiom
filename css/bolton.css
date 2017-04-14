@@ -44,11 +44,11 @@ h3 {
 }
 
 .toc a h4 {
-  color: #ac4142;
+  color: rgb(142, 81, 159);
 }
 
 .toc a h5 {
-  color: #ac4142;
+  color: rgb(142, 81, 159);
   font-size: 0.8rem;
   margin-top: 0.1em;
   margin-bottom: 0.2em;
@@ -84,7 +84,7 @@ pre{
 
 .code .failed
 {
-  background-color:#ac4142; 
+  background-color: rgb(142, 81, 159); 
   padding: 10px;
   font-size: large;
 }
@@ -111,7 +111,7 @@ pre{
 
 .masthead span
 {
-  color:#ac4142;
+  color: rgb(142, 81, 159);
   font-size: 1.8em;
 }
 
