@@ -42,12 +42,12 @@ Original highlight.js style (c) Ivan Sagalaev <maniac@softwaremaniacs.org>
 .hljs-quote,
 .hljs-template-tag,
 .hljs-deletion {
-  color: #880000;
+    color: rgb(103, 153, 133);
 }
 
 .hljs-title,
 .hljs-section {
-  color: #880000;
+    color: rgb(103, 153, 133);
   font-weight: bold;
 }
 
