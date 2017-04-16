@@ -1,0 +1,71 @@
+#header {
+    text-align: center;
+    font-family: "Arial";
+    font-size: 36pt;
+    color: rgb(100, 100, 100);
+}
+
+.purple-bg a {
+    color: white;
+}
+
+a {
+    color: #8e519f;
+};
+
+span.define {
+    color: #8e519f;
+    font-family: "Comic Sans MS";
+}
+
+span.implement {
+    color: #679985;
+    font-family: "Courier";
+}
+
+.purple-bg {
+    margin-top: 1em;
+    background-color: #8e519f;
+    color: white;
+    border-radius: 0.5em;
+}
+
+.green-bg {
+    margin-top: 1em;
+    background-color: #679985;
+    color: white;
+    border-radius: 0.5em;
+}
+
+.white-bg {
+    margin: 1em;
+    background-color: white;
+    color: black;
+    border-radius: 0.2em;
+}
+
+.abstract {
+    font-size: 18pt;
+    font-family: "Arial";
+    padding: 1em;
+    line-height: 1.2em;
+}
+
+.explain {
+    font-size: 14pt;
+    font-family: "Arial";
+    padding: 1em;
+    text-align: justify;
+}
+
+.code-example {
+    background-color: rgb(24, 26, 38);
+    padding: 1em;
+    border-radius: 1em;
+    margin-left: 1em;
+}
+
+span.code {
+    font-family: "Courier";
+    color: #679985;
+}

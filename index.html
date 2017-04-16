@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>[:axiom] -- Define you App; Don't Implement It!</title>
+    <link href="/axiom/assets/css/style.css?v=f7b03729ff01b6db01404e7c1d6fdd06b6cc1dc7" rel="stylesheet">
+    <link href="index.css" rel="stylesheet">
+  </head>
+  <body>
+    <div id="header">
+      <img src="https://brosenan.github.io/axiom/img/axiom-logo-full-size.png" alt="logo" />
+      <br>
+      <span class="define">Define</span> your app; don't <span class="implement">implement</span> it.
+    </div>
+    <div class="purple-bg abstract" id="desc">
+      <table><tr><td width="80%">
+	    <p>Axiom provides a fresh new look at web applications.
+	      Today, when building a web application, the application provider is responsible for everything.
+	      Responsible for implementing correct business logic, responsible for performance, scale and availability.
+	      They are also responsible for defining and implementing a privacy policy ensuring that private user data remains private.</p>
+	  </td><td width="20%"><img width="100%" src="img/illustration-traditional-app.png"></td></tr></table>
+      <table><tr><td width="20%"><img width="100%" src="img/illustration-axiom.png"></td><td>
+	    <p>Axiom is a <em>web platform</em>.
+	      It is intended to be provided as a service, and handle most of the common concerns in
+	      a web application: Scalability, availability and even confidentiality of user data.
+	      Application providers upload their <em>business logic</em> to Axiom as <em>logic rules</em>,
+	      written in Clojure.  Actually, the rules are written in a Clojure DSL we call <strong>Cloudlog</strong>.</p>
+	    <p>Cloudlog is a <em>purely-declarative</em> DSL, based on a purely-declarative subset of Clojure.
+	      Being purely declarative is important for two reasons:</p>
+	    <ol><li>It keeps the application developer focused on <em>defining</em> the app's business logic rather than <em>implementing</em> it; and</li>
+	      <li>It makes sure the application cannot <em>remember</em> user data.
+		This is important to make Axiom itself responsible for the confidentiality of user data.</li></ol>
+      </td></tr></table>
+    </div>
+    <div class="explain">
+      <table><tr><td width="40%">
+	    <p>This example demonstrates how an application is defined using Axiom.
+	      This is a Twitter-like application named <em>tweetlog</em>.
+	      Like Twitter, its main purpose is to show user <em>timelines</em> based on <em>tweets</em> made by users they <em>follow</em>.</p>
+	    <p>In this example, we use two macros: <span class="code">defrule</span> and <span class="code">defclause</span> to define
+	      <em>rules</em> and <em>clauses</em> respectively.</p>
+	    <p>Rules and clauses both represent logic deductions (similar to Horn Clauses in Prolog).
+	      Both rules and clauses operate on <em>facts</em>, which represent user data
+	      (<span class="code">:tweetlog/follows</span> and <span class="code">:tweetlog/tweeted</span> in our example).</p>
+	    <p>Both rules and clauses can leverage the power of Clojure through the use of <em>guards</em>.
+	      Guards are pieces of Clojure code providing variable bindings and filtering through Clojure forms such as
+	      <span class="code">(for)</span>, <span class="code">(let)</span> and <span class="code">(when)</span>.
+	      In our example we use guards to extract user-handles mentioned in tweets.</p>
+	    <p>The key difference between rules and clauses is the fact that the logic of a clause is applied at query time,
+	      when the target query is already known, while the logic of a rule is applied at update time, as facts are added or removed.</p></td>
+	  <td><div class="code-example" width="60%"><img width="100%" src="img/twitter-like-example.png"></div></td>
+      </tr></table>
+      This example is described is a demo we gave at <a href="http://2017.programmingconference.org/">&lt;Programming&gt; 2017</a>.
+      Please check out the <a href="https://youtu.be/3gLMBr2rTj8">video here</a>.
+    </div>
+    <div class="purple-bg abstract">
+      Axiom is currently a work in progress.
+      For more information you are encouraged to:
+      <ul class="">
+	<li>Read our <a href="cloudlog.html">live documentation</a>.</li>
+	<li>Read our academic papers:
+	  <ul><li><a href="http://www.cs.technion.ac.il/users/wwwb/cgi-bin/tr-get.cgi/2015/CS/CS-2015-06.pdf">Separation of Powers in the Cloud</a>
+	      (presented at <a href="http://2015.splashcon.org/track/onward2015-papers#program">Onwrad! 2015</a>):
+	      A paper introducing Cloudlog as a way to provide access control without trusting the application with it.</li>
+	    <li><a href="http://programming-journal.org/2017/1/2/">Application Embedding</a>
+	      (published at the <a href="http://programming-journal.org/">Programming Journal</a>):
+	      A paper intruducing the concept of <em>Application Embedding</em> -- the approach Axiom is based on.</li></ul></li>
+	<li>Watch our video talks:
+	  <ul><li><a href="https://youtu.be/Sl6hh-0ikwU">Application Embedding Talk</a> (&lt;Programming&gt; 2017)</li>
+	    <li><a href="https://youtu.be/3gLMBr2rTj8">Axiom Demo</a> (&lt;Programming&gt; 2017)</li></ul></li>
+	<li>See our <a href="https://github.com/brosenan/axiom/">code on GitHub</a></li>
+      <li><a href="https://cloudalion.org/contact-us/">Contact us</a> directly</li></ul>
+    </div>
+  </body>
+</html>
+
