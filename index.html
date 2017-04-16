@@ -5,23 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>[:axiom] -- Define you App; Don't Implement It!</title>
     <link href="index.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
   </head>
   <body>
     <div id="header">
-      <img src="https://brosenan.github.io/axiom/img/axiom-logo-full-size.png" alt="logo" />
-      <br>
-      <span class="defn">Define</span> your app; don't <span class="implement">implement</span> it.
+      <div class="w3-row">
+	<div class="w3-col m12 header"><img src="https://brosenan.github.io/axiom/img/axiom-logo-full-size.png" alt="logo" width="70%"></div>
+      </div>
+      <div class="w3-row"><span class="defn">Define</span> your app; don't <span class="implement">implement</span> it.</div>
     </div>
     <div class="purple-bg abstract" id="desc">
-      <table><tr><td width="80%">
+      <div class="w3-row"><div class="w3-col m9">
 	    <p>Axiom provides a fresh new look at web applications.
 	      Today, when building a web application, application providers are responsible for everything.
 	      They are responsible for implementing correct business logic,
 	      responsible for providing good performance, scalability and availability.
 	      They are also responsible for defining and implementing a privacy policy ensuring that private user data remains private.</p>
-	  </td><td width="20%"><img width="100%" src="illustration-traditional-app.png"></td></tr></table>
-      <table><tr><td width="20%"><img width="100%" src="illustration-axiom.png"></td><td>
-	    <p>Axiom is a <em>web platform</em>.
+	  </div><div class="w3-col m3"><img width="100%" src="illustration-traditional-app.png"></div></div>
+      <div class="w3-row"><div class="w3-col m3"><img width="100%" src="illustration-axiom.png"></div>
+	<div class="w3-col m9"><p>Axiom is a <em>web platform</em>.
 	      It is intended to be provided as a service, and handle most of the common concerns in
 	      a web application: Scalability, availability and even confidentiality of user data.
 	      Application providers upload their <em>business logic</em> to Axiom as <em>logic rules</em>,
@@ -31,13 +33,13 @@
 	    <ol><li>It keeps the application developer focused on <em>defining</em> the app's business logic rather than <em>implementing</em> it; and</li>
 	      <li>It makes sure the application cannot <em>remember</em> user data.
 		This is important to make Axiom itself responsible for the confidentiality of user data.</li></ol>
-      </td></tr></table>
+      </div></div>
     </div>
     <div class="explain">
-      <table><tr><td width="40%">
-	    <p>This example demonstrates how an application is defined using Axiom.
-	      This is a Twitter-like application named <em>tweetlog</em>.
-	      Like Twitter, its main purpose is to show user <em>timelines</em> based on <em>tweets</em> made by users they <em>follow</em>.</p>
+      <p>This example demonstrates how an application is defined using Axiom.
+	This is a Twitter-like application named <em>tweetlog</em>.
+	Like Twitter, its main purpose is to show user <em>timelines</em> based on <em>tweets</em> made by users they <em>follow</em>.</p>
+      <div class="w3-row"><div class="w3-col m5">
 	    <p>In this example, we use two macros: <span class="code">defrule</span> and <span class="code">defclause</span> to define
 	      <em>rules</em> and <em>clauses</em> respectively.</p>
 	    <p>Rules and clauses both represent logic deductions (similar to Horn Clauses in Prolog).
@@ -48,9 +50,9 @@
 	      <span class="code">(for)</span>, <span class="code">(let)</span> and <span class="code">(when)</span>.
 	      In our example we use guards to extract user-handles mentioned in tweets.</p>
 	    <p>The key difference between rules and clauses is the fact that the logic of a clause is applied at query time,
-	      when the target query is already known, while the logic of a rule is applied at update time, as facts are added or removed.</p></td>
-	  <td><div class="code-example" width="60%"><img width="100%" src="twitter-like-example.png"></div></td>
-      </tr></table>
+	      when the target query is already known, while the logic of a rule is applied at update time, as facts are added or removed.</p></div>
+	<div class="w3-col m7"><div class="code-example" width="60%"><img width="100%" src="twitter-like-example.png"></div></div>
+      </div>
       This example is described is a demo we gave at <a href="http://2017.programmingconference.org/">&lt;Programming&gt; 2017</a>.
       Please check out the <a href="https://youtu.be/3gLMBr2rTj8">video here</a>.
     </div>

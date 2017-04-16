@@ -44,6 +44,14 @@ span.implement {
     border-radius: 0.2em;
 }
 
+.abstract > .w3-row {
+    display: table;
+}
+.abstract > .w3-row > .w3-col {
+    display: table-cell;
+    vertical-align: middle;
+}
+
 .abstract {
     font-size: 18pt;
     font-family: "Arial";
