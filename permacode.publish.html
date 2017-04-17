@@ -63,7 +63,7 @@
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
               <h5>Date: 17 April 2017</h5>
-              <h5>Repository: <a href="https://github.com/brosenan/cloudlog.clj">https://github.com/brosenan/cloudlog.clj</a></h5>
+              <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
           <div class="outline">
@@ -122,7 +122,7 @@
                                  (perm/pure
                                   (some-thing))]))</code></pre></div><div class="code"><pre><code class="clojure">(build-plan [foo3]) =&gt; [foo3]</code></pre></div><div><span id="under-the-hood"></span><h3>1.1 &nbsp;&nbsp; Under the Hood</h3></div><div><p>The helper function <code>get-ns</code> takes a file object and returns its first expression. For example:</p></div><div class="code"><pre><code class="clojure">(get-ns bar) =&gt; '(ns example.bar
                   (:require [permacode.core :as perm])
-                  (:require [example.foo]))</code></pre></div><div><span id="hash-file"></span><h2><b>2 &nbsp;&nbsp; hash-file: Hash a Source File</b></h2></div><div><p>Now that we have our sorted list of files we can go one-by-one and <a href='hasher.html#introduction'>hash</a> it.</p></div><div class="code"><pre><code class="clojure">(def hasher (hasher/nippy-multi-hasher (hasher/atom-store)))</code></pre></div><div><p>For this, we start with a map containing the hash codes for all the modules we already traversed, a file object we wish to hash, and a hasher pair to hash it with. The function returns a hash code for the current file.</p></div><div class="code"><pre><code class="clojure">(def foo-hash (hash-file hasher foo {}))
+                  (:require [example.foo]))</code></pre></div><div><span id="hash-file"></span><h2><b>2 &nbsp;&nbsp; hash-file: Hash a Source File</b></h2></div><div><p>Now that we have our sorted list of files we can go one-by-one and <a href='permacode.hasher.html#introduction'>hash</a> it.</p></div><div class="code"><pre><code class="clojure">(def hasher (hasher/nippy-multi-hasher (hasher/atom-store)))</code></pre></div><div><p>For this, we start with a map containing the hash codes for all the modules we already traversed, a file object we wish to hash, and a hasher pair to hash it with. The function returns a hash code for the current file.</p></div><div class="code"><pre><code class="clojure">(def foo-hash (hash-file hasher foo {}))
  foo-hash =&gt; 'perm.QmUE7gsLyEKiKxzVkytFzy7jVkMu3LiSSecAMX9ax8nd82
  (let [[hash unhash] hasher]
  (unhash (-&gt; foo-hash str (str/replace-first &quot;perm.&quot; &quot;&quot;)))
@@ -135,7 +135,7 @@
         (:require [permacode.core :as perm])
         (:require [perm.QmUE7gsLyEKiKxzVkytFzy7jVkMu3LiSSecAMX9ax8nd82]))
       (perm/pure
-       (some-thing-else))])</code></pre></div><div><p>We add a <code>perm.</code> to the hash to mark it as a permacode hash.<br /> Later, when we validate a module, we allow it to require any module starting with this prefix. For this reason it is <strong>highly important</strong> that software projects that use permacode do not name any modules <code>perm.&#42;</code>.</p></div><div><p>To help detect problems early, source files are <a href='validate.html#validate'>validated</a> before being hashed.</p></div><div class="code"><pre><code class="clojure">(def bar2 (create-example-file (str example-dir &quot;/bar2.clj&quot;)
+       (some-thing-else))])</code></pre></div><div><p>We add a <code>perm.</code> to the hash to mark it as a permacode hash.<br /> Later, when we validate a module, we allow it to require any module starting with this prefix. For this reason it is <strong>highly important</strong> that software projects that use permacode do not name any modules <code>perm.&#42;</code>.</p></div><div><p>To help detect problems early, source files are <a href='permacode.validate.html#validate'>validated</a> before being hashed.</p></div><div class="code"><pre><code class="clojure">(def bar2 (create-example-file (str example-dir &quot;/bar2.clj&quot;)
                               '[(ns example.bar2
                                   (:require [perm.FOOBARBAZQUUX]))
                                 (some-thing-not-in-pure)]))
