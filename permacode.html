@@ -1,0 +1,295 @@
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+
+  <!-- Enable responsiveness on mobile devices-->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <link rel="shortcut icon" href="favicon.ico">
+  <title>axiom//permacode.core - Subsetting Clojure</title>
+  <script src="js/highlight.min.js"></script>
+  <script src="js/gumshoe.min.js"></script>
+  <script src="js/smooth-scroll.min.js"></script>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/poole.css">
+  <link rel="stylesheet" href="css/syntax.css">
+  <link rel="stylesheet" href="css/lanyon.css">
+  <link rel="stylesheet" href="css/bolton.css">
+  <link rel="stylesheet" href="css/bolton-api.css">
+  <link rel="stylesheet" href="css/bolton-highlight.css">
+  <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=PT+Serif:400,400italic,700|PT+Sans:400">
+  
+</head>
+
+  <body class="theme-base-08">
+    <span id="page-top"></span>
+
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+     styles, `#sidebar-checkbox` for behavior. -->
+<input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox">
+
+<!-- Toggleable sidebar -->
+<div class="sidebar" id="sidebar">
+  <nav class="sidebar-nav">
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="dynamo.srv.html">dynamo.srv</a><a class="sidebar-nav-item active" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
+    <span class="sidebar-nav-item">&nbsp;</span>
+    <span class="sidebar-nav-item">&nbsp;</span>
+  </nav>
+</div>
+
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+	  <img src="img/axiom-logo.png">
+          <h3 class="masthead-title">
+            <span>[:axiom]//permacode.core</span>
+            <small>Subsetting Clojure</small>
+          </h3>
+        </div>
+      </div>
+
+      <div class="container content">
+        <div class="page">
+          <div class="heading">
+            <div>
+              <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
+              <h5>Date: 17 April 2017</h5>
+              <h5>Repository: <a href="https://github.com/brosenan/cloudlog.clj">https://github.com/brosenan/cloudlog.clj</a></h5>
+              <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
+          <hr/>
+          <div class="outline">
+            <div class="toc">
+              <nav data-gumshoe-header>
+                <ul data-gumshoe>
+                  <a data-scroll class="top" href="#page-top">TOP</a>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a><a class="section" data-scroll="" href="#a-purely-functional-clojure"><h5><i>1.1 &nbsp; A Purely-Functional Clojure</i></h5></a><a class="section" data-scroll="" href="#content-addressing"><h5><i>1.2 &nbsp; Content Addressing</i></h5></a></li><li><a class="chapter" data-scroll="" href="#pure-compile-time-verification"><h4>2 &nbsp; pure: Compile-time Verification</h4></a><a class="section" data-scroll="" href="#stress-testing"><h5><i>2.1 &nbsp; Stress Testing</i></h5></a></li><li><a class="chapter" data-scroll="" href="#error-a-replacement-for-throw"><h4>3 &nbsp; error: A Replacement for throw</h4></a></li><li><a class="chapter" data-scroll="" href="#eval-symbol"><h4>4 &nbsp; eval-symbol: Evaluate a Permacode Definition</h4></a></li><li><a class="chapter" data-scroll="" href="#module-publics"><h4>5 &nbsp; module-publics: Get All Symbols</h4></a></li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+
+          <div class="toc">
+              <nav>
+                <ul>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a><a class="section" data-scroll="" href="#a-purely-functional-clojure"><h5><i>1.1 &nbsp; A Purely-Functional Clojure</i></h5></a><a class="section" data-scroll="" href="#content-addressing"><h5><i>1.2 &nbsp; Content Addressing</i></h5></a></li><li><a class="chapter" data-scroll="" href="#pure-compile-time-verification"><h4>2 &nbsp; pure: Compile-time Verification</h4></a><a class="section" data-scroll="" href="#stress-testing"><h5><i>2.1 &nbsp; Stress Testing</i></h5></a></li><li><a class="chapter" data-scroll="" href="#error-a-replacement-for-throw"><h4>3 &nbsp; error: A Replacement for throw</h4></a></li><li><a class="chapter" data-scroll="" href="#eval-symbol"><h4>4 &nbsp; eval-symbol: Evaluate a Permacode Definition</h4></a></li><li><a class="chapter" data-scroll="" href="#module-publics"><h4>5 &nbsp; module-publics: Get All Symbols</h4></a></li>
+                </ul>
+              </nav>
+          </div>
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p>Just like the term <em>permalink</em> refers to a URL that will always link to the same content, <em>permacode</em> refers to code that will always behave the same way.</p></div><div><p>There are a few challenges in acheiving this in general code:</p><ul><li>State changes.  Imperative code can store state which affects its own execution.</li><li>The world changes.  Code that queries the state of the world (e.g., <code>&#40;System/currentTimeMillis&#41;</code>) will give different results when the state of the world changes.</li><li>Code changes.  One version of the code will not behave the same way as its predecessors.</li></ul></div><div><p>Making permacode possible in the context of Clojure is a two-step process. First, we need to extract the <em>purely-functional core</em> of Clojure, to avoid the first to issues. Purely-functional code is not affected by the outer world and does not affect it, guaranteeing that the same code will always run the same way. To address the second problem we add <em>content addressing</em> to replace Clojure's module system.</p></div><div><span id="a-purely-functional-clojure"></span><h3>1.1 &nbsp;&nbsp; A Purely-Functional Clojure</h3></div><div><p>permacode attempts to create a purely-functional dialect of Clojure. This is a stripped-down Clojure, with only the purely-functional parts, including:</p><ul><li>Functions (well duh...)</li><li><code>let</code>, <code>loop</code>, <code>if</code> etc.</li><li>maps, sets, vectors and lists</li><li>A subset of the <code>clojure.core</code> library functions and macros, as well as</li><li><code>clojure.string</code>, <code>clojure.set</code> and potentially other pure libraries.</li></ul><p>It does not include:</p><ul><li>Variables</li><li>Atoms, refs, agents, etc.</li><li>Java interop</li><li>Imperative functions from <code>clojure.core</code></li><li>Arbitrary (non-permacode) libraries</li></ul></div><div><span id="content-addressing"></span><h3>1.2 &nbsp;&nbsp; Content Addressing</h3></div><div><p>The term <em>content addressing</em> means that some objects (in our case, permacode modules) are <em>addressed</em> by their <em>content</em>, as opposed to addressing them by <em>name</em>, which is the way Clojure works by default.</p></div><div><p>In Clojure, a <code>:require</code> clause states a name of a module, relative to the classpath of the containing project.  This has two problems as far as permacode is concerned. First, it relies on the concept of a <em>project</em>, so in two different projects there could be a different module with the same name. Second, while a name is stated explicitly, the <em>version</em> is not. It is stated in the project description, but that could just as well be a <code>SNAPSHOT</code> version, which is not a version at all.</p></div><div><p>In Permacode, we would like code artifacts to be explicitly stated. Content addressing allows us to do that, because instead of referring to modules by their names, we refer to them by their <em>content</em>.</p></div><div><p>Someone reading these lines could think, what is the point of having modules in the first place, if we refer to them by their content, that  is, including them instead if <code>:require</code>ing them? Well, the answer is that we do not <em>include</em> one module in another, we just use a <em>cryptographic hash</em> over its content as its name. This is similar to how git represents objects like directories and commits. A directory in git is merely a list of hash codes for versions of underlying files and sub-dirs. A commit contains the hash code of the root directory at the time of the commit. This data structure is called a <a href='https://en.wikipedia.org/wiki/Merkle_tree'>Merkle Tree</a>.</p></div><div><p>To support this, we use an abstraction of a <em>hasher</em>, some data-store that can either <em>hash</em> an s-expression (serialize, hash and store its content, returning the hash code), and <em>unhash</em> a hash-code (retrieve from the data-store, de-serialize and return the s-expression).</p></div><div><p>With such a hasher in place we can:</p><ol><li>Given a set of Clojure files (typically the source tree of a Clojure project),<ul><li>Validate that all *.clj files conform with permacode, and if so &ndash;</li><li>Hash all these files, modifying them to reference each other by hash rather than by name.</li><li>Return a map from module name to module hash.</li></ul></li><li>Given a module hash, load the module.</li><li>Given a fully-qualified symbol (where the namespace is a permacode hash), return the value of that symbol.  This value is guaranteed to always be the same, regardless of where and when it is evaluated.</li></ol></div><div><span id="pure-compile-time-verification"></span><h2><b>2 &nbsp;&nbsp; pure: Compile-time Verification</b></h2></div><div><p>A permacode module should be wrapped in a <code>permacode.core/pure</code> macro. This macro validates the underlying code under the module's own namespace. Validation involves macro expansion, and macros are expanded based on how they are defined relative to that module.</p></div><div><p>A valid set of definitions evaluates to a <code>do</code> block with the same content.</p></div><div class="code"><pre><code class="clojure">(pure
+(defn foo [x y]
+  (+ x y))
+(defn bar [x y]
+  (* x y)))
+ =expands-to=&gt; (do
+               (defn foo [x y]
+                 (+ x y))
+               (defn bar [x y]
+                 (* x y)))</code></pre></div><div><p>For definitions that use disallowed symbols <code>pure</code> throws an exception during macro expansion.</p></div><div class="code"><pre><code class="clojure">(macroexpand '(pure
+              (def some-atom (atom 0))))
+ =&gt; (throws &quot;symbols #{atom} are not allowed&quot;)</code></pre></div><div><p>Allowed symbols should be available unqualified or fully-qualified.</p></div><div class="code"><pre><code class="clojure">(pure
+(def x (+ 1 2))
+(def y (clojure.core/+ 2 3)))
+ =expands-to=&gt; (do
+               (def x (+ 1 2))
+               (def y (clojure.core/+ 2 3)))</code></pre></div><div><p>Some namespaces, such as <code>clojure.string</code> and <code>clojure.set</code> are white-listed, and all their publics are allowed.</p></div><div class="code"><pre><code class="clojure">(pure
+(def x (clojure.string/join &quot;, &quot; (clojure.set/union #{1 2} #{3}))))</code></pre></div><div><p>When namespaces are aliased (like <code>clojure.string</code> is aliased to <code>string</code> in this file), symbols referring to the alias are also allowed.</p></div><div class="code"><pre><code class="clojure">(pure
+(def x (string/join &quot;, &quot; (set/union #{1 2} #{3}))))</code></pre></div><div><span id="stress-testing"></span><h3>2.1 &nbsp;&nbsp; Stress Testing</h3></div><div><p>The following is a usage example coming from <a href='https://brosenan.github.io/cloudlog.clj/core.html'>cloudlog.clj</a>. It is supposed to be all pure, so it's a good test case...</p></div><div class="code"><pre><code class="clojure">(permacode.core/pure
+ (declare generate-rule-func)
+
+ (defmulti propagate-symbols (fn [cond symbols] (first cond)) :default :no-bindings)
+ (defmethod propagate-symbols :no-bindings [cond symbols]
+   symbols)
+
+ (defn binding-symbols [bindings cond]
+   (symbols/symbols (map bindings (range 0 (count bindings) 2))))
+
+ (defmethod propagate-symbols 'let [cond symbols]
+   (set/union symbols (binding-symbols (second cond) cond)))
+
+ (defmethod propagate-symbols 'for [cond symbols]
+   (set/union symbols (binding-symbols (second cond) cond)))
+
+ (defmulti process-conds (fn [conds symbols] (class (first conds))))
+
+                                        ; fact
+ (defmethod process-conds  clojure.lang.IPersistentVector [conds symbols]
+   (let [target (first conds)
+         target-name (first target)]
+     (if (= (count conds) 1)
+       (do ; Target fact
+         [[(vec (rest target))] {:target-fact [target-name (count (rest target))]}])
+                                        ; Continuation
+       (let [[func meta] (generate-rule-func (first conds) (rest conds) symbols)
+             key (second target)
+             params (vec (set/intersection symbols (symbols/symbols func)))
+             missing (set/difference (symbols/symbols key) symbols)
+             meta {:continuation (with-meta `(fn [[~'$key$ ~@params]] ~func) meta)}]
+         (when-not (empty? missing)
+           (permacode.core/error &quot;variables &quot; missing &quot; are unbound in the key for &quot; (first target)))
+         [`[[~key ~@params]] meta]))))
+
+                                        ; guard
+ (defmethod process-conds  clojure.lang.ISeq [conds symbols]
+   (let [cond (first conds)
+         [body meta] (process-conds (rest conds) (propagate-symbols cond symbols))
+         body (seq (concat cond [body]))
+         meta (if (string/starts-with? (str (first cond)) &quot;by&quot;)
+                (assoc meta :checked true)
+                meta)]
+     (if (= (first cond) 'for)
+       [`(apply concat ~body) meta]
+                                        ; else
+       [body meta])))
+
+ (defn generate-rule-func [source-fact conds ext-symbols]
+   (let [symbols (set/difference (symbols/symbols (rest source-fact)) ext-symbols)
+         [body meta] (process-conds conds (set/union symbols ext-symbols))
+         meta (merge meta {:source-fact [(first source-fact) (count (rest source-fact))]})
+         vars (vec symbols)
+         func `(fn [~'$input$]
+                 ~(if (empty? vars)
+                                        ; No unbound variables
+                    `(if (= ~'$input$ [~@(rest source-fact)])
+                       ~body
+                       [])
+                                        ; vars contains the unbound variables
+                    `(let [~'$poss$ ((unify/unify-fn ~vars [~@(rest source-fact)] ~vars) ~'$input$)]
+                       (apply concat (for [~vars ~'$poss$] 
+                                       ~body)))))]
+     [func meta]))
+
+ (defn validate-rule [metadata]
+   (loop [metadata metadata
+          link 0]
+     (when-not (:checked metadata)
+       (permacode.core/error &quot;Rule is insecure. Link &quot; link &quot; is not checked.&quot;))
+     (when (:continuation metadata)
+       (recur (-&gt; metadata :continuation meta) (inc link)))))
+
+ (defmacro defrule [rulename args source-fact &amp; body]
+   (let [conds (concat body [`[~(keyword (str *ns*) (name rulename)) ~@args]])
+         [func meta] (generate-rule-func source-fact conds #{})]
+     (validate-rule meta)
+     `(def ~rulename (with-meta ~func ~(merge meta {:ns *ns* :name (str rulename)})))))
+
+ (defn append-to-keyword [keywd suffix]
+   (keyword (namespace keywd) (str (name keywd) suffix)))
+
+ (defmacro defclause [clausename pred args-in args-out &amp; body]
+   (let [source-fact `[~(append-to-keyword pred &quot;?&quot;) ~'$unique$ ~@args-in]
+         conds (concat body [`[~(append-to-keyword pred &quot;!&quot;) ~'$unique$ ~@args-out]])
+         [func meta] (generate-rule-func source-fact conds #{})]
+     `(def ~clausename (with-meta ~func ~(merge meta {:ns *ns* :name (str clausename)})))))
+
+ (defn with* [seq]
+   (apply merge-with set/union
+          (for [fact seq]
+            (let [fact-name (first fact)
+                  metadata (meta fact)
+                  arity (-&gt; fact rest count)]
+              {[fact-name arity] #{(with-meta (vec (rest fact)) metadata)}}))))
+
+ (defn simulate* [rule factmap]
+   (let [source-fact (-&gt; rule meta :source-fact)
+         input-set (factmap source-fact)
+         after-first (into #{} (apply concat (map rule input-set)))
+         cont (-&gt; rule meta :continuation)]
+     (if cont
+       (let [next-rules (map cont after-first)]
+         (into #{} (apply concat (for [next-rule next-rules]
+                                   (simulate* (with-meta next-rule (meta cont)) factmap)))))
+                                        ;else
+       after-first)))
+
+ (defn simulate-with [rule &amp; facts]
+   (simulate* rule (with* facts)))
+
+ (defmulti fact-table (fn [[name arity]] (class name)))
+
+ (defmethod fact-table clojure.lang.Named [[name arity]]
+   (str (namespace name) &quot;/&quot; (clojure.core/name name)))
+ (defmethod fact-table clojure.lang.IFn [[name arity]]
+   (let [ns (-&gt; name meta :ns)
+         name (-&gt; name meta :name)]
+     (str ns &quot;/&quot; name)))
+ (prefer-method fact-table clojure.lang.Named clojure.lang.IFn)
+
+ (defmacro by [set body]
+   `(when (contains? (-&gt; ~'$input$ meta :writers) ~set)
+      ~body))
+
+ (defmacro by-anyone [body]
+   body))</code></pre></div><div><span id="error-a-replacement-for-throw"></span><h2><b>3 &nbsp;&nbsp; error: A Replacement for throw</b></h2></div><div><p>We do not allow pure code to <code>throw</code>, because throwing exceptions involves creating Java classes. Instead, we provide the <code>error</code> function, which throws an <code>Exception</code> with the given string.</p></div><div class="code"><pre><code class="clojure">(error 1000 &quot; bottles of beer on the wall&quot;) =&gt; (throws #&quot;1000 bottles of beer&quot;)</code></pre></div><div><span id="eval-symbol"></span><h2><b>4 &nbsp;&nbsp; eval-symbol: Evaluate a Permacode Definition</b></h2></div><div><p>At the end, all we want is to be able to take a certain definition and evaluate it. For example, consider the following Permacode module:</p></div><div class="code"><pre><code class="clojure">(def my-module
+  '[(ns example.my-module
+      (:require [clojure.string :as str]
+                [permacode.core]))
+    (permacode.core/pure
+     (defn tokenize [text]
+       (str/split text #&quot;[ ,.!?:]+&quot;)))])
+
+(def my-other-module
+  '[(ns example.my-other-module
+      (:require [perm.QmXGe3DdhRGKfLgs1Dp9sNa2VFktfqj32XicKRcUeLXMxG :as mine]
+                [permacode.core]))
+    (permacode.core/pure
+     (defn extract-hashtags [text]
+       (-&gt;&gt; text mine/tokenize (filter (fn [x] (clojure.string/starts-with? x &quot;#&quot;)))))
+     (def foo (with-meta [2] {:some :meta})))])</code></pre></div><div><p>Let's save these to files.</p></div><div class="code"><pre><code class="clojure">(def example-dir (io/file &quot;/tmp/permacode.core/example&quot;))
+(.mkdirs example-dir)
+(with-open [f (io/writer (io/file example-dir &quot;my_module.clj&quot;))]
+  (doseq [expr my-module]
+    (.write f (pr-str expr))))
+(with-open [f (io/writer (io/file example-dir &quot;my_other_module.clj&quot;))]
+  (doseq [expr my-other-module]
+    (.write f (pr-str expr))))</code></pre></div><div><p>Now let's publish the <code>example</code> directory.</p></div><div class="code"><pre><code class="clojure">(remove-ns 'perm.QmXGe3DdhRGKfLgs1Dp9sNa2VFktfqj32XicKRcUeLXMxG)
+ (remove-ns 'perm.QmVxcd8ooha7JtZvh5AD3QhAiLMm7Zjm5YAqkXitVbVSfo)
+ (def hasher (hasher/nippy-multi-hasher (hasher/atom-store)))
+(def published
+  (publish/hash-all hasher example-dir))
+published =&gt; map?
+published =not=&gt; empty?</code></pre></div><div><p>Now we want to use the <code>extrat-hashtags</code> function.  To do so we use <code>eval-symbol</code>:</p></div><div class="code"><pre><code class="clojure">(published 'example.my-module) =&gt; 'perm.QmXGe3DdhRGKfLgs1Dp9sNa2VFktfqj32XicKRcUeLXMxG
+ (published 'example.my-other-module) =&gt; 'perm.QmVxcd8ooha7JtZvh5AD3QhAiLMm7Zjm5YAqkXitVbVSfo
+ (binding [validate/*hasher* hasher]
+ (let [extract-hashtags (eval-symbol 'perm.QmVxcd8ooha7JtZvh5AD3QhAiLMm7Zjm5YAqkXitVbVSfo/extract-hashtags)]
+   (extract-hashtags &quot;These #days #tweets are all about #hashtags...&quot;) =&gt; [&quot;#days&quot; &quot;#tweets&quot; &quot;#hashtags&quot;]))</code></pre></div><div><p>Metadata is maintained (the actual value is returned, not a variable pointing to it).</p></div><div class="code"><pre><code class="clojure">(binding [validate/*hasher* hasher]
+ (let [foo (eval-symbol 'perm.QmVxcd8ooha7JtZvh5AD3QhAiLMm7Zjm5YAqkXitVbVSfo/foo)]
+   (-&gt; foo meta :some) =&gt; :meta))</code></pre></div><div><span id="module-publics"></span><h2><b>5 &nbsp;&nbsp; module-publics: Get All Symbols</b></h2></div><div><p><code>module-publics</code> (similar to <code>ns-publics</code> in <code>clojure.core</code>) returns all the public definitions in a permacode module in form of a map.</p></div><div class="code"><pre><code class="clojure">(binding [validate/*hasher* hasher]
+ (let [pubs (module-publics 'perm.QmVxcd8ooha7JtZvh5AD3QhAiLMm7Zjm5YAqkXitVbVSfo)]
+   pubs =&gt; map?
+   (pubs 'foo) =&gt; [2]))</code></pre></div>
+        </div>
+      </div>
+    </div>
+
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+
+  </body>
+
+  <script>
+  if (false) {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', '<@=tracking>', 'caudate.me');
+    ga('send', 'pageview');
+  }
+  </script>
+  
+  <script type="text/javascript">
+    smoothScroll.init();
+    gumshoe.init({});
+  
+    hljs.registerLanguage("clojure",function(e){var t={"builtin-name":"def defonce cond apply if-not if-let if not not= = < > <= >= == + / * - rem quot neg? pos? delay? symbol? keyword? true? false? integer? empty? coll? list? set? ifn? fn? associative? sequential? sorted? counted? reversible? number? decimal? class? distinct? isa? float? rational? reduced? ratio? odd? even? char? seq? vector? string? map? nil? contains? zero? instance? not-every? not-any? libspec? -> ->> .. . inc compare do dotimes mapcat take remove take-while drop letfn drop-last take-last drop-while while intern condp case reduced cycle split-at split-with repeat replicate iterate range merge zipmap declare line-seq sort comparator sort-by dorun doall nthnext nthrest partition eval doseq await await-for let agent atom send send-off release-pending-sends add-watch mapv filterv remove-watch agent-error restart-agent set-error-handler error-handler set-error-mode! error-mode shutdown-agents quote var fn loop recur throw try monitor-enter monitor-exit defmacro defn defn- macroexpand macroexpand-1 for dosync and or when when-not when-let comp juxt partial sequence memoize constantly complement identity assert peek pop doto proxy defstruct first rest cons defprotocol cast coll deftype defrecord last butlast sigs reify second ffirst fnext nfirst nnext defmulti defmethod meta with-meta ns in-ns create-ns import refer keys select-keys vals key val rseq name namespace promise into transient persistent! conj! assoc! dissoc! pop! disj! use class type num float double short byte boolean bigint biginteger bigdec print-method print-dup throw-if printf format load compile get-in update-in pr pr-on newline flush read slurp read-line subvec with-open memfn time re-find re-groups rand-int rand mod locking assert-valid-fdecl alias resolve ref deref refset swap! reset! set-validator! compare-and-set! alter-meta! reset-meta! commute get-validator alter ref-set ref-history-count ref-min-history ref-max-history ensure sync io! new next conj set! to-array future future-call into-array aset gen-class reduce map filter find empty hash-map hash-set sorted-map sorted-map-by sorted-set sorted-set-by vec vector seq flatten reverse assoc dissoc list disj get union difference intersection extend extend-type extend-protocol int nth delay count concat chunk chunk-buffer chunk-append chunk-first chunk-rest max min dec unchecked-inc-int unchecked-inc unchecked-dec-inc unchecked-dec unchecked-negate unchecked-add-int unchecked-add unchecked-subtract-int unchecked-subtract chunk-next chunk-cons chunked-seq? prn vary-meta lazy-seq spread list* str find-keyword keyword symbol gensym force rationalize"},r="a-zA-Z_\\-!.?+*=<>&#'",n="["+r+"]["+r+"0-9/;:]*",a="[-+]?\\d+(\\.\\d+)?",o={b:n,r:0},s={cN:"number",b:a,r:0},i=e.inherit(e.QSM,{i:null}),c=e.C(";","$",{r:0}),d={cN:"literal",b:/\b(true|false|nil)\b/},l={b:"[\\[\\{]",e:"[\\]\\}]"},m={cN:"comment",b:"\\^"+n},p=e.C("\\^\\{","\\}"),u={cN:"symbol",b:"[:]{1,2}"+n},f={b:"\\(",e:"\\)"},h={eW:!0,r:0},y={k:t,l:n,cN:"name",b:n,starts:h},b=[f,i,m,p,c,u,l,s,d,o];return f.c=[e.C("comment",""),y,h],h.c=b,l.c=b,{aliases:["clj"],i:/\S/,c:[f,i,m,p,c,u,l,s,d]}});
+    hljs.initHighlightingOnLoad();
+  </script>
+</html>

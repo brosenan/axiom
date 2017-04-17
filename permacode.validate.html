@@ -1,0 +1,227 @@
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+
+  <!-- Enable responsiveness on mobile devices-->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <link rel="shortcut icon" href="favicon.ico">
+  <title>axiom//permacode.validate - Static Analysis</title>
+  <script src="js/highlight.min.js"></script>
+  <script src="js/gumshoe.min.js"></script>
+  <script src="js/smooth-scroll.min.js"></script>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/poole.css">
+  <link rel="stylesheet" href="css/syntax.css">
+  <link rel="stylesheet" href="css/lanyon.css">
+  <link rel="stylesheet" href="css/bolton.css">
+  <link rel="stylesheet" href="css/bolton-api.css">
+  <link rel="stylesheet" href="css/bolton-highlight.css">
+  <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=PT+Serif:400,400italic,700|PT+Sans:400">
+  
+</head>
+
+  <body class="theme-base-08">
+    <span id="page-top"></span>
+
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+     styles, `#sidebar-checkbox` for behavior. -->
+<input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox">
+
+<!-- Toggleable sidebar -->
+<div class="sidebar" id="sidebar">
+  <nav class="sidebar-nav">
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="dynamo.srv.html">dynamo.srv</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item active" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
+    <span class="sidebar-nav-item">&nbsp;</span>
+    <span class="sidebar-nav-item">&nbsp;</span>
+  </nav>
+</div>
+
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+	  <img src="img/axiom-logo.png">
+          <h3 class="masthead-title">
+            <span>[:axiom]//permacode.validate</span>
+            <small>Static Analysis</small>
+          </h3>
+        </div>
+      </div>
+
+      <div class="container content">
+        <div class="page">
+          <div class="heading">
+            <div>
+              <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
+              <h5>Date: 17 April 2017</h5>
+              <h5>Repository: <a href="https://github.com/brosenan/cloudlog.clj">https://github.com/brosenan/cloudlog.clj</a></h5>
+              <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
+          <hr/>
+          <div class="outline">
+            <div class="toc">
+              <nav data-gumshoe-header>
+                <ul data-gumshoe>
+                  <a data-scroll class="top" href="#page-top">TOP</a>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#validate-ns"><h4>2 &nbsp; validate-ns: Validating the ns Expression</h4></a></li><li><a class="chapter" data-scroll="" href="#validate-expr"><h4>3 &nbsp; validate-expr: Validate a Body Expression</h4></a><a class="section" data-scroll="" href="#validating-values"><h5><i>3.1 &nbsp; Validating Values</i></h5></a></li><li><a class="chapter" data-scroll="" href="#validate"><h4>4 &nbsp; validate: Validate an Entire Module</h4></a></li><li><a class="chapter" data-scroll="" href="#perm-require-load-a-hashed-namespace"><h4>5 &nbsp; perm-require: Load a Hashed Namespace</h4></a></li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+
+          <div class="toc">
+              <nav>
+                <ul>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#validate-ns"><h4>2 &nbsp; validate-ns: Validating the ns Expression</h4></a></li><li><a class="chapter" data-scroll="" href="#validate-expr"><h4>3 &nbsp; validate-expr: Validate a Body Expression</h4></a><a class="section" data-scroll="" href="#validating-values"><h5><i>3.1 &nbsp; Validating Values</i></h5></a></li><li><a class="chapter" data-scroll="" href="#validate"><h4>4 &nbsp; validate: Validate an Entire Module</h4></a></li><li><a class="chapter" data-scroll="" href="#perm-require-load-a-hashed-namespace"><h4>5 &nbsp; perm-require: Load a Hashed Namespace</h4></a></li>
+                </ul>
+              </nav>
+          </div>
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p>Permacode validation is intended to make sure that a give Clojure source file conforms to the permacode sub-language.</p></div><div><p>Validation is a two-step process.  Its first part is done on a source file that has been read somehow, and makes sure that it has all the safeguards necessary for the second part to kick in. The second part is done with the <code>pure</code> macro, at compile time. It makes sure that only allowed language constructs are used.</p></div><div><span id="validate-ns"></span><h2><b>2 &nbsp;&nbsp; validate-ns: Validating the ns Expression</b></h2></div><div><p><code>validate-ns</code> takes an <code>ns</code> expression and a list of allowed namespaces, and succeeds (returns nil) if this <code>ns</code> expression is valid in the sense that it only <code>requires</code> namespaces for that list.</p></div><div><p>For a trivial <code>ns</code> expression it succeeds</p></div><div class="code"><pre><code class="clojure">(validate-ns '(ns foo.bar) white-listed-ns) =&gt; nil</code></pre></div><div><p>Simple <code>:require</code> clauses are allowed.</p></div><div class="code"><pre><code class="clojure">(validate-ns '(ns foo.bar
+               (:require [clojure.string]
+                         [clojure.set])
+               (:require [my.proj.core])) (concat white-listed-ns [&quot;my.proj.core&quot;]))
+ =&gt; nil</code></pre></div><div><p>And so are <code>:require</code> clauses with <code>:as</code>:</p></div><div class="code"><pre><code class="clojure">(validate-ns '(ns foo.bar
+               (:require [clojure.string :as string])) white-listed-ns)
+ =&gt; nil</code></pre></div><div><p>Other forms are not supported.</p></div><div class="code"><pre><code class="clojure">(validate-ns '(ns foo.bar
+               (:require [clojure.string :refer :all])) white-listed-ns)
+ =&gt; (throws &quot;:refer is not allowed in ns expressions in permacode modules&quot;)</code></pre></div><div><p>If a <code>:require</code> refers to a namespace that is not in the environment, an exception is thrown.</p></div><div class="code"><pre><code class="clojure">(validate-ns '(ns foo.bar
+               (:require [clojure.core.async])) white-listed-ns)
+ =&gt; (throws #&quot;Namespace clojure.core.async is not approved for permacode&quot;)</code></pre></div><div><p><code>validate-ns</code> also throws an exception if the expression it is given is not an <code>ns</code> expression.</p></div><div class="code"><pre><code class="clojure">(validate-ns '(not-an-ns-expr foo.bar) white-listed-ns)
+ =&gt; (throws #&quot;The first expression in a permacode source file must be an ns.  not-an-ns-expr given.&quot;)</code></pre></div><div><p>Permacode modules can <code>:require</code> other permacode modules by naming them as <code>perm.&#42;</code> where <code>&#42;</code> is replaecd with their hash code. We consider <code>:require</code>ing such a module safe.</p></div><div class="code"><pre><code class="clojure">(validate-ns '(ns foo.bar
+               (:require [perm.ABCD1234])) white-listed-ns)
+ =not=&gt; (throws)</code></pre></div><div><p>When the <code>permacode.core</code> namespace is <code>:require</code>d and is given an alias, <code>validate-ns</code> returns that alias.</p></div><div class="code"><pre><code class="clojure">(validate-ns '(ns foo.bar
+               (:require [perm.ABCD1234 :as foo]
+                         [permacode.core :as bar]
+                         [clojure.string :as string])) white-listed-ns)
+ =&gt; 'bar</code></pre></div><div><span id="validate-expr"></span><h2><b>3 &nbsp;&nbsp; validate-expr: Validate a Body Expression</b></h2></div><div><p>Given a set of allowed symbols we can validate a body  expression. A declaration adds a symbol to the environment.</p></div><div class="code"><pre><code class="clojure">(let [new-env (validate-expr #{'foo 'bar} '(def quux))]
+ (new-env 'quux) =&gt; 'quux)</code></pre></div><div><p>The same works with definitions as well.</p></div><div class="code"><pre><code class="clojure">(let [new-env (validate-expr #{'foo 'bar} '(def quux 123))]
+ (new-env 'quux) =&gt; 'quux)</code></pre></div><div><p>The environment provided to the body contains the variable being <code>def</code>ed, so that recursive definitions are possible.</p></div><div class="code"><pre><code class="clojure">(validate-expr #{} '(def quux [1 quux]))
+=&gt; #{'quux}</code></pre></div><div><p>Macros are expanded.  For example. <code>defn</code> is interpreted as a <code>def</code> with <code>fn</code>.</p></div><div class="code"><pre><code class="clojure">(let [new-env (validate-expr #{'foo 'bar} '(defn quux [x] x))]
+ (new-env 'quux) =&gt; 'quux)</code></pre></div><div><p>When a form is not a valid top-level form, an exception is thrown.</p></div><div class="code"><pre><code class="clojure">(validate-expr #{'foo 'bar} '(let [x 2] (+ x 3)))
+ =&gt; (throws &quot;let* is not a valid top-level form.&quot;)</code></pre></div><div><p>For a <code>do</code>, we recurse to validate the child forms.</p></div><div class="code"><pre><code class="clojure">(validate-expr #{} '(do
+                     (def foo 1)
+                     (def bar 2)))
+ =&gt; #{'foo 'bar}</code></pre></div><div><p><code>defmacro</code>, <code>defmulti</code> and <code>defmethod</code> use Java interop when expanded. We allow them in permacode, by making special cases out of them.</p></div><div class="code"><pre><code class="clojure">(validate-expr #{'clojure.core/concat 'clojure.core/list 'clojure.core/seq} ; used by the syntax-quote
+              '(defmacro foo [x y z] `(~x ~y ~z)))
+ =&gt; #{'foo 'clojure.core/concat 'clojure.core/list 'clojure.core/seq}
+ (validate-expr #{'first}
+              '(defmulti bar first))
+ =&gt; #{'first 'bar}
+ (validate-expr #{}
+              '(defmulti bar first))
+ =&gt; (throws &quot;symbols #{first} are not allowed&quot;)
+ (validate-expr #{'+}
+              '(defmethod bar :x [a b]
+                 (+ a b)))
+ =&gt; #{'+ 'bar}
+ (validate-expr #{}
+              '(defmethod bar c [a b]
+                 (+ a b)))
+ =&gt; (throws &quot;symbols #{c +} are not allowed&quot;)</code></pre></div><div><p>To support multimethods, <code>prefer-method</code> is allowed at the top-level.</p></div><div class="code"><pre><code class="clojure">(validate-expr #{'foo 'a 'b}
+              '(prefer-method foo a b)) =&gt; #{'foo 'a 'b}
+(validate-expr #{}
+              '(prefer-method foo a b)) =&gt; (throws &quot;symbols #{a foo b} are not allowed&quot;)</code></pre></div><div><p>Comments (that expand to <code>nil</code>) are allowed as top-level expressions.</p></div><div class="code"><pre><code class="clojure">(validate-expr #{} '(comment
+                     (foo bar)))
+ =&gt; #{}</code></pre></div><div><span id="validating-values"></span><h3>3.1 &nbsp;&nbsp; Validating Values</h3></div><div><p>In definitions, the values are validated to only refer to allowed symbols.</p></div><div class="code"><pre><code class="clojure">(validate-expr #{'foo} '(def bar (+ foo 2)))
+ =&gt; (throws &quot;symbols #{+} are not allowed&quot;)
+ (validate-expr #{'foo '+} '(def bar (+ foo 2)))
+ =&gt; #{'foo 'bar '+}</code></pre></div><div><p>In <code>do</code> blocks, symbols defined (or even declared) in previous definitions can be used in succeeding definitions.</p></div><div class="code"><pre><code class="clojure">(validate-expr #{} '(do
+                     (declare foo)
+                     (def bar foo)))
+ =&gt; #{'bar 'foo}</code></pre></div><div><p>While we do not allow Java interop in permacode, we do allow one small part of it: class literals. We do allow class names (symbols with dots in the middle) in expressions. The assumption is that alone (e.g., without possibility of instantiation or calling static methods) classes are harmless.  And they are useful.  Often, calsses are the best way to distinguish between different kinds of Clojure elements.</p></div><div class="code"><pre><code class="clojure">(validate-expr #{} '(def bar foo.bar.MyClass))
+ =&gt; #{'bar}
+ (validate-expr #{} '(def bar (foo.bar.MyClass.)))
+ =&gt; (throws &quot;symbols #{new} are not allowed&quot;)</code></pre></div><div><span id="validate"></span><h2><b>4 &nbsp;&nbsp; validate: Validate an Entire Module</b></h2></div><div><p>A module is valid if:</p><ol><li>Its first expression is <code>ns</code>, and it is valid based on <a href='#validate-ns'>validate-ns</a>.</li><li>All its other expressions are <code>pure</code> expressions.  The <code>pure</code> macro validates its own contents.</li></ol></div><div><p><code>validate</code> takes the content of a module (as a seq of expressions) and and a list of allowed namespaces, and succeeds (does not throw exceptions) if valid.</p></div><div class="code"><pre><code class="clojure">(validate '[(ns foo.bar
+             (:require [permacode.core]
+                       [clojure.string :as str]
+                       [perm.FOOBAR123 :as some-other-module]))
+           (permacode.core/pure
+            (def x 3))] white-listed-ns)
+ =&gt; nil</code></pre></div><div><p>If something is wrong in the <code>ns</code> expression, it throws.</p></div><div class="code"><pre><code class="clojure">(validate '[(ns foo.bar
+             (:require [permacode.core]
+                       [some.bad.module]
+                       [clojure.string :as str]
+                       [perm.FOOBAR123 :as some-other-module]))
+           (permacode.core/pure
+            (def x 3))] white-listed-ns)
+ =&gt; (throws)</code></pre></div><div><p>If one of the other expressions in the module is not wrapped in a <code>pure</code>, an exception is thrown.</p></div><div class="code"><pre><code class="clojure">(validate '[(ns foo.bar
+             (:require [permacode.core]
+                       [clojure.string :as str]
+                       [perm.FOOBAR123 :as some-other-module]))
+           (permacode.core/pure
+            (def x 3))
+           (def y 5)] white-listed-ns)
+ =&gt; (throws &quot;Expression (def y 5) must be wrapped in a pure macro&quot;)</code></pre></div><div><p>In case <code>permacode.core</code> is aliased to some name, <code>validate</code> allowes <code>pure</code> to be used from within that alias.</p></div><div class="code"><pre><code class="clojure">(validate '[(ns foo.bar
+             (:require [permacode.core :as perm]
+                       [clojure.string :as str]
+                       [perm.FOOBAR123 :as some-other-module]))
+           (perm/pure
+            (def x 3))] white-listed-ns)
+ =&gt; nil</code></pre></div><div><span id="perm-require-load-a-hashed-namespace"></span><h2><b>5 &nbsp;&nbsp; perm-require: Load a Hashed Namespace</b></h2></div><div><p>When we have a hash-code that represents a permacode namespace, we need to <code>perm-require</code> it so that it becomes available for programs.</p></div><div><p>The <code>perm-require</code> function takes a hash code and possibly an alias, and loads the module along with its dependencies, similar to the <code>clojure.core/require</code> function.</p></div><div><p>If the hash's namespace is already loaded, we return.</p></div><div class="code"><pre><code class="clojure">(binding [*hasher* (hasher/nippy-multi-hasher (hasher/atom-store))]
+ (perm-require 'perm.abcd) =&gt; nil
+ (provided
+  (find-ns 'perm.abcd) =&gt; :something))</code></pre></div><div><p>If the namespace if not loaded, the code is retrieved from the hasher.</p></div><div class="code"><pre><code class="clojure">(def hash-to-require (symbol (str &quot;perm.abcd&quot; (rand-int 10000))))
+(def unhash-called (atom false))
+(def mock-content '[(ns foo
+                      (:require [permacode.core :as perm]))
+                    (perm/pure
+                     (defn f [x] (+ 1 x)))])
+(defn mock-unhash [hash]
+  (assert (= hash (-&gt; hash-to-require str (string/replace-first &quot;perm.&quot; &quot;&quot;))))
+  (swap! unhash-called not)
+  mock-content)</code></pre></div><div><p>After retrieving the code it is <code>eval</code>uated in the new namespace.</p></div><div class="code"><pre><code class="clojure">(binding [*hasher* [nil mock-unhash]]
+ (perm-require hash-to-require) =&gt; nil
+ (provided
+  (find-ns hash-to-require) =&gt; nil)
+ @unhash-called =&gt; true
+ (find-ns hash-to-require) =not=&gt; nil?
+ ((ns-aliases hash-to-require) 'perm) =not=&gt; nil?
+ (let [f @((ns-publics hash-to-require) 'f)]
+   (f 2)) =&gt; 3)</code></pre></div><div><p>If the header requires a forbidden module, an exception is thrown.</p></div><div class="code"><pre><code class="clojure">(def mock-content '[(ns foo
+                      (:require [clojure.java.io]))])
+(def hash-to-require (symbol (str &quot;abcd&quot; (rand-int 10000)))) ; Fresh namespace</code></pre></div><div class="code"><pre><code class="clojure">(binding [*hasher* [nil mock-unhash]]
+ (perm-require hash-to-require) =&gt; (throws &quot;Namespace clojure.java.io is not approved for permacode&quot;))</code></pre></div><div><p>When a module <code>:require</code>s some other permacode module, <code>perm-require</code> recursively loads it.</p></div><div class="code"><pre><code class="clojure">(def mock-content '[(ns foo
+                      (:require [perm.FOOBAR1234]))])
+(def hash-to-require (symbol (str &quot;abcd&quot; (rand-int 10000)))) ; Fresh namespace</code></pre></div><div class="code"><pre><code class="clojure">(binding [*hasher* [nil mock-unhash]]
+ (perm-require hash-to-require) =&gt; nil
+ (provided
+  (find-ns hash-to-require) =&gt; nil
+  (find-ns 'perm.FOOBAR1234) =&gt; :something))</code></pre></div><div><p><code>perm-require</code> accepts an optional <code>:as</code> keyword argument, and creates an alias accordingly.</p></div><div class="code"><pre><code class="clojure">(let [alias (symbol (str &quot;foobar&quot; (rand-int 100000)))]
+ (binding [*hasher* [nil mock-unhash]]
+   (perm-require hash-to-require :as alias) =&gt; nil
+   ((ns-aliases *ns*) alias) =not=&gt; nil?))</code></pre></div>
+        </div>
+      </div>
+    </div>
+
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+
+  </body>
+
+  <script>
+  if (false) {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', '<@=tracking>', 'caudate.me');
+    ga('send', 'pageview');
+  }
+  </script>
+  
+  <script type="text/javascript">
+    smoothScroll.init();
+    gumshoe.init({});
+  
+    hljs.registerLanguage("clojure",function(e){var t={"builtin-name":"def defonce cond apply if-not if-let if not not= = < > <= >= == + / * - rem quot neg? pos? delay? symbol? keyword? true? false? integer? empty? coll? list? set? ifn? fn? associative? sequential? sorted? counted? reversible? number? decimal? class? distinct? isa? float? rational? reduced? ratio? odd? even? char? seq? vector? string? map? nil? contains? zero? instance? not-every? not-any? libspec? -> ->> .. . inc compare do dotimes mapcat take remove take-while drop letfn drop-last take-last drop-while while intern condp case reduced cycle split-at split-with repeat replicate iterate range merge zipmap declare line-seq sort comparator sort-by dorun doall nthnext nthrest partition eval doseq await await-for let agent atom send send-off release-pending-sends add-watch mapv filterv remove-watch agent-error restart-agent set-error-handler error-handler set-error-mode! error-mode shutdown-agents quote var fn loop recur throw try monitor-enter monitor-exit defmacro defn defn- macroexpand macroexpand-1 for dosync and or when when-not when-let comp juxt partial sequence memoize constantly complement identity assert peek pop doto proxy defstruct first rest cons defprotocol cast coll deftype defrecord last butlast sigs reify second ffirst fnext nfirst nnext defmulti defmethod meta with-meta ns in-ns create-ns import refer keys select-keys vals key val rseq name namespace promise into transient persistent! conj! assoc! dissoc! pop! disj! use class type num float double short byte boolean bigint biginteger bigdec print-method print-dup throw-if printf format load compile get-in update-in pr pr-on newline flush read slurp read-line subvec with-open memfn time re-find re-groups rand-int rand mod locking assert-valid-fdecl alias resolve ref deref refset swap! reset! set-validator! compare-and-set! alter-meta! reset-meta! commute get-validator alter ref-set ref-history-count ref-min-history ref-max-history ensure sync io! new next conj set! to-array future future-call into-array aset gen-class reduce map filter find empty hash-map hash-set sorted-map sorted-map-by sorted-set sorted-set-by vec vector seq flatten reverse assoc dissoc list disj get union difference intersection extend extend-type extend-protocol int nth delay count concat chunk chunk-buffer chunk-append chunk-first chunk-rest max min dec unchecked-inc-int unchecked-inc unchecked-dec-inc unchecked-dec unchecked-negate unchecked-add-int unchecked-add unchecked-subtract-int unchecked-subtract chunk-next chunk-cons chunked-seq? prn vary-meta lazy-seq spread list* str find-keyword keyword symbol gensym force rationalize"},r="a-zA-Z_\\-!.?+*=<>&#'",n="["+r+"]["+r+"0-9/;:]*",a="[-+]?\\d+(\\.\\d+)?",o={b:n,r:0},s={cN:"number",b:a,r:0},i=e.inherit(e.QSM,{i:null}),c=e.C(";","$",{r:0}),d={cN:"literal",b:/\b(true|false|nil)\b/},l={b:"[\\[\\{]",e:"[\\]\\}]"},m={cN:"comment",b:"\\^"+n},p=e.C("\\^\\{","\\}"),u={cN:"symbol",b:"[:]{1,2}"+n},f={b:"\\(",e:"\\)"},h={eW:!0,r:0},y={k:t,l:n,cN:"name",b:n,starts:h},b=[f,i,m,p,c,u,l,s,d,o];return f.c=[e.C("comment",""),y,h],h.c=b,l.c=b,{aliases:["clj"],i:/\S/,c:[f,i,m,p,c,u,l,s,d]}});
+    hljs.initHighlightingOnLoad();
+  </script>
+</html>
