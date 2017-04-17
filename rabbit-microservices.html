@@ -37,7 +37,7 @@
     <span>&nbsp;</span>
     <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
     <span>&nbsp;</span>
-    <a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="dynamo.srv.html">dynamo.srv</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item active" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
+    <a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="dynamo.srv.html">dynamo.srv</a><a class="sidebar-nav-item" href="migrator.html">migrator.core</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item active" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
     <span class="sidebar-nav-item">&nbsp;</span>
     <span class="sidebar-nav-item">&nbsp;</span>
   </nav>
@@ -185,19 +185,20 @@
  ; By running handle-event...
  (handle-event #'my-func alive :the-channel {:delivery-tag 777} my-event-bin) =&gt; nil
  ; we execute my-func, which adds the event to received
- @received =&gt; [my-event]</code></pre></div><div><p>If the wrapped function accepts two parameters, the second parameter is taken to be a <code>publish</code> function, which publishes events on the facts exchange.</p></div><div class="code"><pre><code class="clojure">(def event2 {:kind :fact
-            :name &quot;foo/baz&quot;
+ @received =&gt; [my-event]</code></pre></div><div><p>If the wrapped function accepts two parameters, the second parameter is taken to be a <code>publish</code> function, which publishes events on the facts exchange. The event handler (<code>my-func</code> in the example below) does not have to specify all fields in the event it publishes (<code>event2</code> in the example). All fields that are not specified in the event default to their values in the event that triggerred the function (<code>event-that-was-sent</code> in the example).</p></div><div class="code"><pre><code class="clojure">(def event2 {:name &quot;foo/baz&quot;
             :key 5555
             :data [1 2 3 4]})
- (def event2-bin (nippy/freeze event2))
  (defn my-func
  {:reg {:kind :fact
         :name &quot;foo/bar&quot;}}
  [ev publish]
  (publish event2))
+ (def event-that-was-sent
+ (merge my-event event2))
  (handle-event #'my-func alive :the-channel :meta-attrs my-event-bin) =&gt; nil
  (provided
-(lb/publish :the-channel facts-exch (event-routing-key event2) irrelevant :meta-attrs) =&gt; irrelevant)</code></pre></div><div><p>When the <code>alive</code> atom evaluates to <code>false</code>, the publish function does nothing.</p></div><div class="code"><pre><code class="clojure">(reset! alive false)
+(nippy/freeze event-that-was-sent) =&gt; ..bin..
+(lb/publish :the-channel facts-exch (event-routing-key event2) ..bin.. :meta-attrs) =&gt; irrelevant)</code></pre></div><div><p>When the <code>alive</code> atom evaluates to <code>false</code>, the publish function does nothing.</p></div><div class="code"><pre><code class="clojure">(reset! alive false)
  (handle-event #'my-func alive :the-channel :meta-attrs my-event-bin) =&gt; nil
  ; Nothing is published</code></pre></div><div><p>If the wrapped function accepts three parameters, the third parameter is taken to be an <code>ack</code> function, that explicitly acknowledges the received event.</p></div><div class="code"><pre><code class="clojure">(defn my-func
  {:reg {:kind :fact
