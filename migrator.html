@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,11 +80,20 @@
           <div class="toc">
               <nav>
                 <ul>
-                  
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li>
                 </ul>
               </nav>
           </div>
-          
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>migrator</code> is a microservice that listens for events describing new rules being published, and initiates data migration using <code>zk-plan</code>.</p></div><div><span id="extract-version-rules"></span><h2><b>2 &nbsp;&nbsp; extract-version-rules</b></h2></div><div><p><code>extract-version-rules</code> handles <code>:axiom/version</code> events.</p></div><div class="code"><pre><code class="clojure">(-&gt; #'extract-version-rules meta :reg) =&gt; {:kind :fact
+                                          :name &quot;axiom/version&quot;}</code></pre></div><div><p><code>:axiom/version</code> events report on addition or removal of <code>permacode</code> module versions. <code>extract-version-rules</code> extracts all the rule functions from such a version and publishes corresponding <code>:axiom/rule</code> events.</p></div><div><p>It publishes only rule functions, identified by having a <code>:source-fact</code> meta field.</p></div><div class="code"><pre><code class="clojure">(extract-version-rules {:key &quot;perm.1234ABC&quot;} ..pub..) =&gt; nil
+ (provided
+(perm/module-publics 'perm.1234ABC) =&gt; {'foo (with-meta (fn []) {:source-fact [&quot;foo&quot; 1]})
+                                        'bar (with-meta (fn []) {:source-fact [&quot;bar&quot; 1]})
+                                        'baz (fn [])} ; baz will not be published
+(..pub.. {:name &quot;axiom/rule&quot;
+          :key 'perm.1234ABC/foo}) =&gt; irrelevant
+(..pub.. {:name &quot;axiom/rule&quot;
+          :key 'perm.1234ABC/bar}) =&gt; irrelevant)</code></pre></div>
         </div>
       </div>
     </div>
