@@ -102,7 +102,7 @@
                (def x (+ 1 2))
                (def y (clojure.core/+ 2 3)))</code></pre></div><div><p>Some namespaces, such as <code>clojure.string</code> and <code>clojure.set</code> are white-listed, and all their publics are allowed.</p></div><div class="code"><pre><code class="clojure">(pure
 (def x (clojure.string/join &quot;, &quot; (clojure.set/union #{1 2} #{3}))))</code></pre></div><div><p>When namespaces are aliased (like <code>clojure.string</code> is aliased to <code>string</code> in this file), symbols referring to the alias are also allowed.</p></div><div class="code"><pre><code class="clojure">(pure
-(def x (string/join &quot;, &quot; (set/union #{1 2} #{3}))))</code></pre></div><div><span id="stress-testing"></span><h3>2.1 &nbsp;&nbsp; Stress Testing</h3></div><div><p>The following is a usage example coming from <a href='cloudlog.html'>cloudlog.clj</a>. It is supposed to be all pure, so it's a good test case...</p></div><div class="code"><pre><code class="clojure">(permacode.core/pure
+(def x (string/join &quot;, &quot; (set/union #{1 2} #{3}))))</code></pre></div><div><span id="stress-testing"></span><h3>2.1 &nbsp;&nbsp; Stress Testing</h3></div><div><p>The following is a usage example coming from <a href='cloudlog.html'>cloudlog</a>. It is supposed to be all pure, so it's a good test case...</p></div><div class="code"><pre><code class="clojure">(permacode.core/pure
  (declare generate-rule-func)
 
  (defmulti propagate-symbols (fn [cond symbols] (first cond)) :default :no-bindings)
