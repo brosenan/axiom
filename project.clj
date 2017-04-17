@@ -1,6 +1,6 @@
 (defproject axiom "0.1.0-SNAPSHOT"
   :description "FIXME: write description"
-  :url "http://example.com/FIXME"
+  :url "http://brosenan.github.io/axiom"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.8.0"]]
@@ -16,7 +16,7 @@
             :template {:site   "axiom"
                        :author "Boaz Rosenan"
                        :email  "brosenan@gmail.com"
-                       :url "https://github.com/brosenan/cloudlog.clj"}
+                       :url "https://github.com/brosenan/axiom"}
             :output "docs"
             :files {"cloudlog"
                     {:input "libs/cloudlog/test/cloudlog/core_test.clj"
@@ -49,4 +49,24 @@
                     "dynamo.srv"
                     {:input "libs/dynamo/test/dynamo/srv_test.clj"
                      :title "dynamo.srv"
-                     :subtitle "A microservice for Updating DynamoDB Tables"}}})
+                     :subtitle "A microservice for Updating DynamoDB Tables"}
+                    "permacode"
+                    {:input "libs/permacode/test/permacode/core_test.clj"
+                     :title "permacode.core"
+                     :subtitle "Subsetting Clojure"}
+                    "permacode.hasher"
+                    {:input "libs/permacode/test/permacode/hasher_test.clj"
+                     :title "permacode.hasher"
+                     :subtitle "Content Addressable Storage"}
+                    "permacode.validate"
+                    {:input "libs/permacode/test/permacode/validate_test.clj"
+                     :title "permacode.validate"
+                     :subtitle "Static Analysis"}
+                    "permacode.symbols"
+                    {:input "libs/permacode/test/permacode/symbols_test.clj"
+                     :title "permacode.symbols"
+                     :subtitle "Extracting Symbols Used by Expressions"}
+                    "permacode.publish"
+                    {:input "libs/permacode/test/permacode/publish_test.clj"
+                     :title "permacode.publish"
+                     :subtitle "Store Local Code and Get Hashes"}}})
