@@ -48,7 +48,7 @@
 	      Both rules and clauses operate on <em>facts</em>, which represent user data
 	      (<span class="code">:tweetlog/follows</span> and <span class="code">:tweetlog/tweeted</span> in our example).</p>
 	    <p>Both rules and clauses can leverage the power of Clojure through the use of <em>guards</em>.
-	      Guards are pieces of Clojure code providing variable bindings and filtering through Clojure forms such as
+	      <a href="cloudlog.html#guards">Guards</a> are pieces of Clojure code providing variable bindings and filtering through Clojure forms such as
 	      <span class="code">(for)</span>, <span class="code">(let)</span> and <span class="code">(when)</span>.
 	      In our example we use guards to extract user-handles mentioned in tweets.</p>
 	    <p>The key difference between rules and clauses is the fact that the logic of a clause is applied at query time,
@@ -61,8 +61,9 @@
     <div class="abstract purple-bg">
       <div class="w3-row">
 	<div class="w3-col m6">
-	  Axiom uses <a href="https://en.wikipedia.org/wiki/Merkle_tree">content-addressable storage</a>
-	  to store Clojure source files comprising application definitions.
+	  Axiom uses a framework named <a href="permacode.html">Permacode</a>
+	  to store Clojure source files comprising application definitions
+	  in the form of a<a href="https://en.wikipedia.org/wiki/Merkle_tree">Merkle Tree</a>.
 	  Each version of each source file is assigned a hash code, which represents it within Axiom.
 	  Data derived from rules is placed in tables which names are prifixed by these hashes.
 	  This allows several versions of the same application to co-exist.</div>
