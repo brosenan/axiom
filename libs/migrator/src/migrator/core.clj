@@ -1,9 +1,12 @@
-(ns migrator.core)
+(ns migrator.core
+  (:require [permacode.core :as perm]))
 
-;;; This is an incorrect implementation, such as might be written by
-;;; someone who was used to a Lisp in which an empty list is equal to
-;;; nil.
-(defn first-element [sequence default]
-  (if (nil? sequence)
-    default
-    (first sequence)))
+(defn extract-version-rules
+  {:reg {:kind :fact
+         :name "axiom/version"}}
+  [ev publish]
+  (let [pubs (perm/module-publics (symbol (:key ev)))]
+    (doseq [[k v] pubs]
+      (when (-> v meta :source-fact)
+        (publish {:name "axiom/rule"
+                  :key (symbol (:key ev) (str k))})))))
