@@ -201,21 +201,24 @@ If it takes one parameter, we pass this parameter a de-serialization of the even
  ; we execute my-func, which adds the event to received
  @received => [my-event])
 
-"If the wrapped function accepts two parameters, the second parameter is taken to be a `publish` function, which publishes events on the facts exchange."
+"If the wrapped function accepts two parameters, the second parameter is taken to be a `publish` function, which publishes events on the facts exchange.
+The event handler (`my-func` in the example below) does not have to specify all fields in the event it publishes (`event2` in the example).
+All fields that are not specified in the event default to their values in the event that triggerred the function (`event-that-was-sent` in the example)."
 (fact
- (def event2 {:kind :fact
-              :name "foo/baz"
+ (def event2 {:name "foo/baz"
               :key 5555
               :data [1 2 3 4]})
- (def event2-bin (nippy/freeze event2))
  (defn my-func
    {:reg {:kind :fact
           :name "foo/bar"}}
    [ev publish]
    (publish event2))
+ (def event-that-was-sent
+   (merge my-event event2))
  (handle-event #'my-func alive :the-channel :meta-attrs my-event-bin) => nil
  (provided
-  (lb/publish :the-channel facts-exch (event-routing-key event2) irrelevant :meta-attrs) => irrelevant))
+  (nippy/freeze event-that-was-sent) => ..bin..
+  (lb/publish :the-channel facts-exch (event-routing-key event2) ..bin.. :meta-attrs) => irrelevant))
 
 "When the `alive` atom evaluates to `false`, the publish function does nothing."
 (fact

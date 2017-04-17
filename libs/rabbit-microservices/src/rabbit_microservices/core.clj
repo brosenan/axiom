@@ -67,7 +67,7 @@
   (let [event (nippy/thaw binary)
         publish (fn [ev]
                   (when @alive
-                    (lb/publish chan facts-exch (event-routing-key ev) (nippy/freeze ev) meta-attrs)))
+                    (lb/publish chan facts-exch (event-routing-key ev) (nippy/freeze (merge event ev)) meta-attrs)))
         ack (fn [] (my-ack chan (:delivery-tag meta-attrs)))]
     (case (arg-count func)
       1 (@func event)

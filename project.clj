@@ -69,4 +69,8 @@
                     "permacode.publish"
                     {:input "libs/permacode/test/permacode/publish_test.clj"
                      :title "permacode.publish"
-                     :subtitle "Store Local Code and Get Hashes"}}})
+                     :subtitle "Store Local Code and Get Hashes"}
+                    "migrator"
+                    {:input "libs/migrator/test/migrator/core_test.clj"
+                     :title "migrator.core"
+                     :subtitle "Initiating Data Migrations for Rules"}}})
