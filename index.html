@@ -27,7 +27,7 @@
 	      It is intended to be provided as a service, and handle most of the common concerns in
 	      a web application: Scalability, availability and even confidentiality of user data.
 	      Application providers upload their <em>business logic</em> to Axiom as <em>logic rules</em>,
-	      written in Clojure.  Actually, the rules are written in a Clojure DSL we call <strong>Cloudlog</strong>.</p>
+	      written in Clojure.  Actually, the rules are written in a Clojure DSL we call <a href="cloudlog.html">Cloudlog</a>.</p>
 	    <p>Cloudlog is a <em>purely-declarative</em> DSL, based on a purely-declarative subset of Clojure.
 	      Being purely declarative is important for two reasons:</p>
 	    <ol><li>It keeps the application developer focused on <em>defining</em> the app's business logic rather than <em>implementing</em> it; and</li>
@@ -42,7 +42,8 @@
       <div class="w3-row"><div class="w3-col m5">
 	    <p>In this example, we use two macros: <span class="code">defrule</span> and <span class="code">defclause</span> to define
 	      <em>rules</em> and <em>clauses</em> respectively.</p>
-	    <p>Rules and clauses both represent logic deductions (similar to Horn Clauses in Prolog).
+	    <p><a href="cloudlog.html#defrule">Rules</a> and
+	      <a href="cloudlog.html#defclause">clauses<a/> both represent logic deductions (similar to Horn Clauses in Prolog).
 	      Both rules and clauses operate on <em>facts</em>, which represent user data
 	      (<span class="code">:tweetlog/follows</span> and <span class="code">:tweetlog/tweeted</span> in our example).</p>
 	    <p>Both rules and clauses can leverage the power of Clojure through the use of <em>guards</em>.
