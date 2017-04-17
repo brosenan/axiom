@@ -3,8 +3,6 @@
   (:use [cloudlog.core]))
 
 [[:chapter {:title "defrule: Rule Definition Macro" :tag "defrule"}]]
-"Definition:"
-[[:reference {:refer "cloudlog.core/defrule"}]]
 
 [[:section {:title "Simple Rules"}]]
 "`defrule` defines a Cloudlog rule.  Such a rule always starts with a **fact pattern**: 
@@ -349,9 +347,6 @@ and the output paramter."
                      [:test/doc "doc5" "World peace starts with a small Hello!"])
       => #{[1234 "World peace starts with a small Hello!"]
            [2345 "Foo goes into a Bar..."]})
-
-"Definition:"
-[[:reference {:refer "cloudlog.core/defclause"}]]
 
 [[:file {:src "libs/cloudlog/test/cloudlog/core_test_sim.clj"}]]
 [[:file {:src "libs/cloudlog/test/cloudlog/core_test_facttable.clj"}]]
