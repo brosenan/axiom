@@ -56,7 +56,40 @@
       This example is described is a demo we gave at <a href="http://2017.programmingconference.org/">&lt;Programming&gt; 2017</a>.
       Please check out the <a href="https://youtu.be/3gLMBr2rTj8">video here</a>.
     </div>
-    <div class="purple-bg abstract">
+    <div class="abstract purple-bg">
+      <div class="w3-row">
+	<div class="w3-col m6">
+	  Axiom uses <a href="https://en.wikipedia.org/wiki/Content-addressable_storage">content-addressable storage</a>
+	  to store Clojure source files comprising application definitions.
+	  Each version of each source file is assigned a hash code, which represents it within Axiom.
+	  Data derived from rules is placed in tables which names are prifixed by these hashes.
+	  This allows several versions of the same application to co-exist.</div>
+	<div class="w3-col m6"><img src="permacode.png" width="100%"></div>
+      </div>
+      <div class="w3-row">
+	<div class="w3-col m7"><img src="migration.png" width="100%"></div>
+	<div class="w3-col m5">
+	  <p>Since rules generate derived data, when introducing a new (version of a) rule, all derived data based on existing
+	    raw data and the new rule need to be generated.
+	    Axiom does that in bach processing, where different tables are considered one by one,
+	    but the data of each table is processed in parallel.</p>
+	  <p>This form of automatic data migration frees application developers from the need to develop
+	    one-time migration scripts to transform data.</p></div>
+      </div>
+      <div class="w3-row">
+	<div class="w3-col m5">
+	  <p>Once data migration is complete, an <a href="http://storm.apache.org/">Apache Storm</a> topology it launched to handle
+	    continous traffic.
+	    New facts are published on an AMQP topic, and Storm Spouts listen to them, and introduce them to the topology.
+	    Storm Bolts listen to these changes and cross-reference them with facts and partial rules that are stored in a database.
+	    The resulting partial rules and derived facts are stored to the database, and the derived facts are also published on AMQP topics.
+	    This allows them to be considered by other rules.</p>
+	</div>
+	<div class="w3-col m7"><img src="topology.png" width="100%"></div>
+      </div>
+      <p>Clauses use a similar mechanism to rules, but their data is transient and is not stored to a database.</p>
+    </div>
+    <div class="explain">
       Axiom is currently a work in progress.
       For more information you are encouraged to:
       <ul class="">
