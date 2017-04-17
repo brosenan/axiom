@@ -2,7 +2,7 @@
   (:use midje.sweet)
   (:use [cloudlog.core]))
 
-[[:chapter {:title "defrule: Rule Definition Macro"}]]
+[[:chapter {:title "defrule: Rule Definition Macro" :tag "defrule"}]]
 "Definition:"
 [[:reference {:refer "cloudlog.core/defrule"}]]
 
