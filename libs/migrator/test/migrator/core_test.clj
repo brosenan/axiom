@@ -5,7 +5,7 @@
 
 [[:chapter {:title "Introduction"}]]
 "`migrator` is a microservice that listens for events describing new rules being published,
-and initiates data migration using `zk-plan`."
+and initiates data migration using [zk-plan](zk-plan.html)."
 
 [[:chapter {:title "extract-version-rules"}]]
 "`extract-version-rules` handles `:axiom/version` events."

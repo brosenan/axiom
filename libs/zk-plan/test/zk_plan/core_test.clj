@@ -3,8 +3,16 @@
   (:use [zk-plan.core])
   (:use [zookeeper :as zk]))
 
-[[:chapter {:title "External API"}]]
-[[:section {:title "create-plan"}]]
+[[:chapter {:title "Introduction"}]]
+"`zk-plan` is a tool for orchestrating execution of parallel jobs.
+It is based on the notion of a *plan*, which is dependecy graph of Clojure functions to be executed.
+After [creating a plan](#create-plan), [populating it](#add-task) and [marking it ready for execution](#mark-as-ready), a cluster of *workers*
+start taking tasks from it.
+A worker will only take a task for which all dependencies are met.
+If a task fails it is automatically retried by another worker.
+Eventually, [plan-completed?](#plan-completed) will indicated if all tasks in a given plan have been successfully completed."
+
+[[:chapter {:title "create-plan"}]]
 "
 **Parameters:**
 - **zk:** the Zookeeper connection object
@@ -19,7 +27,7 @@ It calls zk/createn to create a new zookeeper node"
   (str ..parent.. "/plan-") => ..prefix..))
 
 
-[[:section {:title "add-task"}]]
+[[:chapter {:title "add-task"}]]
 "
 **Parameters:**
 - **zk:** the Zookeeper connection object
@@ -62,7 +70,7 @@ It calls zk/createn to create a new zookeeper node"
        (set-initial-clj-data irrelevant irrelevant irrelevant) => irrelevant
        (mark-as-ready ..zk.. ..task..) => irrelevant))
 
-[[:section {:title "mark-as-ready"}]]
+[[:chapter {:title "mark-as-ready"}]]
 "
 **Parameters:**
 - **zk:** the Zookeeper connection object
@@ -75,7 +83,7 @@ It calls zk/createn to create a new zookeeper node"
       (provided
        (zk/create ..zk.. "/foo/bar/ready" :persistent? true) => true))
 
-[[:section {:title "worker"}]]
+[[:chapter {:title "worker"}]]
 "
 **Parameters:**
 - **zk:** the Zookeeper connection object
@@ -115,7 +123,7 @@ we remove the `owner` node from it to allow another task to complete the job"
   (zk/exists ..zk.. "/foo/bar") => {:some "thing"}
   (zk/delete ..zk.. "/foo/bar/owner") => irrelevant))
 
-[[:section {:title "plan-completed?"}]]
+[[:chapter {:title "plan-completed?"}]]
 "
 **Parameters:**
 - **zk:** the Zookeeper connection object
@@ -134,8 +142,102 @@ we remove the `owner` node from it to allow another task to complete the job"
  (provided
   (zk/children ..zk.. ..plan..) => '("foo" "task-39893" "bar")))
 
+[[:chapter {:title "Usage Example"}]]
+"The idea of this test is to stress zk_plan by launching `N` parallel worker threads to execute a randomized
+plan with `M` tasks, each depending on `K` preceding tasks (if such exist)."
+(def N 10) ; the number of workers
+(def M 100) ; the number of tasks
+(def K 10) ; the number of dependencies per task
 
-[[:chapter {:title "Internal Implementation"}]]
+"The tasks work against a map of `M` atoms, one atom per each task.  These atoms count the workers working on this task."
+(def worker-counters (into {} (map (fn [i] [i (atom 0)]) (range M))))
+
+"Each task will also report it completed its work by adding its ordinal number to this set."
+(def workers-completed (atom #{}))
+
+"Each task begins by incrementing the atom, then sleeps for a while, then decrements the atom.
+After incrementing, it checks that the value is 1, that is, no other worker is working on the same task.
+The function compares its arguments against the `expected` vector, and returns its number.
+The function below creates a task function (s-expression) for task `i`"
+(defn stress-task-func [i expected]
+  `(fn [& ~'args]
+     (let [~'my-atom (worker-counters ~i)]
+       (println ~i)
+       (try
+         (swap! ~'my-atom inc)
+         (if (not= @~'my-atom 1)
+           (throw (Exception. (str "Bad counter value: " @~'my-atom))))
+         (if (not= (vec~'args) ~(vec expected))
+           (throw (Exception. (str "Bad arguments.  Expected: " ~(vec expected) "  Actual: " ~'args))))
+         (Thread/sleep 100)
+         (swap! workers-completed #(conj % ~i))
+         (finally 
+           (swap! ~'my-atom dec)))
+       ~i)))
+
+"We build the plan.  The first `K` tasks are built without arguments.
+The other `M-K` tasks are built with `K` arguments each, which are randomly selected from the range `[0,i)`"
+(defn build-stress-plan [zk parent]
+  (let [plan (create-plan zk parent)]
+
+    (loop [tasks {}
+           i 0]
+      (if (< i M)
+        (let [next-task (if (< i K)
+                          (add-task zk plan (stress-task-func i nil) [])
+                                        ; else
+                          (let [selected (take K (shuffle (range i)))]
+                            (add-task zk plan (stress-task-func i selected) (map tasks selected))))]
+          (recur (assoc tasks i next-task) (inc i)))))
+    (mark-as-ready zk plan)
+    plan))
+
+"We now deploy `N` workers to execute the plan.
+Each thread runs the `worker` function repeatedly.
+In case of an exception thrown from the worker, we report it, but move on to call `worker` again."
+(defn start-stress-workers [zk parent]
+  (let [threads (map (fn [_] (Thread. (fn []
+                                        (loop []
+                                          (try
+                                            (worker zk parent {})
+                                            (catch Exception e
+                                              (.printStackTrace e)))
+                                          (recur))))) (range N))]
+    (doseq [thread threads]
+      (.start thread))
+    threads))
+
+"To stop all threads we simply `.join` them"
+(defn join-stress-workers [threads]
+  (doseq [thread threads]
+    (.stop thread)))
+
+"Puttint this all together:
+- Connect to an actual Zookeeper
+- Clear the parent: `/stress` if exists
+- (Re) Create the parent
+- Start the workers
+- Create the plan
+- Wait until the plan is complete
+- Stop the workers"
+(fact :integ ; This is an integration test
+ (let [zk (zk/connect "127.0.0.1:2181")
+       parent "/stress"]
+   (zk/delete-all zk "/stress")
+   (zk/create zk parent :persistent? true)
+   (let [threads (start-stress-workers zk parent)
+         plan (build-stress-plan zk parent)]
+     (loop []
+       (when-not (plan-completed? zk plan)
+         (Thread/sleep 100)
+         (recur)))
+     (doseq [m (range M)]
+       (when-not (contains? @workers-completed m)
+         (println "Task " m " was not completed")))
+     (join-stress-workers threads))))
+         
+
+[[:chapter {:title "Under the Hood"}]]
 [[:section {:title "get-task"}]]
 "
 **Parameters:**
@@ -336,19 +438,20 @@ We call execute-function to get the result, and store it as the 'result' child."
 "It reads the function definition from the content of the task node.
 If no parameters exist in the task it executes the function without parameters."
 (fact
-      (execute-function ..zk.. ..task..) => 3
-      (provided
-       (get-clj-data ..zk.. ..task..) => '(fn [] 3)
-       (zk/children ..zk.. ..task..) => '("foo" "task-1234")))
+ (defn returns-3 [] 3)
+ (execute-function ..zk.. ..task..) => 3
+ (provided
+  (get-clj-data ..zk.. ..task..) => 'returns-3
+  (zk/children ..zk.. ..task..) => '("foo" "task-1234")))
 "It passes the task arguments to the function"
 (fact
-      (execute-function ..zk.. "/foo/task-1234") => [1 2 3]
-      (provided
-       (get-clj-data ..zk.. "/foo/task-1234") => '(fn [& args] args)
-       (zk/children ..zk.. "/foo/task-1234") => '("arg-00001" "arg-00002" "arg-00000")
-       (get-clj-data ..zk.. "/foo/task-1234/arg-00000") => 1
-       (get-clj-data ..zk.. "/foo/task-1234/arg-00001") => 2
-       (get-clj-data ..zk.. "/foo/task-1234/arg-00002") => 3))
+ (execute-function ..zk.. "/foo/task-1234") => [1 2 3]
+ (provided
+  (get-clj-data ..zk.. "/foo/task-1234") => '(fn [& args] args)
+  (zk/children ..zk.. "/foo/task-1234") => '("arg-00001" "arg-00002" "arg-00000")
+  (get-clj-data ..zk.. "/foo/task-1234/arg-00000") => 1
+  (get-clj-data ..zk.. "/foo/task-1234/arg-00001") => 2
+  (get-clj-data ..zk.. "/foo/task-1234/arg-00002") => 3))
 
 [[:section {:title "propagate-result"}]]
 "
@@ -449,99 +552,3 @@ This should be done lazily, so that additional plans must not be queried."
 "`:max` is applied at any step, such that the function does not overflow even with high `count` values"
 (fact
  (calc-sleep-time {:max 1000} 100) => 1000)
-
-[[:chapter {:title "Integration Testing"}]]
-[[:section {:title "Stress Test"}]]
-"The idea of this test is to stress zk_plan by launching `N` parallel worker threads to execute a randomized
-plan with `M` tasks, each depending on `K` preceding tasks (if such exist)."
-(def N 10) ; the number of workers
-(def M 100) ; the number of tasks
-(def K 10) ; the number of dependencies per task
-
-"The tasks work against a map of `M` atoms, one atom per each task.  These atoms count the workers working on this task."
-(def worker-counters (into {} (map (fn [i] [i (atom 0)]) (range M))))
-
-"Each task will also report it completed its work by adding its ordinal number to this set."
-(def workers-completed (atom #{}))
-
-"Each task begins by incrementing the atom, then sleeps for a while, then decrements the atom.
-After incrementing, it checks that the value is 1, that is, no other worker is working on the same task.
-The function compares its arguments against the `expected` vector, and returns its number.
-The function below creates a task function (s-expression) for task `i`"
-(defn stress-task-func [i expected]
-  `(fn [& ~'args]
-     (let [~'my-atom (worker-counters ~i)]
-       (println ~i)
-       (try
-         (swap! ~'my-atom inc)
-         (if (not= @~'my-atom 1)
-           (throw (Exception. (str "Bad counter value: " @~'my-atom))))
-         (if (not= (vec~'args) ~(vec expected))
-           (throw (Exception. (str "Bad arguments.  Expected: " ~(vec expected) "  Actual: " ~'args))))
-         (Thread/sleep 100)
-         (swap! workers-completed #(conj % ~i))
-         (finally 
-           (swap! ~'my-atom dec)))
-       ~i)))
-
-"We build the plan.  The first `K` tasks are built without arguments.
-The other `M-K` tasks are built with `K` arguments each, which are randomly selected from the range `[0,i)`"
-(defn build-stress-plan [zk parent]
-  (let [plan (create-plan zk parent)]
-
-    (loop [tasks {}
-           i 0]
-      (if (< i M)
-        (let [next-task (if (< i K)
-                          (add-task zk plan (stress-task-func i nil) [])
-                                        ; else
-                          (let [selected (take K (shuffle (range i)))]
-                            (add-task zk plan (stress-task-func i selected) (map tasks selected))))]
-          (recur (assoc tasks i next-task) (inc i)))))
-    (mark-as-ready zk plan)
-    plan))
-
-"We now deploy `N` workers to execute the plan.
-Each thread runs the `worker` function repeatedly.
-In case of an exception thrown from the worker, we report it, but move on to call `worker` again."
-(defn start-stress-workers [zk parent]
-  (let [threads (map (fn [_] (Thread. (fn []
-                                        (loop []
-                                          (try
-                                            (worker zk parent {})
-                                            (catch Exception e
-                                              (.printStackTrace e)))
-                                          (recur))))) (range N))]
-    (doseq [thread threads]
-      (.start thread))
-    threads))
-
-"To stop all threads we simply `.join` them"
-(defn join-stress-workers [threads]
-  (doseq [thread threads]
-    (.stop thread)))
-
-"Puttint this all together:
-- Connect to an actual Zookeeper
-- Clear the parent: `/stress` if exists
-- (Re) Create the parent
-- Start the workers
-- Create the plan
-- Wait until the plan is complete
-- Stop the workers"
-(fact :integ ; This is an integration test
- (let [zk (zk/connect "127.0.0.1:2181")
-       parent "/stress"]
-   (zk/delete-all zk "/stress")
-   (zk/create zk parent :persistent? true)
-   (let [threads (start-stress-workers zk parent)
-         plan (build-stress-plan zk parent)]
-     (loop []
-       (when-not (plan-completed? zk plan)
-         (Thread/sleep 100)
-         (recur)))
-     (doseq [m (range M)]
-       (when-not (contains? @workers-completed m)
-         (println "Task " m " was not completed")))
-     (join-stress-workers threads))))
-         
