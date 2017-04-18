@@ -160,20 +160,20 @@ After incrementing, it checks that the value is 1, that is, no other worker is w
 The function compares its arguments against the `expected` vector, and returns its number.
 The function below creates a task function (s-expression) for task `i`"
 (defn stress-task-func [i expected]
-  `(fn [& ~'args]
-     (let [~'my-atom (worker-counters ~i)]
-       (println ~i)
-       (try
-         (swap! ~'my-atom inc)
-         (if (not= @~'my-atom 1)
-           (throw (Exception. (str "Bad counter value: " @~'my-atom))))
-         (if (not= (vec~'args) ~(vec expected))
-           (throw (Exception. (str "Bad arguments.  Expected: " ~(vec expected) "  Actual: " ~'args))))
-         (Thread/sleep 100)
-         (swap! workers-completed #(conj % ~i))
-         (finally 
-           (swap! ~'my-atom dec)))
-       ~i)))
+  (fn [& args]
+    (println i)
+    (let [my-atom (worker-counters i)]
+      (try
+        (swap! my-atom inc)
+        (if (not= @my-atom 1)
+          (throw (Exception. (str "Bad counter value: " @my-atom))))
+        (if (not= (vec args) (vec expected))
+          (throw (Exception. (str "Bad arguments.  Expected: " (vec expected) "  Actual: " args))))
+        (Thread/sleep 100)
+        (swap! workers-completed #(conj % i))
+        (finally 
+          (swap! my-atom dec)))
+      i)))
 
 "We build the plan.  The first `K` tasks are built without arguments.
 The other `M-K` tasks are built with `K` arguments each, which are randomly selected from the range `[0,i)`"
@@ -184,10 +184,10 @@ The other `M-K` tasks are built with `K` arguments each, which are randomly sele
            i 0]
       (if (< i M)
         (let [next-task (if (< i K)
-                          (add-task zk plan (stress-task-func i nil) [])
+                          (add-task zk plan `(stress-task-func ~i nil) [])
                                         ; else
                           (let [selected (take K (shuffle (range i)))]
-                            (add-task zk plan (stress-task-func i selected) (map tasks selected))))]
+                            (add-task zk plan `(stress-task-func ~i ~(vec selected)) (map tasks selected))))]
           (recur (assoc tasks i next-task) (inc i)))))
     (mark-as-ready zk plan)
     plan))

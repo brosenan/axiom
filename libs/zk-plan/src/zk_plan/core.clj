@@ -62,12 +62,12 @@
 
 (defn execute-function [zk node]
   (let [func (get-clj-data zk node)
+        func' (eval func)
         vals (->> (zk/children zk node)
                   (filter #(re-matches #"arg-\d+" %))
                   sort
                   (map #(str node "/" %))
-                  (map #(get-clj-data zk %)))
-        func' (eval func)]
+                  (map #(get-clj-data zk %)))]
     (let [res (apply func' vals)]
       res)))
 
