@@ -26,3 +26,14 @@
                 (async/>!! res-chan event)))
             (async/close! res-chan)
             true))))
+
+(defn scanner [config table shard shards chan]
+  (let [kw (table-kw table)
+        items (far/scan config kw {:segment shard
+                                   :total-segments shards})]
+    (doseq [item items]
+      (let [body (nippy/thaw (:event item))]
+        (async/>!! chan (merge body {:kind :fact
+                                     :name table
+                                     :key (read-string (:key item))
+                                     :ts (:ts item)}))))))

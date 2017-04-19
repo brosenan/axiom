@@ -92,8 +92,8 @@ The function returns a hash code for the current file."
          (some-thing))]))
 
 "When a module has dependencies, the `ns` expression at its head is modified to reflect these dependencies."
-(def bar-hash (hash-file hasher bar {'example.foo foo-hash}))
 (fact
+ (def bar-hash (hash-file hasher bar {'example.foo foo-hash}))
  (let [[hash unhash] hasher]
    (unhash (-> bar-hash str (str/replace-first "perm." "")))
    => '[(ns example.bar

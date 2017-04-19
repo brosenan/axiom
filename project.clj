@@ -7,7 +7,10 @@
   :plugins [[lein-monolith "0.3.2"]
             [lein-cprint "1.2.0"]]
   :aliases {"im" ["do" ["midje" ":filter" "-integ"] ["install"]]
-            "eim" ["monolith" "each" "im"]}
+            "eim" ["monolith" "each" "im"]
+            "autotest" ["midje" ":autotest" ":filter" "-integ"]
+            "integ" ["midje" ":filter" ":integ"]
+            "einteg" ["monolith" "each" "integ"]}
   :monolith {:project-dirs ["libs/*"]
              :inherit [:aliases]}
   :profiles {:dev {:dependencies [[im.chit/lucid.publish "1.2.8"]

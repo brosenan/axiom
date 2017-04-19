@@ -148,32 +148,32 @@ Our configuration is as follows (we follow [these](https://github.com/ptaoussani
                          :key ["z"]}
                         res-chan])
    (async/alts!! [res-chan
-                  (async/timeout 100)]) => [{:kind :fact
-                                             :name "foo/foo"
-                                             :key ["z"]
-                                             :ts 1000
-                                             :data ["foo/foo" ["z"] 1000]
-                                             :change 1}
-                                            res-chan]
+                  (async/timeout 1000)]) => [{:kind :fact
+                                              :name "foo/foo"
+                                              :key ["z"]
+                                              :ts 1000
+                                              :data ["foo/foo" ["z"] 1000]
+                                              :change 1}
+                                             res-chan]
    (async/alts!! [res-chan
-                  (async/timeout 100)]) => [{:kind :fact
-                                             :name "foo/foo"
-                                             :key ["z"]
-                                             :ts 2000
-                                             :data ["foo/foo" ["z"] 2000]
-                                             :change 1}
-                                            res-chan]
+                  (async/timeout 1000)]) => [{:kind :fact
+                                              :name "foo/foo"
+                                              :key ["z"]
+                                              :ts 2000
+                                              :data ["foo/foo" ["z"] 2000]
+                                              :change 1}
+                                             res-chan]
    (async/alts!! [res-chan
-                  (async/timeout 100)]) => [{:kind :fact
-                                             :name "foo/foo"
-                                             :key ["z"]
-                                             :ts 3000
-                                             :data ["foo/foo" ["z"] 3000]
-                                             :change 1}
-                                            res-chan]
+                  (async/timeout 1000)]) => [{:kind :fact
+                                              :name "foo/foo"
+                                              :key ["z"]
+                                              :ts 3000
+                                              :data ["foo/foo" ["z"] 3000]
+                                              :change 1}
+                                             res-chan]
    (async/alts!! [res-chan
-                  (async/timeout 100)]) => [nil
-                                            res-chan]))
+                  (async/timeout 1000)]) => [nil
+                                             res-chan]))
 
 "We shut down the service by closing the request channel, and then waiting for the
 retriever thread to complete by reading from it."
@@ -181,3 +181,30 @@ retriever thread to complete by reading from it."
   :integ ; Does not run on usual CI testing
   (async/close! req-chan)
   (async/<!! worker-thread))
+
+[[:chapter {:title "scanner: Scan a Shard of a Table"}]]
+"For the purpose of data migration we need to process all events in a table.
+To do this efficiently, we shard the table."
+
+"`scanner` is given a name of a table, a shard number, a total number of shards and an output channel.
+It then produces all events from that shard into the channel and closes the channel.
+It is blocking, and is therefore assumed to be working from within its own thread."
+(fact
+ (scanner ..config.. ..table.. ..shard.. ..shards.. ..chan..) => nil
+ (provided
+  (table-kw ..table..) => ..kw..
+  (far/scan ..config.. ..kw.. {:segment ..shard..
+                               :total-segments ..shards..}) => [{:key "1" :ts 1000 :event ..bin1..}
+                                                                {:key "2" :ts 2000 :event ..bin2..}]
+  (nippy/thaw ..bin1..) => {:data [1 2 3]}
+  (async/>!! ..chan.. {:kind :fact
+                       :name ..table..
+                       :key 1
+                       :ts 1000
+                       :data [1 2 3]}) => irrelevant
+  (nippy/thaw ..bin2..) => {:data [2 3 4]}
+  (async/>!! ..chan.. {:kind :fact
+                       :name ..table..
+                       :key 2
+                       :ts 2000
+                       :data [2 3 4]}) => irrelevant))
