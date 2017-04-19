@@ -14,20 +14,25 @@
 (defmacro provide [resource inj & exprs]
   (let [resource (keyword resource)]
     `(async/go
-       (let [~'$value (do ~@exprs)]
-         (swap! (first ~inj) #(assoc % ~resource ~'$value))
-         (async/>!! (second ~inj) [~resource ~'$value])))))
+       (when-not (contains? @(first ~inj) ~resource)
+         (let [~'$value (do ~@exprs)]
+           (when-not (nil? (System/getenv "AXIOM_DI_DEBUG"))
+             (println "Providing " ~resource))
+           (swap! (first ~inj) #(assoc % ~resource ~'$value))
+           (async/>!! (second ~inj) [~resource ~'$value]))))))
 
 (defmacro with-dependencies [inj deps & exprs]
   (let [keys (map keyword deps)]
     `(loop []
        (let [~'$fulfilled @(first ~inj)
-             ~'$missing (some #(not (contains? ~'$fulfilled %)) '~keys)]
+             ~'$missing (first (filter #(not (contains? ~'$fulfilled %)) '~keys))]
          (cond (nil? ~'$missing)
                (let [{:keys ~deps} ~'$fulfilled]
                  ~@exprs)
                :else
                (let [~'$chan (async/chan)]
+                 (when-not (nil? (System/getenv "AXIOM_DI_DEBUG"))
+                   (println "Resource " ~'$missing " is missing.  Waiting..."))
                  (async/sub (~inj 2) ~'$missing ~'$chan)
                  (async/alts! [~'$chan
                                (async/timeout 100)])
