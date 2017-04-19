@@ -299,7 +299,7 @@ of the two.  We don't care as long as we get what we need from the other side of
 "The matcher will emit a query to the `db-chan`, specifying what it is looking for"
 (def db-request
  (async/alts!! [db-chan
-                (async/timeout 100)]))
+                (async/timeout 1000)]))
 
 (fact
  (-> db-request second) => db-chan)
@@ -320,14 +320,14 @@ of the two.  We don't care as long as we get what we need from the other side of
 "For each such event the matcher will emit the events obtained by multiplying the fact and the rules."
 (fact
  (async/alts!! [res-chan
-                (async/timeout 100)]) => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["hello"]) res-chan]
+                (async/timeout 1000)]) => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["hello"]) res-chan]
  (async/alts!! [res-chan
-                (async/timeout 100)]) => [(event :fact "cloudlog-events.core_test/timeline" "eve" ["hello"]) res-chan])
+                (async/timeout 1000)]) => [(event :fact "cloudlog-events.core_test/timeline" "eve" ["hello"]) res-chan])
 
 "Finally, the channel needs to be closed."
 (fact
  (async/alts!! [res-chan
-                (async/timeout 100)]) => [nil res-chan])
+                (async/timeout 1000)]) => [nil res-chan])
 
 [[:section {:title "Matching Facts for Rules"}]]
 "A matcher function can accept either a fact event or a rule event."
@@ -337,7 +337,7 @@ of the two.  We don't care as long as we get what we need from the other side of
 "For a rule, the matcher will query the database for matching facts."
 (def db-request
  (async/alts!! [db-chan
-                (async/timeout 100)]))
+                (async/timeout 1000)]))
 (fact
  (-> db-request second) => db-chan)
 (fact
@@ -354,10 +354,10 @@ of the two.  We don't care as long as we get what we need from the other side of
 "The results are emitted on the `res-chan`:"
 (fact
  (async/alts!! [res-chan
-                (async/timeout 100)]) => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["hello"]) res-chan]
+                (async/timeout 1000)]) => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["hello"]) res-chan]
  (async/alts!! [res-chan
-                (async/timeout 100)]) => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["world"]) res-chan]
+                (async/timeout 1000)]) => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["world"]) res-chan]
  (async/alts!! [res-chan
-                (async/timeout 100)]) => [nil res-chan])
+                (async/timeout 1000)]) => [nil res-chan])
 
 

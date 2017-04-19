@@ -10,11 +10,10 @@
             [langohr.exchange  :as le]))
 
 [[:chapter {:title "Introduction"}]]
-"`rabbit-microservices` is a library that allows microservices to be defined as Clojure modules.
-A microservice is attached to a queue, and consists of functions that are applied in response to events on the queue.
-Functions are associated with AMQP topics according to meta fields provided for them.
-Each such function is given two arguments when invoked: The event on which it was invoked, and a `publish` function
-allowing it to publish events in response."
+"`rabbit-microservices` is a library that supports the definition of microservices.
+It [provides](di.html#provide) the `serve` function as a [resource](di.html).
+In turn, the `serve` function registers given functions to a subset of the events published through AMQP.
+It is provided a partial event, and calls the given function on any event that matches the given partial event."
 
 "The event structure we refer to here is the one discussed in [cloudlog-events](cloudlog-events.html)."
 

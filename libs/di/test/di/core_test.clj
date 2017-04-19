@@ -58,11 +58,15 @@ To wait for them clients can subscribe to the topic they are interested in."
 Its underlying expressions can use macros such as `>!` and `<!`."
 (fact
  (def baz-chan (async/chan))
+ (def wait-chan (async/chan))
  (provide baz inj
           (async/<! baz-chan))
  (:baz @(first inj)) => nil ; not yet...
- (async/>!! baz-chan 4) 
- (:baz @(first inj)) => 4)
+ ; let's subscribe to the value
+ (async/sub (inj 2) :baz wait-chan)
+ (async/>!! baz-chan 4)
+ (async/alts!! [wait-chan
+                (async/timeout 1000)]) => [[:baz 4] wait-chan])
 
 [[:chapter {:title "with-dependencies"}]]
 "When we wish to evaluate something that depends on external resources, `with-dependencies` is the way to go.
