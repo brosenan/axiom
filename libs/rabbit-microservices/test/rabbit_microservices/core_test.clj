@@ -20,29 +20,49 @@ It is provided a partial event, and calls the given function on any event that m
 "The event structure we refer to here is the one discussed in [cloudlog-events](cloudlog-events.html)."
 
 [[:chapter {:title "serve: Register an Event Handler" :tag "serve"}]]
-"`serve` is a [dependency-injection resource](di.html) which ..."
+"`serve` is a [dependency-injection resource](di.html) which depends on an `amqp-service` resource (which itself depends on `amqp-config`)."
+(fact
+ (let [inj (di/injector {:amqp-service {:chan :some-chan}})]
+   (module inj)
+   (def serve (di/wait-for inj serve))))
 
-"When given such a function, `register-func` performs the following:
+
+"`serve` is a function that takes a service function and a partial event and does the following:
 1. Declares a queue, dedicated to this function.
 2. Binds this queue to the `facts` exchange, based on the routing key pattern provided by the `:reg` map.
 3. Subscribes to this queue using a function that wraps the given function."
 (fact
- (register-func {:chan ..chan..} (fn [ev]) {:kind :fact
-                                            :name "foo/bar"}) => nil
+ (serve (fn [ev]) {:kind :fact
+                   :name "foo/bar"}) => nil
  (provided
-  (lq/declare-server-named ..chan..) => ..q..
-  (lq/bind ..chan.. ..q.. facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
-  (lc/subscribe ..chan.. ..q.. irrelevant {:auto-ack true}) => irrelevant))
+  (lq/declare-server-named :some-chan) => ..q..
+  (lq/bind :some-chan ..q.. facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
+  (lc/subscribe :some-chan ..q.. irrelevant {:auto-ack true}) => irrelevant))
 
 "Auto acknowledgement is disabled when the provided function has three parameters.
 The third of which is expected to be bound to an explicit `ack` function."
 (fact
- (register-func {:chan ..chan..} (fn [event publish ack]) {:kind :fact
-                                                           :name "foo/bar"}) => nil
+ (serve (fn [event publish ack]) {:kind :fact
+                                  :name "foo/bar"}) => nil
  (provided
-  (lq/declare-server-named ..chan..) => ..q..
-  (lq/bind ..chan.. ..q.. facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
-  (lc/subscribe ..chan.. ..q.. irrelevant {:auto-ack false}) => irrelevant))
+  (lq/declare-server-named :some-chan) => ..q..
+  (lq/bind :some-chan ..q.. facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
+  (lc/subscribe :some-chan ..q.. irrelevant {:auto-ack false}) => irrelevant))
+
+[[:chapter {:title "publish: Publish an Event from the Outside"}]]
+"`publish` is a service that allows its users to publish events from outside the context of a service.
+It depends on `amqp-service`."
+(fact
+ (let [inj (di/injector {:amqp-service {:chan :some-chan}})]
+   (module inj)
+   (def publish (di/wait-for inj publish))))
+
+(fact
+ (publish ..ev..) => nil
+ (provided
+  (nippy/freeze ..ev..) => ..bin..
+  (event-routing-key ..ev..) => ..routing-key..
+  (lb/publish :some-chan facts-exch ..routing-key.. ..bin.. {}) => irrelevant))
 
 [[:chapter {:title "Usage Example"}]]
 "To demonstrate how the above functions work together we build a small usage example."
@@ -52,42 +72,44 @@ The third of which is expected to be bound to an explicit `ack` function."
 2. Function `count-ev` that counts the events of the different names and emits events of type \"count\" (it does not count \"count\" events).
 3. Function `foo-from-count` that listens on \"count\" events and emits corresponding \"foo\" events with the same value."
 
-(def foo-sum (atom 0))
-(def ev-count (atom {}))
-(async/go
-  (di/with-dependencies di/the-inj [serve]
-    (println "Registering services")
-    (serve (fn ;; sum-foo
-             [ev pub]
+(fact
+ :integ ; Integration test.  Does not run during continouts integration
+ (def foo-sum (atom 0))
+ (def ev-count (atom {}))
+ (async/go
+   (di/with-dependencies di/the-inj [serve]
+     (println "Registering services")
+     (serve (fn ;; sum-foo
+              [ev pub]
               (swap! foo-sum (partial + (:data ev)))
               (pub {:kind :fact
                     :name "foo-sum"
                     :key 0
                     :data @foo-sum}))
-           {:kind :fact
-            :name "foo"})
+            {:kind :fact
+             :name "foo"})
 
-    (serve (fn  ;; count-ev
-             [ev pub]
-             (let [key (:name ev)]
-               (swap! ev-count (fn [m]
-                                 (let [old (or (m key) 0)
-                                       new (inc old)]
-                                   (assoc m key new))))
-               (pub {:kind :fact
-                     :name "count"
-                     :key key
-                     :data (@ev-count key)})))
-           {:kind :fact})
+     (serve (fn  ;; count-ev
+              [ev pub]
+              (let [key (:name ev)]
+                (swap! ev-count (fn [m]
+                                  (let [old (or (m key) 0)
+                                        new (inc old)]
+                                    (assoc m key new))))
+                (pub {:kind :fact
+                      :name "count"
+                      :key key
+                      :data (@ev-count key)})))
+            {:kind :fact})
 
-    (serve (fn ;; foo-from-count
-             [ev pub]
-             (pub {:kind :fact
-                   :name "foo"
-                   :key (:key ev)
-                   :data (:data ev)}))
-           {:kind :fact
-            :name "count"})))
+     (serve (fn ;; foo-from-count
+              [ev pub]
+              (pub {:kind :fact
+                    :name "foo"
+                    :key (:key ev)
+                    :data (:data ev)}))
+            {:kind :fact
+             :name "count"}))))
 
 "For the `serve` resource to initialize, we need to provide an `amqp-config` resource with values needed for the underlying `langohr` library
 to find the AMQP broker.
@@ -109,18 +131,6 @@ All we need is to get the fire started is a little match -- a single event."
       (while (< @foo-sum 10000000)
         (Thread/sleep 100))
       (println "done!"))
-
-[[:chapter {:title "publish: Publish an Event from the Outside"}]]
-"The second parameter of a service function is bound to a `publish` function, allowing services to publish events.
-However, we sometime need to publish events outside the context of a service (i.e., not in response to an incoming event).
-The (global) `publish` function does that.
-The only difference between the two functions is that the global `publish` receives the `service` as its first parameter."
-(fact
- (publish {:chan ..chan..} ..ev..) => nil
- (provided
-  (nippy/freeze ..ev..) => ..bin..
-  (event-routing-key ..ev..) => ..routing-key..
-  (lb/publish ..chan.. facts-exch ..routing-key.. ..bin.. {}) => irrelevant))
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "create-service: Initialization" :tag "create-service"}]]

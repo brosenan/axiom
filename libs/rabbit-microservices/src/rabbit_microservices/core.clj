@@ -55,7 +55,7 @@
 (defn arg-count [func]
   (-> func class .getDeclaredMethods first .getParameterTypes alength))
 
-(defn publish [srv ev]
+(defn publisher [srv ev]
   (let [bin (nippy/freeze ev)
         rk (event-routing-key ev)]
     (lb/publish (:chan srv) facts-exch rk bin {})
@@ -82,15 +82,18 @@
     (lc/subscribe (:chan service) q (partial handle-event func (:alive service)) {:auto-ack (< (arg-count func) 3)})
     nil))
 
-(di/provide amqp-service di/the-inj
-            (di/with-dependencies di/the-inj [amqp-config]
-              (binding [rmq/*default-config* amqp-config]
-                (create-service))))
+(defn module [inj]
+  (di/provide amqp-service inj
+              (di/with-dependencies inj [amqp-config]
+                (binding [rmq/*default-config* amqp-config]
+                  (create-service))))
 
-(di/provide serve di/the-inj
-            (di/with-dependencies di/the-inj [amqp-service]
-              (partial register-func amqp-service)))
+  (di/provide serve inj
+              (di/with-dependencies inj [amqp-service]
+                (partial register-func amqp-service)))
 
-(di/provide publish di/the-inj
-            (di/with-dependencies di/the-inj [amqp-service]
-              (partial publish amqp-service)))
+  (di/provide publish inj
+              (di/with-dependencies inj [amqp-service]
+                (partial publisher amqp-service))))
+
+(module di/the-inj)
