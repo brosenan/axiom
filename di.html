@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li><li><a class="chapter" data-scroll="" href="#the-inj"><h4>5 &nbsp; the-inj</h4></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,7 +80,7 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li><li><a class="chapter" data-scroll="" href="#the-inj"><h4>5 &nbsp; the-inj</h4></a></li>
                 </ul>
               </nav>
           </div>
@@ -135,7 +135,7 @@
           (with-dependencies inj [foo]
             (inc foo)))
  (async/alts!! [chan
-                (async/timeout 1000)]) =&gt; [2 chan])</code></pre></div>
+                (async/timeout 1000)]) =&gt; [2 chan])</code></pre></div><div><span id="the-inj"></span><h2><b>5 &nbsp;&nbsp; the-inj</b></h2></div><div><p><code>di.core</code> provides one injector instance: <code>the-inj</code>, which is intended to be used to connect providers and consumers in software systems.</p></div><div class="code"><pre><code class="clojure">the-inj =not=&gt; nil?</code></pre></div>
         </div>
       </div>
     </div>
