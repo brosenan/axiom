@@ -152,27 +152,27 @@
 (def timeline-matcher (matcher timeline 1 db-chan))</code></pre></div><div><span id="matching-rules-for-facts"></span><h3>4.1 &nbsp;&nbsp; Matching Rules for Facts</h3></div><div><p>The returned matcher is a function that takes an event and an output channel for the resulting events.</p></div><div class="code"><pre><code class="clojure">(def res-chan (async/chan 1000))
 (timeline-matcher (event :fact &quot;:test/tweeted&quot; &quot;bob&quot; [&quot;hello&quot;]) res-chan)</code></pre></div><div><p>The matcher will emit a query to the <code>db-chan</code>, specifying what it is looking for</p></div><div class="code"><pre><code class="clojure">(def db-request
  (async/alts!! [db-chan
-                (async/timeout 100)]))</code></pre></div><div class="code"><pre><code class="clojure">(-&gt; db-request second) =&gt; db-chan</code></pre></div><div><p>The request consists of a pair <code>&#91;req chan&#93;</code>, where <code>req</code> is a partial event that matches what we are looking for:</p></div><div class="code"><pre><code class="clojure">(-&gt; db-request first first) =&gt; {:kind :rule
+                (async/timeout 1000)]))</code></pre></div><div class="code"><pre><code class="clojure">(-&gt; db-request second) =&gt; db-chan</code></pre></div><div><p>The request consists of a pair <code>&#91;req chan&#93;</code>, where <code>req</code> is a partial event that matches what we are looking for:</p></div><div class="code"><pre><code class="clojure">(-&gt; db-request first first) =&gt; {:kind :rule
                                :name &quot;cloudlog-events.core_test/timeline!0&quot;
                                :key &quot;bob&quot;}</code></pre></div><div><p>And <code>chan</code> is the channel on which the database is expected to provide the reply</p></div><div class="code"><pre><code class="clojure">(def reply-chan (-&gt; db-request first second))</code></pre></div><div><p>Next, the database emits matching rules on the reply channel, and closes it.</p></div><div class="code"><pre><code class="clojure">(async/&gt;!! reply-chan (event :rule &quot;cloudlog-events.core_test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;]))
 (async/&gt;!! reply-chan (event :rule &quot;cloudlog-events.core_test/timeline!0&quot; &quot;bob&quot; [&quot;eve&quot; &quot;bob&quot;]))
 (async/close! reply-chan)</code></pre></div><div><p>For each such event the matcher will emit the events obtained by multiplying the fact and the rules.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [res-chan
-              (async/timeout 100)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;alice&quot; [&quot;hello&quot;]) res-chan]
+              (async/timeout 1000)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;alice&quot; [&quot;hello&quot;]) res-chan]
  (async/alts!! [res-chan
-              (async/timeout 100)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;eve&quot; [&quot;hello&quot;]) res-chan]</code></pre></div><div><p>Finally, the channel needs to be closed.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [res-chan
-              (async/timeout 100)]) =&gt; [nil res-chan]</code></pre></div><div><span id="matching-facts-for-rules"></span><h3>4.2 &nbsp;&nbsp; Matching Facts for Rules</h3></div><div><p>A matcher function can accept either a fact event or a rule event.</p></div><div class="code"><pre><code class="clojure">(def res-chan (async/chan 1000))
+              (async/timeout 1000)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;eve&quot; [&quot;hello&quot;]) res-chan]</code></pre></div><div><p>Finally, the channel needs to be closed.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [res-chan
+              (async/timeout 1000)]) =&gt; [nil res-chan]</code></pre></div><div><span id="matching-facts-for-rules"></span><h3>4.2 &nbsp;&nbsp; Matching Facts for Rules</h3></div><div><p>A matcher function can accept either a fact event or a rule event.</p></div><div class="code"><pre><code class="clojure">(def res-chan (async/chan 1000))
 (timeline-matcher (event :rule &quot;cloudlog-events.core_test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;]) res-chan)</code></pre></div><div><p>For a rule, the matcher will query the database for matching facts.</p></div><div class="code"><pre><code class="clojure">(def db-request
  (async/alts!! [db-chan
-                (async/timeout 100)]))</code></pre></div><div class="code"><pre><code class="clojure">(-&gt; db-request second) =&gt; db-chan</code></pre></div><div class="code"><pre><code class="clojure">(-&gt; db-request first first) =&gt; {:kind :fact
+                (async/timeout 1000)]))</code></pre></div><div class="code"><pre><code class="clojure">(-&gt; db-request second) =&gt; db-chan</code></pre></div><div class="code"><pre><code class="clojure">(-&gt; db-request first first) =&gt; {:kind :fact
                                :name &quot;test/tweeted&quot;
                                :key &quot;bob&quot;}</code></pre></div><div class="code"><pre><code class="clojure">(def reply-chan (-&gt; db-request first second))</code></pre></div><div><p>Now the database replies fact events.</p></div><div class="code"><pre><code class="clojure">(async/&gt;!! reply-chan (event :fact &quot;test/tweeted&quot; &quot;bob&quot; [&quot;hello&quot;]))
 (async/&gt;!! reply-chan (event :fact &quot;test/tweeted&quot; &quot;bob&quot; [&quot;world&quot;]))
 (async/close! reply-chan)</code></pre></div><div><p>The results are emitted on the <code>res-chan</code>:</p></div><div class="code"><pre><code class="clojure">(async/alts!! [res-chan
-              (async/timeout 100)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;alice&quot; [&quot;hello&quot;]) res-chan]
+              (async/timeout 1000)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;alice&quot; [&quot;hello&quot;]) res-chan]
  (async/alts!! [res-chan
-              (async/timeout 100)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;alice&quot; [&quot;world&quot;]) res-chan]
+              (async/timeout 1000)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;alice&quot; [&quot;world&quot;]) res-chan]
  (async/alts!! [res-chan
-              (async/timeout 100)]) =&gt; [nil res-chan]</code></pre></div>
+              (async/timeout 1000)]) =&gt; [nil res-chan]</code></pre></div>
         </div>
       </div>
     </div>

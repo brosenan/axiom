@@ -98,11 +98,15 @@
  (async/alts!! [bar-chan
               (async/timeout 1000)]) =&gt; [[:bar &quot;This is bar&quot;]
                                          bar-chan]</code></pre></div><div><p><code>provide</code> executes within the context of a <code>go</code> block. Its underlying expressions can use macros such as <code>&gt;!</code> and <code>&lt;!</code>.</p></div><div class="code"><pre><code class="clojure">(def baz-chan (async/chan))
+ (def wait-chan (async/chan))
  (provide baz inj
         (async/&lt;! baz-chan))
  (:baz @(first inj)) =&gt; nil ; not yet...
- (async/&gt;!! baz-chan 4) 
- (:baz @(first inj)) =&gt; 4</code></pre></div><div><span id="with-dependencies"></span><h2><b>4 &nbsp;&nbsp; with-dependencies</b></h2></div><div><p>When we wish to evaluate something that depends on external resources, <code>with-dependencies</code> is the way to go. It can only be used from within a surrounding <code>go</code> block. It needs this <code>go</code> block to suspend execution until all requirements are fulfilled.</p></div><div><p>Consider the following injector. It has two resources: <code>foo</code> and <code>bar</code>, which are defined (and are therefore fulfilled) first. Then we set the value of the <code>res</code> atom to be the sum of both resources using <code>with-dependencies</code>. We expect that the value of <code>res</code> will be set to the sum of <code>foo</code> and <code>bar</code> immediately.</p></div><div class="code"><pre><code class="clojure">(let [inj (injector)
+ ; let's subscribe to the value
+ (async/sub (inj 2) :baz wait-chan)
+ (async/&gt;!! baz-chan 4)
+ (async/alts!! [wait-chan
+              (async/timeout 1000)]) =&gt; [[:baz 4] wait-chan]</code></pre></div><div><span id="with-dependencies"></span><h2><b>4 &nbsp;&nbsp; with-dependencies</b></h2></div><div><p>When we wish to evaluate something that depends on external resources, <code>with-dependencies</code> is the way to go. It can only be used from within a surrounding <code>go</code> block. It needs this <code>go</code> block to suspend execution until all requirements are fulfilled.</p></div><div><p>Consider the following injector. It has two resources: <code>foo</code> and <code>bar</code>, which are defined (and are therefore fulfilled) first. Then we set the value of the <code>res</code> atom to be the sum of both resources using <code>with-dependencies</code>. We expect that the value of <code>res</code> will be set to the sum of <code>foo</code> and <code>bar</code> immediately.</p></div><div class="code"><pre><code class="clojure">(let [inj (injector)
      chan (async/chan)]
  (provide foo inj
           1)
