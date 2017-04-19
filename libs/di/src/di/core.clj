@@ -31,3 +31,4 @@
                  (recur)))))))
 
 
+(def the-inj (injector))

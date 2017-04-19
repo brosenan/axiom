@@ -117,3 +117,8 @@ resources that depend on other resources."
               (inc foo)))
    (async/alts!! [chan
                   (async/timeout 1000)]) => [2 chan]))
+
+[[:chapter {:title "the-inj"}]]
+"`di.core` provides one injector instance: `the-inj`, which is intended to be used to connect providers and consumers in software systems."
+(fact
+ the-inj =not=> nil?)
