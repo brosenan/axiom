@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li><li><a class="chapter" data-scroll="" href="#the-inj"><h4>5 &nbsp; the-inj</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li><li><a class="chapter" data-scroll="" href="#the-inj"><h4>5 &nbsp; the-inj</h4></a></li><li><a class="chapter" data-scroll="" href="#wait-for"><h4>6 &nbsp; wait-for</h4></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,14 +80,17 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li><li><a class="chapter" data-scroll="" href="#the-inj"><h4>5 &nbsp; the-inj</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li><li><a class="chapter" data-scroll="" href="#the-inj"><h4>5 &nbsp; the-inj</h4></a></li><li><a class="chapter" data-scroll="" href="#wait-for"><h4>6 &nbsp; wait-for</h4></a></li>
                 </ul>
               </nav>
           </div>
           <div><span id="intoduction"></span><h2><b>1 &nbsp;&nbsp; Intoduction</b></h2></div><div><p><a href='https://en.wikipedia.org/wiki/Dependency_injection'>Dependency Injection</a> (DI) is a practice by which code assets receive their dependencies from their surroundings at runtime, as opposed to the practice in which they are compiled against these dependencies. This allows different modules to be decoupled from one another, making software more modular and easier to modify and test.</p></div><div><p>This module provides DI to Clojure projects. It defines two macros: <code>provide</code> and <code>with-dependencies</code>. <code>provide</code> defines the algorithm for providing a <em>resource</em>. <code>with-dependencies</code> calculates an expression based on one or more resources known as its <em>dependencies</em>. The evaluation of the expression inside <code>with-dependencies</code> is delayed until all resources are available.</p></div><div><p><code>provide</code> and <code>with-dependencies</code> can be used in concert.</p></div><div><span id="injector"></span><h2><b>2 &nbsp;&nbsp; injector</b></h2></div><div><p><code>injector</code> constructs an empty injector, which should be passed to <code>provide</code> and <code>with-dependencies</code>.</p></div><div class="code"><pre><code class="clojure">(let [inj (injector)]
  @(inj 0) =&gt; {} ; Map of fulfilled resources
  (inj 1) =&gt; irrelevant ; channel on which newly fulfilled resources are published
- (inj 2) =&gt; irrelevant)</code></pre></div><div><span id="provide"></span><h2><b>3 &nbsp;&nbsp; provide</b></h2></div><div><p>The <code>provide</code> macro defines an algorithm for fulfilling a resource. It is called eagerly as a side-effect of loading its containing module.</p></div><div class="code"><pre><code class="clojure">(def inj (injector))
+ (inj 2) =&gt; irrelevant)</code></pre></div><div><p><code>injector</code> takes an optional argument with default values for resources.</p></div><div class="code"><pre><code class="clojure">(let [inj (injector {:foo 1
+                    :bar 2})]
+ (:foo @(inj 0)) =&gt; 1
+ (:bar @(inj 0)) =&gt; 2)</code></pre></div><div><span id="provide"></span><h2><b>3 &nbsp;&nbsp; provide</b></h2></div><div><p>The <code>provide</code> macro defines an algorithm for fulfilling a resource. It is called eagerly as a side-effect of loading its containing module.</p></div><div class="code"><pre><code class="clojure">(def inj (injector))
  (provide foo inj
         1 ; There can be
         2 ; any number of
@@ -139,7 +142,14 @@
           (with-dependencies inj [foo]
             (inc foo)))
  (async/alts!! [chan
-                (async/timeout 1000)]) =&gt; [2 chan])</code></pre></div><div><span id="the-inj"></span><h2><b>5 &nbsp;&nbsp; the-inj</b></h2></div><div><p><code>di.core</code> provides one injector instance: <code>the-inj</code>, which is intended to be used to connect providers and consumers in software systems.</p></div><div class="code"><pre><code class="clojure">the-inj =not=&gt; nil?</code></pre></div>
+                (async/timeout 1000)]) =&gt; [2 chan])</code></pre></div><div><span id="the-inj"></span><h2><b>5 &nbsp;&nbsp; the-inj</b></h2></div><div><p><code>di.core</code> provides one injector instance: <code>the-inj</code>, which is intended to be used to connect providers and consumers in software systems.</p></div><div class="code"><pre><code class="clojure">the-inj =not=&gt; nil?</code></pre></div><div><span id="wait-for"></span><h2><b>6 &nbsp;&nbsp; wait-for</b></h2></div><div><p>Sometimes, especially during tests, we wish to get a resource outside a <code>go</code> block. In such cases we wish to block the current thread. Please note that this should be avoided in <code>provide</code> blocks, as it may lead to deadlocks. In other contexts blocking a thread is unadvised due to performance impact. However, for testing this may be extremely useful.</p></div><div><p>Consider our previous example, with resources <code>foo</code> and <code>bar</code>, where <code>bar</code> depends on <code>foo</code>.</p></div><div class="code"><pre><code class="clojure">(def inj (injector))
+ (def chan (async/chan))
+ (provide foo inj
+        (async/&lt;! (async/timeout 1))
+        1)
+ (provide bar inj
+        (with-dependencies inj [foo]
+          (inc foo)))</code></pre></div><div><p>In the previous example we needed to create a <code>go</code> block to capture <code>bar</code>'s value from within a <code>with-dependencies</code> block. For this to be visible from the outside we used a channel. However, it can be much simpler to just assert on the value of <code>bar</code> using a blocking call. <code>wait-for</code> gives us just that.</p></div><div class="code"><pre><code class="clojure">(wait-for inj bar) =&gt; 2</code></pre></div>
         </div>
       </div>
     </div>

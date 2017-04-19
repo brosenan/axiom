@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#table-kw"><h4>1 &nbsp; table-kw</h4></a></li><li><a class="chapter" data-scroll="" href="#retriever"><h4>2 &nbsp; retriever: An Async Retrieval Function</h4></a></li><li><a class="chapter" data-scroll="" href="#integration-testing----usage-example"><h4>3 &nbsp; Integration Testing / Usage Example</h4></a></li><li><a class="chapter" data-scroll="" href="#scanner-scan-a-shard-of-a-table"><h4>4 &nbsp; scanner: Scan a Shard of a Table</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#table-kw"><h4>1 &nbsp; table-kw</h4></a></li><li><a class="chapter" data-scroll="" href="#retriever"><h4>2 &nbsp; retriever: An Async Retrieval Function</h4></a></li><li><a class="chapter" data-scroll="" href="#usage-example"><h4>3 &nbsp; Usage Example</h4></a></li><li><a class="chapter" data-scroll="" href="#scanner-scan-a-shard-of-a-table"><h4>4 &nbsp; scanner: Scan a Shard of a Table</h4></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,7 +80,7 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#table-kw"><h4>1 &nbsp; table-kw</h4></a></li><li><a class="chapter" data-scroll="" href="#retriever"><h4>2 &nbsp; retriever: An Async Retrieval Function</h4></a></li><li><a class="chapter" data-scroll="" href="#integration-testing----usage-example"><h4>3 &nbsp; Integration Testing / Usage Example</h4></a></li><li><a class="chapter" data-scroll="" href="#scanner-scan-a-shard-of-a-table"><h4>4 &nbsp; scanner: Scan a Shard of a Table</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#table-kw"><h4>1 &nbsp; table-kw</h4></a></li><li><a class="chapter" data-scroll="" href="#retriever"><h4>2 &nbsp; retriever: An Async Retrieval Function</h4></a></li><li><a class="chapter" data-scroll="" href="#usage-example"><h4>3 &nbsp; Usage Example</h4></a></li><li><a class="chapter" data-scroll="" href="#scanner-scan-a-shard-of-a-table"><h4>4 &nbsp; scanner: Scan a Shard of a Table</h4></a></li>
                 </ul>
               </nav>
           </div>
@@ -111,7 +111,7 @@
                                          :data [2 3 4]}
                                         chan-res]</code></pre></div><div><p>Eventually <code>retriever</code> closes the response channel.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [chan-res
               (async/timeout 100)]) =&gt; [nil chan-res]</code></pre></div><div><p>If the request channel is closed, <code>retriever</code> exits, returning <code>false</code>.</p></div><div class="code"><pre><code class="clojure">(async/close! chan-req)
- (retriever ..config.. chan-req) =&gt; false</code></pre></div><div><span id="integration-testing----usage-example"></span><h2><b>3 &nbsp;&nbsp; Integration Testing / Usage Example</b></h2></div><div><p>To see that this library can actually connect to DynamoDB we will use <code>dynamo.srv</code> to create a few events in different tables, and then use <code>retriever</code> to retrieve some of them.</p></div><div><p>We will use a <a href='http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html'>local DynamoDB</a> exposed on the local host on port 8006. Our configuration is as follows (we follow <a href='https://github.com/ptaoussanis/faraday#connecting'>these</a> instructions:</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
+ (retriever ..config.. chan-req) =&gt; false</code></pre></div><div><span id="usage-example"></span><h2><b>3 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>To see that this library can actually connect to DynamoDB we will use <code>dynamo.srv</code> to create a few events in different tables, and then use <code>retriever</code> to retrieve some of them.</p></div><div><p>We will use a <a href='http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html'>local DynamoDB</a> exposed on the local host on port 8006. Our configuration is as follows (we follow <a href='https://github.com/ptaoussanis/faraday#connecting'>these</a> instructions:</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
 (def client-opts
   {:access-key &quot;FOO&quot;
    :secret-key &quot;BAR&quot;
