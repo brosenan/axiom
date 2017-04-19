@@ -7,6 +7,14 @@
 "`migrator` is a microservice that listens for events describing new rules being published,
 and initiates data migration using [zk-plan](zk-plan.html)."
 
+[[:chapter {:title "init"}]]
+"This service has external dependencies.
+The `init` function allows the system to provide these dependencies in terms of a `_config` map."
+(fact
+ (init ..config..) => nil
+ (provided
+  (reset! _config ..config..) => irrelevant))
+
 [[:chapter {:title "extract-version-rules"}]]
 "`extract-version-rules` handles `:axiom/version` events."
 (fact

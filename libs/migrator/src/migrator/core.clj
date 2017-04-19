@@ -1,6 +1,12 @@
 (ns migrator.core
   (:require [permacode.core :as perm]))
 
+(def _config (atom {}))
+
+(defn init [config]
+  (reset! _config config)
+  nil)
+
 (defn extract-version-rules
   {:reg {:kind :fact
          :name "axiom/version"}}
