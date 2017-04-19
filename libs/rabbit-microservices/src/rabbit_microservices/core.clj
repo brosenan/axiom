@@ -5,7 +5,8 @@
             [langohr.consumers :as lc]
             [langohr.basic     :as lb]
             [langohr.exchange  :as le]
-            [taoensso.nippy :as nippy]))
+            [taoensso.nippy :as nippy]
+            [di.core :as di]))
 
 
 (def facts-exch "facts")
@@ -51,8 +52,8 @@
                   :else
                   "#")))
 
-(defn arg-count [funcvar]
-  (->> funcvar meta :arglists first count))
+(defn arg-count [func]
+  (-> func class .getDeclaredMethods first .getParameterTypes alength))
 
 (defn publish [srv ev]
   (let [bin (nippy/freeze ev)
@@ -70,19 +71,26 @@
                     (lb/publish chan facts-exch (event-routing-key ev) (nippy/freeze (merge event ev)) meta-attrs)))
         ack (fn [] (my-ack chan (:delivery-tag meta-attrs)))]
     (case (arg-count func)
-      1 (@func event)
-      2 (@func event publish)
-      3 (@func event publish ack)))
+      1 (func event)
+      2 (func event publish)
+      3 (func event publish ack)))
   nil)
 
-(defn register-func [service funcvar]
-  (let [reg (-> funcvar meta :reg)
-        q (lq/declare-server-named (:chan service))]
+(defn register-func [service func reg]
+  (let [q (lq/declare-server-named (:chan service))]
     (lq/bind (:chan service) q facts-exch {:routing-key (event-routing-key reg)})
-    (lc/subscribe (:chan service) q (partial handle-event funcvar (:alive service)) {:auto-ack (< (arg-count funcvar) 3)})
+    (lc/subscribe (:chan service) q (partial handle-event func (:alive service)) {:auto-ack (< (arg-count func) 3)})
     nil))
 
-(defn register-service [service ns]
-  (doseq [funcvar (vals (ns-publics ns))]
-    (when (-> funcvar meta :reg)
-      (register-func service funcvar))))
+(di/provide amqp-service di/the-inj
+            (di/with-dependencies di/the-inj [amqp-config]
+              (binding [rmq/*default-config* amqp-config]
+                (create-service))))
+
+(di/provide serve di/the-inj
+            (di/with-dependencies di/the-inj [amqp-service]
+              (partial register-func amqp-service)))
+
+(di/provide publish di/the-inj
+            (di/with-dependencies di/the-inj [amqp-service]
+              (partial publish amqp-service)))

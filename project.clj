@@ -9,7 +9,7 @@
   :aliases {"im" ["do" ["midje" ":filter" "-integ"] ["install"]]
             "eim" ["monolith" "each" "im"]
             "autotest" ["midje" ":autotest" ":filter" "-integ"]
-            "integ" ["midje" ":filter" ":integ"]
+            "integ" ["midje" ":filter" "integ"]
             "einteg" ["monolith" "each" "integ"]}
   :monolith {:project-dirs ["libs/*"]
              :inherit [:aliases]}
