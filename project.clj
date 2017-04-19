@@ -76,4 +76,8 @@
                     "migrator"
                     {:input "libs/migrator/test/migrator/core_test.clj"
                      :title "migrator.core"
-                     :subtitle "Initiating Data Migrations for Rules"}}})
+                     :subtitle "Initiating Data Migrations for Rules"}
+                    "di"
+                    {:input "libs/di/test/di/core_test.clj"
+                     :title "di.core"
+                     :subtitle "Dependency Injection"}}})
