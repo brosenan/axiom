@@ -24,6 +24,13 @@ The evaluation of the expression inside `with-dependencies` is delayed until all
    (inj 1) => irrelevant ; channel on which newly fulfilled resources are published
    (inj 2) => irrelevant)) ; publication for unfulfilled resources
 
+"`injector` takes an optional argument with default values for resources."
+(fact
+ (let [inj (injector {:foo 1
+                      :bar 2})]
+   (:foo @(inj 0)) => 1
+   (:bar @(inj 0)) => 2))
+
 [[:chapter {:title "provide"}]]
 "The `provide` macro defines an algorithm for fulfilling a resource.
 It is called eagerly as a side-effect of loading its containing module."
@@ -126,3 +133,27 @@ resources that depend on other resources."
 "`di.core` provides one injector instance: `the-inj`, which is intended to be used to connect providers and consumers in software systems."
 (fact
  the-inj =not=> nil?)
+
+[[:chapter {:title "wait-for"}]]
+"Sometimes, especially during tests, we wish to get a resource outside a `go` block.
+In such cases we wish to block the current thread.
+Please note that this should be avoided in `provide` blocks, as it may lead to deadlocks.
+In other contexts blocking a thread is unadvised due to performance impact.
+However, for testing this may be extremely useful."
+
+"Consider our previous example, with resources `foo` and `bar`, where `bar` depends on `foo`."
+(fact
+ (def inj (injector))
+ (def chan (async/chan))
+ (provide foo inj
+          (async/<! (async/timeout 1))
+          1)
+ (provide bar inj
+          (with-dependencies inj [foo]
+            (inc foo))))
+"In the previous example we needed to create a `go` block to capture `bar`'s value from within a `with-dependencies` block.
+For this to be visible from the outside we used a channel.
+However, it can be much simpler to just assert on the value of `bar` using a blocking call.
+`wait-for` gives us just that."
+(fact
+ (wait-for inj bar) => 2)

@@ -19,6 +19,31 @@ It is provided a partial event, and calls the given function on any event that m
 
 "The event structure we refer to here is the one discussed in [cloudlog-events](cloudlog-events.html)."
 
+[[:chapter {:title "serve: Register an Event Handler" :tag "serve"}]]
+"`serve` is a [dependency-injection resource](di.html) which ..."
+
+"When given such a function, `register-func` performs the following:
+1. Declares a queue, dedicated to this function.
+2. Binds this queue to the `facts` exchange, based on the routing key pattern provided by the `:reg` map.
+3. Subscribes to this queue using a function that wraps the given function."
+(fact
+ (register-func {:chan ..chan..} (fn [ev]) {:kind :fact
+                                            :name "foo/bar"}) => nil
+ (provided
+  (lq/declare-server-named ..chan..) => ..q..
+  (lq/bind ..chan.. ..q.. facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
+  (lc/subscribe ..chan.. ..q.. irrelevant {:auto-ack true}) => irrelevant))
+
+"Auto acknowledgement is disabled when the provided function has three parameters.
+The third of which is expected to be bound to an explicit `ack` function."
+(fact
+ (register-func {:chan ..chan..} (fn [event publish ack]) {:kind :fact
+                                                           :name "foo/bar"}) => nil
+ (provided
+  (lq/declare-server-named ..chan..) => ..q..
+  (lq/bind ..chan.. ..q.. facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
+  (lc/subscribe ..chan.. ..q.. irrelevant {:auto-ack false}) => irrelevant))
+
 [[:chapter {:title "Usage Example"}]]
 "To demonstrate how the above functions work together we build a small usage example."
 
@@ -111,31 +136,6 @@ The returned map contains the connection, the channel and an `:alive` atom, that
   (le/declare ..chan.. facts-exch "topic") => irrelevant))
 
 "The dynamic variable `langohr.core/*default-config*` controls the configuration.  See the [Langohr documentation](http://clojurerabbitmq.info) for more information."
-
-[[:section {:title "register-func: Register an Event Handler" :tag "register-func"}]]
-"`register-func` takes a service, a function and a partial event and serves the function as part of the service."
-
-"When given such a function, `register-func` performs the following:
-1. Declares a queue, dedicated to this function.
-2. Binds this queue to the `facts` exchange, based on the routing key pattern provided by the `:reg` map.
-3. Subscribes to this queue using a function that wraps the given function."
-(fact
- (register-func {:chan ..chan..} (fn [ev]) {:kind :fact
-                                            :name "foo/bar"}) => nil
- (provided
-  (lq/declare-server-named ..chan..) => ..q..
-  (lq/bind ..chan.. ..q.. facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
-  (lc/subscribe ..chan.. ..q.. irrelevant {:auto-ack true}) => irrelevant))
-
-"Auto acknowledgement is disabled when the provided function has three parameters.
-The third of which is expected to be bound to an explicit `ack` function."
-(fact
- (register-func {:chan ..chan..} (fn [event publish ack]) {:kind :fact
-                                                           :name "foo/bar"}) => nil
- (provided
-  (lq/declare-server-named ..chan..) => ..q..
-  (lq/bind ..chan.. ..q.. facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
-  (lc/subscribe ..chan.. ..q.. irrelevant {:auto-ack false}) => irrelevant))
 
 [[:section {:title "event-routing-key"}]]
 "The `event-routing-key` function returns a AMQP-conforming routing key for a given event map."

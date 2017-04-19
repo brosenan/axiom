@@ -97,7 +97,7 @@ and the request channel.  Once called, it will perform the following:
  (async/close! chan-req)
  (retriever ..config.. chan-req) => false)
 
-[[:chapter {:title "Integration Testing / Usage Example"}]]
+[[:chapter {:title "Usage Example"}]]
 "To see that this library can actually connect to DynamoDB we will use `dynamo.srv` to create a few events in different
 tables, and then use `retriever` to retrieve some of them."
 

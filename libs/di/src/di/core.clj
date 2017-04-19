@@ -1,11 +1,14 @@
 (ns di.core
   (:require [clojure.core.async :as async]))
 
-(defn injector []
-  (let [chan (async/chan)]
-    [(atom {})
-     chan
-     (async/pub chan first)]))
+(defn injector
+  ([fulfilled]
+   (let [chan (async/chan)]
+     [(atom fulfilled)
+      chan
+      (async/pub chan first)]))
+  ([]
+   (injector {})))
 
 
 (defmacro provide [resource inj & exprs]
@@ -32,3 +35,11 @@
 
 
 (def the-inj (injector))
+
+(defmacro wait-for [inj key]
+  `(let [~'$chan (async/chan)]
+     (async/go
+       (async/>! ~'$chan
+                 (with-dependencies ~inj [~key]
+                   ~key)))
+     (async/<!! ~'$chan)))
