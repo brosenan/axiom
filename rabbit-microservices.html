@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#serve"><h4>2 &nbsp; serve: Register an Event Handler</h4></a></li><li><a class="chapter" data-scroll="" href="#usage-example"><h4>3 &nbsp; Usage Example</h4></a></li><li><a class="chapter" data-scroll="" href="#publish-publish-an-event-from-the-outside"><h4>4 &nbsp; publish: Publish an Event from the Outside</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#create-service"><h5><i>5.1 &nbsp; create-service: Initialization</i></h5></a><a class="section" data-scroll="" href="#event-routing-key"><h5><i>5.2 &nbsp; event-routing-key</i></h5></a><a class="section" data-scroll="" href="#handle-event"><h5><i>5.3 &nbsp; handle-event</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#serve"><h4>2 &nbsp; serve: Register an Event Handler</h4></a></li><li><a class="chapter" data-scroll="" href="#publish-publish-an-event-from-the-outside"><h4>3 &nbsp; publish: Publish an Event from the Outside</h4></a></li><li><a class="chapter" data-scroll="" href="#usage-example"><h4>4 &nbsp; Usage Example</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#create-service"><h5><i>5.1 &nbsp; create-service: Initialization</i></h5></a><a class="section" data-scroll="" href="#event-routing-key"><h5><i>5.2 &nbsp; event-routing-key</i></h5></a><a class="section" data-scroll="" href="#handle-event"><h5><i>5.3 &nbsp; handle-event</i></h5></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,56 +80,65 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#serve"><h4>2 &nbsp; serve: Register an Event Handler</h4></a></li><li><a class="chapter" data-scroll="" href="#usage-example"><h4>3 &nbsp; Usage Example</h4></a></li><li><a class="chapter" data-scroll="" href="#publish-publish-an-event-from-the-outside"><h4>4 &nbsp; publish: Publish an Event from the Outside</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#create-service"><h5><i>5.1 &nbsp; create-service: Initialization</i></h5></a><a class="section" data-scroll="" href="#event-routing-key"><h5><i>5.2 &nbsp; event-routing-key</i></h5></a><a class="section" data-scroll="" href="#handle-event"><h5><i>5.3 &nbsp; handle-event</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#serve"><h4>2 &nbsp; serve: Register an Event Handler</h4></a></li><li><a class="chapter" data-scroll="" href="#publish-publish-an-event-from-the-outside"><h4>3 &nbsp; publish: Publish an Event from the Outside</h4></a></li><li><a class="chapter" data-scroll="" href="#usage-example"><h4>4 &nbsp; Usage Example</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#create-service"><h5><i>5.1 &nbsp; create-service: Initialization</i></h5></a><a class="section" data-scroll="" href="#event-routing-key"><h5><i>5.2 &nbsp; event-routing-key</i></h5></a><a class="section" data-scroll="" href="#handle-event"><h5><i>5.3 &nbsp; handle-event</i></h5></a></li>
                 </ul>
               </nav>
           </div>
-          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>rabbit-microservices</code> is a library that supports the definition of microservices. It <a href='di.html#provide'>provides</a> the <code>serve</code> function as a <a href='di.html'>resource</a>. In turn, the <code>serve</code> function registers given functions to a subset of the events published through AMQP. It is provided a partial event, and calls the given function on any event that matches the given partial event.</p></div><div><p>The event structure we refer to here is the one discussed in <a href='cloudlog-events.html'>cloudlog-events</a>.</p></div><div><span id="serve"></span><h2><b>2 &nbsp;&nbsp; serve: Register an Event Handler</b></h2></div><div><p><code>serve</code> is a <a href='di.html'>dependency-injection resource</a> which ...</p></div><div><p>When given such a function, <code>register-func</code> performs the following:</p><ol><li>Declares a queue, dedicated to this function.</li><li>Binds this queue to the <code>facts</code> exchange, based on the routing key pattern provided by the <code>:reg</code> map.</li><li>Subscribes to this queue using a function that wraps the given function.</li></ol></div><div class="code"><pre><code class="clojure">(register-func {:chan ..chan..} (fn [ev]) {:kind :fact
-                                          :name &quot;foo/bar&quot;}) =&gt; nil
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>rabbit-microservices</code> is a library that supports the definition of microservices. It <a href='di.html#provide'>provides</a> the <code>serve</code> function as a <a href='di.html'>resource</a>. In turn, the <code>serve</code> function registers given functions to a subset of the events published through AMQP. It is provided a partial event, and calls the given function on any event that matches the given partial event.</p></div><div><p>The event structure we refer to here is the one discussed in <a href='cloudlog-events.html'>cloudlog-events</a>.</p></div><div><span id="serve"></span><h2><b>2 &nbsp;&nbsp; serve: Register an Event Handler</b></h2></div><div><p><code>serve</code> is a <a href='di.html'>dependency-injection resource</a> which depends on an <code>amqp-service</code> resource (which itself depends on <code>amqp-config</code>).</p></div><div class="code"><pre><code class="clojure">(let [inj (di/injector {:amqp-service {:chan :some-chan}})]
+ (module inj)
+ (def serve (di/wait-for inj serve)))</code></pre></div><div><p><code>serve</code> is a function that takes a service function and a partial event and does the following:</p><ol><li>Declares a queue, dedicated to this function.</li><li>Binds this queue to the <code>facts</code> exchange, based on the routing key pattern provided by the <code>:reg</code> map.</li><li>Subscribes to this queue using a function that wraps the given function.</li></ol></div><div class="code"><pre><code class="clojure">(serve (fn [ev]) {:kind :fact
+                 :name &quot;foo/bar&quot;}) =&gt; nil
  (provided
-(lq/declare-server-named ..chan..) =&gt; ..q..
-(lq/bind ..chan.. ..q.. facts-exch {:routing-key &quot;f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#&quot;}) =&gt; irrelevant
-(lc/subscribe ..chan.. ..q.. irrelevant {:auto-ack true}) =&gt; irrelevant)</code></pre></div><div><p>Auto acknowledgement is disabled when the provided function has three parameters. The third of which is expected to be bound to an explicit <code>ack</code> function.</p></div><div class="code"><pre><code class="clojure">(register-func {:chan ..chan..} (fn [event publish ack]) {:kind :fact
-                                                         :name &quot;foo/bar&quot;}) =&gt; nil
+(lq/declare-server-named :some-chan) =&gt; ..q..
+(lq/bind :some-chan ..q.. facts-exch {:routing-key &quot;f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#&quot;}) =&gt; irrelevant
+(lc/subscribe :some-chan ..q.. irrelevant {:auto-ack true}) =&gt; irrelevant)</code></pre></div><div><p>Auto acknowledgement is disabled when the provided function has three parameters. The third of which is expected to be bound to an explicit <code>ack</code> function.</p></div><div class="code"><pre><code class="clojure">(serve (fn [event publish ack]) {:kind :fact
+                                :name &quot;foo/bar&quot;}) =&gt; nil
  (provided
-(lq/declare-server-named ..chan..) =&gt; ..q..
-(lq/bind ..chan.. ..q.. facts-exch {:routing-key &quot;f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#&quot;}) =&gt; irrelevant
-(lc/subscribe ..chan.. ..q.. irrelevant {:auto-ack false}) =&gt; irrelevant)</code></pre></div><div><span id="usage-example"></span><h2><b>3 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>To demonstrate how the above functions work together we build a small usage example.</p></div><div><p>In our example we have the following service functions:</p><ol><li>Function <code>sum-foo</code> that sums the values in the data of events of name "foo" and emits events named "foo-sum".</li><li>Function <code>count-ev</code> that counts the events of the different names and emits events of type "count" (it does not count "count" events).</li><li>Function <code>foo-from-count</code> that listens on "count" events and emits corresponding "foo" events with the same value.</li></ol></div><div class="code"><pre><code class="clojure">(def foo-sum (atom 0))
-(def ev-count (atom {}))
-(async/go
-  (di/with-dependencies di/the-inj [serve]
-    (println &quot;Registering services&quot;)
-    (serve (fn ;; sum-foo
-             [ev pub]
-              (swap! foo-sum (partial + (:data ev)))
+(lq/declare-server-named :some-chan) =&gt; ..q..
+(lq/bind :some-chan ..q.. facts-exch {:routing-key &quot;f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#&quot;}) =&gt; irrelevant
+(lc/subscribe :some-chan ..q.. irrelevant {:auto-ack false}) =&gt; irrelevant)</code></pre></div><div><span id="publish-publish-an-event-from-the-outside"></span><h2><b>3 &nbsp;&nbsp; publish: Publish an Event from the Outside</b></h2></div><div><p><code>publish</code> is a service that allows its users to publish events from outside the context of a service. It depends on <code>amqp-service</code>.</p></div><div class="code"><pre><code class="clojure">(let [inj (di/injector {:amqp-service {:chan :some-chan}})]
+ (module inj)
+ (def publish (di/wait-for inj publish)))</code></pre></div><div class="code"><pre><code class="clojure">(publish ..ev..) =&gt; nil
+ (provided
+(nippy/freeze ..ev..) =&gt; ..bin..
+(event-routing-key ..ev..) =&gt; ..routing-key..
+(lb/publish :some-chan facts-exch ..routing-key.. ..bin.. {}) =&gt; irrelevant)</code></pre></div><div><span id="usage-example"></span><h2><b>4 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>To demonstrate how the above functions work together we build a small usage example.</p></div><div><p>In our example we have the following service functions:</p><ol><li>Function <code>sum-foo</code> that sums the values in the data of events of name "foo" and emits events named "foo-sum".</li><li>Function <code>count-ev</code> that counts the events of the different names and emits events of type "count" (it does not count "count" events).</li><li>Function <code>foo-from-count</code> that listens on "count" events and emits corresponding "foo" events with the same value.</li></ol></div><div class="code"><pre><code class="clojure">:integ ; Integration test.  Does not run during continouts integration
+ (def foo-sum (atom 0))
+ (def ev-count (atom {}))
+ (async/go
+ (di/with-dependencies di/the-inj [serve]
+   (println &quot;Registering services&quot;)
+   (serve (fn ;; sum-foo
+            [ev pub]
+            (swap! foo-sum (partial + (:data ev)))
+            (pub {:kind :fact
+                  :name &quot;foo-sum&quot;
+                  :key 0
+                  :data @foo-sum}))
+          {:kind :fact
+           :name &quot;foo&quot;})
+
+   (serve (fn  ;; count-ev
+            [ev pub]
+            (let [key (:name ev)]
+              (swap! ev-count (fn [m]
+                                (let [old (or (m key) 0)
+                                      new (inc old)]
+                                  (assoc m key new))))
               (pub {:kind :fact
-                    :name &quot;foo-sum&quot;
-                    :key 0
-                    :data @foo-sum}))
-           {:kind :fact
-            :name &quot;foo&quot;})
+                    :name &quot;count&quot;
+                    :key key
+                    :data (@ev-count key)})))
+          {:kind :fact})
 
-    (serve (fn  ;; count-ev
-             [ev pub]
-             (let [key (:name ev)]
-               (swap! ev-count (fn [m]
-                                 (let [old (or (m key) 0)
-                                       new (inc old)]
-                                   (assoc m key new))))
-               (pub {:kind :fact
-                     :name &quot;count&quot;
-                     :key key
-                     :data (@ev-count key)})))
-           {:kind :fact})
-
-    (serve (fn ;; foo-from-count
-             [ev pub]
-             (pub {:kind :fact
-                   :name &quot;foo&quot;
-                   :key (:key ev)
-                   :data (:data ev)}))
-           {:kind :fact
-            :name &quot;count&quot;})))</code></pre></div><div><p>For the <code>serve</code> resource to initialize, we need to provide an <code>amqp-config</code> resource with values needed for the underlying <code>langohr</code> library to find the AMQP broker. We will use the default values.</p></div><div class="code"><pre><code class="clojure">(di/provide amqp-config di/the-inj
+   (serve (fn ;; foo-from-count
+            [ev pub]
+            (pub {:kind :fact
+                  :name &quot;foo&quot;
+                  :key (:key ev)
+                  :data (:data ev)}))
+          {:kind :fact
+           :name &quot;count&quot;})))</code></pre></div><div><p>For the <code>serve</code> resource to initialize, we need to provide an <code>amqp-config</code> resource with values needed for the underlying <code>langohr</code> library to find the AMQP broker. We will use the default values.</p></div><div class="code"><pre><code class="clojure">(di/provide amqp-config di/the-inj
             rmq/*default-config*)</code></pre></div><div><p>Now our service is ready to roll.<br /> All we need is to get the fire started is a little match &ndash; a single event.</p></div><div class="code"><pre><code class="clojure">:integ ; Integration test.  Does not run during continouts integration
     (async/go
       (di/with-dependencies di/the-inj [publish]
@@ -141,11 +150,7 @@
     (println &quot;waiting for the sum to reach ten-milion&quot;)
     (while (&lt; @foo-sum 10000000)
       (Thread/sleep 100))
-    (println &quot;done!&quot;)</code></pre></div><div><span id="publish-publish-an-event-from-the-outside"></span><h2><b>4 &nbsp;&nbsp; publish: Publish an Event from the Outside</b></h2></div><div><p>The second parameter of a service function is bound to a <code>publish</code> function, allowing services to publish events. However, we sometime need to publish events outside the context of a service (i.e., not in response to an incoming event). The (global) <code>publish</code> function does that. The only difference between the two functions is that the global <code>publish</code> receives the <code>service</code> as its first parameter.</p></div><div class="code"><pre><code class="clojure">(publish {:chan ..chan..} ..ev..) =&gt; nil
- (provided
-(nippy/freeze ..ev..) =&gt; ..bin..
-(event-routing-key ..ev..) =&gt; ..routing-key..
-(lb/publish ..chan.. facts-exch ..routing-key.. ..bin.. {}) =&gt; irrelevant)</code></pre></div><div><span id="under-the-hood"></span><h2><b>5 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="create-service"></span><h3>5.1 &nbsp;&nbsp; create-service: Initialization</h3></div><div><p><code>create-service</code> initializes a connection and a channel to RabbitMQ. It also declares the <code>facts</code> exchange, which is a topic-based AMQP exchange. The returned map contains the connection, the channel and an <code>:alive</code> atom, that defaults to <code>true</code>.</p></div><div class="code"><pre><code class="clojure">(let [srv (create-service)]
+    (println &quot;done!&quot;)</code></pre></div><div><span id="under-the-hood"></span><h2><b>5 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="create-service"></span><h3>5.1 &nbsp;&nbsp; create-service: Initialization</h3></div><div><p><code>create-service</code> initializes a connection and a channel to RabbitMQ. It also declares the <code>facts</code> exchange, which is a topic-based AMQP exchange. The returned map contains the connection, the channel and an <code>:alive</code> atom, that defaults to <code>true</code>.</p></div><div class="code"><pre><code class="clojure">(let [srv (create-service)]
  [(:conn srv) (:chan srv) @(:alive srv)]) =&gt; [..conn.. ..chan.. true]
  (provided
 (rmq/connect) =&gt; ..conn..
