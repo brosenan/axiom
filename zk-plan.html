@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 18 April 2017</h5>
+              <h5>Date: 19 April 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -131,30 +131,30 @@
 (zk/children ..zk.. ..plan..) =&gt; '(&quot;foo&quot; &quot;task-39893&quot; &quot;bar&quot;))</code></pre></div><div><span id="usage-example"></span><h2><b>7 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>The idea of this test is to stress zk_plan by launching <code>N</code> parallel worker threads to execute a randomized plan with <code>M</code> tasks, each depending on <code>K</code> preceding tasks (if such exist).</p></div><div class="code"><pre><code class="clojure">(def N 10) ; the number of workers
 (def M 100) ; the number of tasks
 (def K 10) ; the number of dependencies per task</code></pre></div><div><p>The tasks work against a map of <code>M</code> atoms, one atom per each task.  These atoms count the workers working on this task.</p></div><div class="code"><pre><code class="clojure">(def worker-counters (into {} (map (fn [i] [i (atom 0)]) (range M))))</code></pre></div><div><p>Each task will also report it completed its work by adding its ordinal number to this set.</p></div><div class="code"><pre><code class="clojure">(def workers-completed (atom #{}))</code></pre></div><div><p>Each task begins by incrementing the atom, then sleeps for a while, then decrements the atom. After incrementing, it checks that the value is 1, that is, no other worker is working on the same task. The function compares its arguments against the <code>expected</code> vector, and returns its number. The function below creates a task function (s-expression) for task <code>i</code></p></div><div class="code"><pre><code class="clojure">(defn stress-task-func [i expected]
-  `(fn [&amp; ~'args]
-     (let [~'my-atom (worker-counters ~i)]
-       (println ~i)
-       (try
-         (swap! ~'my-atom inc)
-         (if (not= @~'my-atom 1)
-           (throw (Exception. (str &quot;Bad counter value: &quot; @~'my-atom))))
-         (if (not= (vec~'args) ~(vec expected))
-           (throw (Exception. (str &quot;Bad arguments.  Expected: &quot; ~(vec expected) &quot;  Actual: &quot; ~'args))))
-         (Thread/sleep 100)
-         (swap! workers-completed #(conj % ~i))
-         (finally 
-           (swap! ~'my-atom dec)))
-       ~i)))</code></pre></div><div><p>We build the plan.  The first <code>K</code> tasks are built without arguments. The other <code>M-K</code> tasks are built with <code>K</code> arguments each, which are randomly selected from the range <code>&#91;0,i&#41;</code></p></div><div class="code"><pre><code class="clojure">(defn build-stress-plan [zk parent]
+  (fn [&amp; args]
+    (println i)
+    (let [my-atom (worker-counters i)]
+      (try
+        (swap! my-atom inc)
+        (if (not= @my-atom 1)
+          (throw (Exception. (str &quot;Bad counter value: &quot; @my-atom))))
+        (if (not= (vec args) (vec expected))
+          (throw (Exception. (str &quot;Bad arguments.  Expected: &quot; (vec expected) &quot;  Actual: &quot; args))))
+        (Thread/sleep 100)
+        (swap! workers-completed #(conj % i))
+        (finally 
+          (swap! my-atom dec)))
+      i)))</code></pre></div><div><p>We build the plan.  The first <code>K</code> tasks are built without arguments. The other <code>M-K</code> tasks are built with <code>K</code> arguments each, which are randomly selected from the range <code>&#91;0,i&#41;</code></p></div><div class="code"><pre><code class="clojure">(defn build-stress-plan [zk parent]
   (let [plan (create-plan zk parent)]
 
     (loop [tasks {}
            i 0]
       (if (&lt; i M)
         (let [next-task (if (&lt; i K)
-                          (add-task zk plan (stress-task-func i nil) [])
+                          (add-task zk plan `(stress-task-func ~i nil) [])
                                         ; else
                           (let [selected (take K (shuffle (range i)))]
-                            (add-task zk plan (stress-task-func i selected) (map tasks selected))))]
+                            (add-task zk plan `(stress-task-func ~i ~(vec selected)) (map tasks selected))))]
           (recur (assoc tasks i next-task) (inc i)))))
     (mark-as-ready zk plan)
     plan))</code></pre></div><div><p>We now deploy <code>N</code> workers to execute the plan. Each thread runs the <code>worker</code> function repeatedly. In case of an exception thrown from the worker, we report it, but move on to call <code>worker</code> again.</p></div><div class="code"><pre><code class="clojure">(defn start-stress-workers [zk parent]
@@ -258,16 +258,17 @@
      (zk/create ..zk.. &quot;/path/to/dep-&quot; :persistent? true :sequential? true) =&gt; ..to-link..
      (set-initial-clj-data ..zk.. ..from-link.. ..to-link..) =&gt; irrelevant)</code></pre></div><div><span id="take-ownership"></span><h3>8.5 &nbsp;&nbsp; take-ownership</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>task:</strong> the task to take ownership over</li></ul><p><strong>Returns:</strong> whether or not we managed to take ownership</p></div><div><p>It tries to add an ephemeral 'owner' node to the task, and return whether it was successful</p></div><div class="code"><pre><code class="clojure">(take-ownership ..zk.. &quot;/foo/task-1234&quot;) =&gt; ..result..
     (provided
-     (zk/create ..zk.. &quot;/foo/task-1234/owner&quot; :persistent? false) =&gt; ..result..)</code></pre></div><div><span id="execute-function"></span><h3>8.6 &nbsp;&nbsp; execute-function</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>task:</strong> path to the task node containing arguments for the function</li></ul><p><strong>Returns:</strong> the return value from the task's function</p></div><div><p>It reads the function definition from the content of the task node. If no parameters exist in the task it executes the function without parameters.</p></div><div class="code"><pre><code class="clojure">(execute-function ..zk.. ..task..) =&gt; 3
-    (provided
-     (get-clj-data ..zk.. ..task..) =&gt; '(fn [] 3)
-     (zk/children ..zk.. ..task..) =&gt; '(&quot;foo&quot; &quot;task-1234&quot;))</code></pre></div><div><p>It passes the task arguments to the function</p></div><div class="code"><pre><code class="clojure">(execute-function ..zk.. &quot;/foo/task-1234&quot;) =&gt; [1 2 3]
-    (provided
-     (get-clj-data ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(fn [&amp; args] args)
-     (zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;arg-00001&quot; &quot;arg-00002&quot; &quot;arg-00000&quot;)
-     (get-clj-data ..zk.. &quot;/foo/task-1234/arg-00000&quot;) =&gt; 1
-     (get-clj-data ..zk.. &quot;/foo/task-1234/arg-00001&quot;) =&gt; 2
-     (get-clj-data ..zk.. &quot;/foo/task-1234/arg-00002&quot;) =&gt; 3)</code></pre></div><div><span id="propagate-result"></span><h3>8.7 &nbsp;&nbsp; propagate-result</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>prov:</strong> path to the <code>prov-&#42;</code> node to propagate</li><li><strong>value:</strong> the value to be propagated</li></ul><p><strong>Returns:</strong> nothing in particular</p></div><div><p>It does the following:</p><ul><li>reads the path of the <code>dep-&#42;</code> node from the <code>prov-&#42;</code> node</li><li>create an <code>arg-&#42;</code> node at the same task and with the same serial number as the <code>dep-&#42;</code> node</li><li>set the value of the <code>arg-&#42;</code> node to be <code>value</code></li><li>remove the <code>dep-&#42;</code> node</li></ul></div><div class="code"><pre><code class="clojure">(propagate-result ..zk.. ..prov.. ..value..) =&gt; irrelevant
+     (zk/create ..zk.. &quot;/foo/task-1234/owner&quot; :persistent? false) =&gt; ..result..)</code></pre></div><div><span id="execute-function"></span><h3>8.6 &nbsp;&nbsp; execute-function</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>task:</strong> path to the task node containing arguments for the function</li></ul><p><strong>Returns:</strong> the return value from the task's function</p></div><div><p>It reads the function definition from the content of the task node. If no parameters exist in the task it executes the function without parameters.</p></div><div class="code"><pre><code class="clojure">(defn returns-3 [] 3)
+ (execute-function ..zk.. ..task..) =&gt; 3
+ (provided
+(get-clj-data ..zk.. ..task..) =&gt; 'returns-3
+(zk/children ..zk.. ..task..) =&gt; '(&quot;foo&quot; &quot;task-1234&quot;))</code></pre></div><div><p>It passes the task arguments to the function</p></div><div class="code"><pre><code class="clojure">(execute-function ..zk.. &quot;/foo/task-1234&quot;) =&gt; [1 2 3]
+ (provided
+(get-clj-data ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(fn [&amp; args] args)
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;arg-00001&quot; &quot;arg-00002&quot; &quot;arg-00000&quot;)
+(get-clj-data ..zk.. &quot;/foo/task-1234/arg-00000&quot;) =&gt; 1
+(get-clj-data ..zk.. &quot;/foo/task-1234/arg-00001&quot;) =&gt; 2
+(get-clj-data ..zk.. &quot;/foo/task-1234/arg-00002&quot;) =&gt; 3)</code></pre></div><div><span id="propagate-result"></span><h3>8.7 &nbsp;&nbsp; propagate-result</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>prov:</strong> path to the <code>prov-&#42;</code> node to propagate</li><li><strong>value:</strong> the value to be propagated</li></ul><p><strong>Returns:</strong> nothing in particular</p></div><div><p>It does the following:</p><ul><li>reads the path of the <code>dep-&#42;</code> node from the <code>prov-&#42;</code> node</li><li>create an <code>arg-&#42;</code> node at the same task and with the same serial number as the <code>dep-&#42;</code> node</li><li>set the value of the <code>arg-&#42;</code> node to be <code>value</code></li><li>remove the <code>dep-&#42;</code> node</li></ul></div><div class="code"><pre><code class="clojure">(propagate-result ..zk.. ..prov.. ..value..) =&gt; irrelevant
  (provided
 (get-clj-data ..zk.. ..prov..) =&gt; &quot;/foo/task-1234/dep-01472&quot;
 (zk/create ..zk.. &quot;/foo/task-1234/arg-01472&quot; :persistent? true) =&gt; true
