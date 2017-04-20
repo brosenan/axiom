@@ -5,7 +5,8 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.8.0"]]
   :plugins [[lein-monolith "0.3.2"]
-            [lein-cprint "1.2.0"]]
+            [lein-cprint "1.2.0"]
+            [lein-midje "3.2.1"]]
   :aliases {"im" ["do" ["midje" ":filter" "-integ"] ["install"]]
             "eim" ["monolith" "each" "im"]
             "autotest" ["midje" ":autotest" ":filter" "-integ"]
