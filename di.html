@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li><li><a class="chapter" data-scroll="" href="#the-inj"><h4>5 &nbsp; the-inj</h4></a></li><li><a class="chapter" data-scroll="" href="#wait-for"><h4>6 &nbsp; wait-for</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li><li><a class="chapter" data-scroll="" href="#wait-for"><h4>5 &nbsp; wait-for</h4></a></li><li><a class="chapter" data-scroll="" href="#best-practices"><h4>6 &nbsp; Best Practices</h4></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,7 +80,7 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li><li><a class="chapter" data-scroll="" href="#the-inj"><h4>5 &nbsp; the-inj</h4></a></li><li><a class="chapter" data-scroll="" href="#wait-for"><h4>6 &nbsp; wait-for</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li><li><a class="chapter" data-scroll="" href="#wait-for"><h4>5 &nbsp; wait-for</h4></a></li><li><a class="chapter" data-scroll="" href="#best-practices"><h4>6 &nbsp; Best Practices</h4></a></li>
                 </ul>
               </nav>
           </div>
@@ -109,7 +109,7 @@
  (async/sub (inj 2) :baz wait-chan)
  (async/&gt;!! baz-chan 4)
  (async/alts!! [wait-chan
-              (async/timeout 1000)]) =&gt; [[:baz 4] wait-chan]</code></pre></div><div><span id="with-dependencies"></span><h2><b>4 &nbsp;&nbsp; with-dependencies</b></h2></div><div><p>When we wish to evaluate something that depends on external resources, <code>with-dependencies</code> is the way to go. It can only be used from within a surrounding <code>go</code> block. It needs this <code>go</code> block to suspend execution until all requirements are fulfilled.</p></div><div><p>Consider the following injector. It has two resources: <code>foo</code> and <code>bar</code>, which are defined (and are therefore fulfilled) first. Then we set the value of the <code>res</code> atom to be the sum of both resources using <code>with-dependencies</code>. We expect that the value of <code>res</code> will be set to the sum of <code>foo</code> and <code>bar</code> immediately.</p></div><div class="code"><pre><code class="clojure">(let [inj (injector)
+              (async/timeout 1000)]) =&gt; [[:baz 4] wait-chan]</code></pre></div><div><span id="with-dependencies"></span><h2><b>4 &nbsp;&nbsp; with-dependencies</b></h2></div><div><p>When we wish to evaluate something that depends on external resources, <code>with-dependencies</code> is the way to go. It can only be used from within a surrounding <code>go</code> block. It needs this <code>go</code> block to suspend execution until all requirements are fulfilled.</p></div><div><p>Consider the following example. We create an injector and define resources: <code>foo</code> and <code>bar</code>, which are provided first. Then we have a <code>go</code> block in which we wait for both <code>foo</code> and <code>bar</code>, and push their sum into a channel. Finally, we wait (blocking wait) to get this value from the channel (or time-out if we didn't get it within one second). We expect that the value we get from the channel be the sum of <code>foo</code> and <code>bar</code>.</p></div><div class="code"><pre><code class="clojure">(let [inj (injector)
      chan (async/chan)]
  (provide foo inj
           1)
@@ -119,7 +119,7 @@
    (async/&gt;! chan (with-dependencies inj [foo bar]
                     (+ foo bar))))
  (async/alts!! [chan
-                (async/timeout 1000)]) =&gt; [3 chan])</code></pre></div><div><p>However, if the order were different, we still expect <code>with-dependencies</code> to behave the same way.</p></div><div class="code"><pre><code class="clojure">(let [inj (injector)
+                (async/timeout 1000)]) =&gt; [3 chan])</code></pre></div><div><p>We expect it to work regardless of the order, that is, we expect <code>with-dependencies</code> to block execution until <code>foo</code> and <code>bar</code> are provided. In the following example we place the <code>go</code> block before providing <code>foo</code> and <code>bar</code>, and add a 1 ms delay in the providing of <code>foo</code>.</p></div><div class="code"><pre><code class="clojure">(let [inj (injector)
      chan (async/chan)]
  (async/go
    (async/&gt;! chan (with-dependencies inj [foo bar]
@@ -142,14 +142,50 @@
           (with-dependencies inj [foo]
             (inc foo)))
  (async/alts!! [chan
-                (async/timeout 1000)]) =&gt; [2 chan])</code></pre></div><div><span id="the-inj"></span><h2><b>5 &nbsp;&nbsp; the-inj</b></h2></div><div><p><code>di.core</code> provides one injector instance: <code>the-inj</code>, which is intended to be used to connect providers and consumers in software systems.</p></div><div class="code"><pre><code class="clojure">the-inj =not=&gt; nil?</code></pre></div><div><span id="wait-for"></span><h2><b>6 &nbsp;&nbsp; wait-for</b></h2></div><div><p>Sometimes, especially during tests, we wish to get a resource outside a <code>go</code> block. In such cases we wish to block the current thread. Please note that this should be avoided in <code>provide</code> blocks, as it may lead to deadlocks. In other contexts blocking a thread is unadvised due to performance impact. However, for testing this may be extremely useful.</p></div><div><p>Consider our previous example, with resources <code>foo</code> and <code>bar</code>, where <code>bar</code> depends on <code>foo</code>.</p></div><div class="code"><pre><code class="clojure">(def inj (injector))
+                (async/timeout 1000)]) =&gt; [2 chan])</code></pre></div><div><span id="wait-for"></span><h2><b>5 &nbsp;&nbsp; wait-for</b></h2></div><div><p>Sometimes, especially during tests, we wish to get a resource outside a <code>go</code> block. In such cases we wish to block the current thread. Please note that this should be avoided in <code>provide</code> blocks, as it may lead to deadlocks. In other contexts blocking a thread is unadvised due to performance impact. However, for testing this may be extremely useful.</p></div><div><p>Consider our previous example, with resources <code>foo</code> and <code>bar</code>, where <code>bar</code> depends on <code>foo</code>.</p></div><div class="code"><pre><code class="clojure">(def inj (injector))
  (def chan (async/chan))
  (provide foo inj
         (async/&lt;! (async/timeout 1))
         1)
  (provide bar inj
         (with-dependencies inj [foo]
-          (inc foo)))</code></pre></div><div><p>In the previous example we needed to create a <code>go</code> block to capture <code>bar</code>'s value from within a <code>with-dependencies</code> block. For this to be visible from the outside we used a channel. However, it can be much simpler to just assert on the value of <code>bar</code> using a blocking call. <code>wait-for</code> gives us just that.</p></div><div class="code"><pre><code class="clojure">(wait-for inj bar) =&gt; 2</code></pre></div>
+          (inc foo)))</code></pre></div><div><p>In the previous example we needed to create a <code>go</code> block to capture <code>bar</code>'s value from within a <code>with-dependencies</code> block. For this to be visible from the outside we used a channel. However, it can be much simpler to just assert on the value of <code>bar</code> using a blocking call. <code>wait-for</code> gives us just that.</p></div><div class="code"><pre><code class="clojure">(wait-for inj bar) =&gt; 2</code></pre></div><div><span id="best-practices"></span><h2><b>6 &nbsp;&nbsp; Best Practices</b></h2></div><div><p>In our opinion, the best way to write modules that use the <code>di</code> library for dependency injection is to wrap all the code that interacts with the injector (i.e., all code that provides and/or depends on resources) in a single function, which we encourage you to call <code>module</code>. This function will take one argument &ndash; the injector, which will be provided externally.</p></div><div><p>For example, imagine we have a module that depends on one resource: <code>some-number</code> (a number), and provides two resources:</p><ol><li><code>plus-some-number</code> &ndash; a function that adds <code>some-number</code> to a given number, and</li><li><code>times-some-number</code> &ndash; a function that multiplies <code>some-number</code> by a given number.We will wrap both providers in a <code>module</code> function which will take the injector as argument.As convention (borrowed from <a href='https://jquery.com'>jQuery</a> plugins), we will call the injector argument <code>$</code>.</li></ol></div><div class="code"><pre><code class="clojure">(defn module [$]
+  (provide plus-some-number $
+           (with-dependencies $ [some-number]
+             (fn [x] (+ x some-number))))
+  (provide times-some-number $
+           (with-dependencies $ [some-number]
+             (fn [x] (* x some-number)))))</code></pre></div><div><p>Now we can test our module. We can call <code>module</code> with different injectors, initialized with different <code>some-number</code> values,  to see that our module behaves as it should in different cases.</p></div><div class="code"><pre><code class="clojure">;; test with 2
+ (let [$ (injector {:some-number 2})]
+ (module $)
+ (let [plus (wait-for $ plus-some-number)
+       times (wait-for $ times-some-number)]
+   (plus 1) =&gt; 3
+   (times 1) =&gt; 2))
+ ;; test with 3
+ (let [$ (injector {:some-number 3})]
+ (module $)
+ (let [plus (wait-for $ plus-some-number)
+       times (wait-for $ times-some-number)]
+   (plus 1) =&gt; 4
+   (times 1) =&gt; 3))</code></pre></div><div><p>Now imagine another module that complements our own. Let's imagine a module <code>module2</code>, which provides <code>some-number</code> as 2, and then provides the resource <code>six</code> based on our functions.</p></div><div class="code"><pre><code class="clojure">(defn module2 [$]
+  (provide some-number $
+           2)
+  (provide six $
+           (with-dependencies $ [plus-some-number
+                                 times-some-number
+                                 some-number]
+             (plus-some-number (times-some-number some-number)))))</code></pre></div><div><p>(generally there is only need for placing one <code>module</code> function in a namespace, so the function can always be called <code>module</code>. Here we needed a different function to demonstrate how different modules can work together)</p></div><div><p>We can test <code>module2</code> by injecting mock functions:</p></div><div class="code"><pre><code class="clojure">(let [$ (injector {:plus-some-number (fn [x] [:plus x])
+                  :times-some-number (fn [x] [:times x])})]
+ (module2 $)
+ (wait-for $ some-number) =&gt; 2
+ (wait-for $ six) =&gt; [:plus [:times 2]])</code></pre></div><div><p>In production, these two modules need to actually meet each other and cooperate. We use a single injector and git it to both of them.</p></div><div class="code"><pre><code class="clojure">(let [$ (injector)]
+ (module $)
+ (module2 $)
+ (wait-for $ six) =&gt; 6)</code></pre></div><div><p>The order in which we inject the different modules does not matter.</p></div><div class="code"><pre><code class="clojure">(let [$ (injector)]
+ (module2 $) 
+ (module $)
+ (wait-for $ six) =&gt; 6)</code></pre></div>
         </div>
       </div>
     </div>

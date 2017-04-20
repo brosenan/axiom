@@ -105,8 +105,10 @@
 (lb/publish :some-chan facts-exch ..routing-key.. ..bin.. {}) =&gt; irrelevant)</code></pre></div><div><span id="usage-example"></span><h2><b>4 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>To demonstrate how the above functions work together we build a small usage example.</p></div><div><p>In our example we have the following service functions:</p><ol><li>Function <code>sum-foo</code> that sums the values in the data of events of name "foo" and emits events named "foo-sum".</li><li>Function <code>count-ev</code> that counts the events of the different names and emits events of type "count" (it does not count "count" events).</li><li>Function <code>foo-from-count</code> that listens on "count" events and emits corresponding "foo" events with the same value.</li></ol></div><div class="code"><pre><code class="clojure">:integ ; Integration test.  Does not run during continouts integration
  (def foo-sum (atom 0))
  (def ev-count (atom {}))
+ (def inj (di/injector))
+ (module inj)
  (async/go
- (di/with-dependencies di/the-inj [serve]
+ (di/with-dependencies inj [serve]
    (println &quot;Registering services&quot;)
    (serve (fn ;; sum-foo
             [ev pub]
@@ -138,10 +140,11 @@
                   :key (:key ev)
                   :data (:data ev)}))
           {:kind :fact
-           :name &quot;count&quot;})))</code></pre></div><div><p>For the <code>serve</code> resource to initialize, we need to provide an <code>amqp-config</code> resource with values needed for the underlying <code>langohr</code> library to find the AMQP broker. We will use the default values.</p></div><div class="code"><pre><code class="clojure">(di/provide amqp-config di/the-inj
-            rmq/*default-config*)</code></pre></div><div><p>Now our service is ready to roll.<br /> All we need is to get the fire started is a little match &ndash; a single event.</p></div><div class="code"><pre><code class="clojure">:integ ; Integration test.  Does not run during continouts integration
+           :name &quot;count&quot;})))</code></pre></div><div><p>For the <code>serve</code> resource to initialize, we need to provide an <code>amqp-config</code> resource with values needed for the underlying <code>langohr</code> library to find the AMQP broker. We will use the default values.</p></div><div class="code"><pre><code class="clojure">:integ
+ (di/provide amqp-config inj
+           rmq/*default-config*)</code></pre></div><div><p>Now our service is ready to roll.<br /> All we need is to get the fire started is a little match &ndash; a single event.</p></div><div class="code"><pre><code class="clojure">:integ ; Integration test.  Does not run during continouts integration
     (async/go
-      (di/with-dependencies di/the-inj [publish]
+      (di/with-dependencies inj [publish]
         (println &quot;Kicking the first event&quot;)
         (publish {:kind :fact
                   :name &quot;foo&quot;
