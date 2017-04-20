@@ -73,3 +73,16 @@ span.code {
     font-weight: bold;
     color: #679985;
 }
+
+.toc {
+    background-color: #8e519f;
+    padding: 2em;
+    color: white;
+}
+
+a.sidebar-nav-item {
+    color: white;
+    display: block;
+    line-height: 120%;
+    font-size: 18pt;
+}
