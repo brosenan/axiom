@@ -96,4 +96,3 @@
               (di/with-dependencies inj [amqp-service]
                 (partial publisher amqp-service))))
 
-(module di/the-inj)

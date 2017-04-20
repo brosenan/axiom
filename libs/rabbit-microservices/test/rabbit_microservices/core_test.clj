@@ -76,8 +76,10 @@ It depends on `amqp-service`."
  :integ ; Integration test.  Does not run during continouts integration
  (def foo-sum (atom 0))
  (def ev-count (atom {}))
+ (def inj (di/injector))
+ (module inj)
  (async/go
-   (di/with-dependencies di/the-inj [serve]
+   (di/with-dependencies inj [serve]
      (println "Registering services")
      (serve (fn ;; sum-foo
               [ev pub]
@@ -114,14 +116,16 @@ It depends on `amqp-service`."
 "For the `serve` resource to initialize, we need to provide an `amqp-config` resource with values needed for the underlying `langohr` library
 to find the AMQP broker.
 We will use the default values."
-(di/provide amqp-config di/the-inj
-            rmq/*default-config*)
+(fact
+ :integ
+ (di/provide amqp-config inj
+             rmq/*default-config*))
 
 "Now our service is ready to roll.  
 All we need is to get the fire started is a little match -- a single event."
 (fact :integ ; Integration test.  Does not run during continouts integration
       (async/go
-        (di/with-dependencies di/the-inj [publish]
+        (di/with-dependencies inj [publish]
           (println "Kicking the first event")
           (publish {:kind :fact
                     :name "foo"

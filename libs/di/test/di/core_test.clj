@@ -80,10 +80,11 @@ Its underlying expressions can use macros such as `>!` and `<!`."
 It can only be used from within a surrounding `go` block.
 It needs this `go` block to suspend execution until all requirements are fulfilled."
 
-"Consider the following injector.
-It has two resources: `foo` and `bar`, which are defined (and are therefore fulfilled) first.
-Then we set the value of the `res` atom to be the sum of both resources using `with-dependencies`.
-We expect that the value of `res` will be set to the sum of `foo` and `bar` immediately."
+"Consider the following example.
+We create an injector and define resources: `foo` and `bar`, which are provided first.
+Then we have a `go` block in which we wait for both `foo` and `bar`, and push their sum into a channel.
+Finally, we wait (blocking wait) to get this value from the channel (or time-out if we didn't get it within one second).
+We expect that the value we get from the channel be the sum of `foo` and `bar`."
 (fact
  (let [inj (injector)
        chan (async/chan)]
@@ -97,7 +98,10 @@ We expect that the value of `res` will be set to the sum of `foo` and `bar` imme
    (async/alts!! [chan
                   (async/timeout 1000)]) => [3 chan]))
 
-"However, if the order were different, we still expect `with-dependencies` to behave the same way."
+"We expect it to work regardless of the order, that is,
+we expect `with-dependencies` to block execution until `foo` and `bar` are provided.
+In the following example we place the `go` block before providing `foo` and `bar`,
+and add a 1 ms delay in the providing of `foo`."
 (fact
  (let [inj (injector)
        chan (async/chan)]
@@ -129,11 +133,6 @@ resources that depend on other resources."
    (async/alts!! [chan
                   (async/timeout 1000)]) => [2 chan]))
 
-[[:chapter {:title "the-inj"}]]
-"`di.core` provides one injector instance: `the-inj`, which is intended to be used to connect providers and consumers in software systems."
-(fact
- the-inj =not=> nil?)
-
 [[:chapter {:title "wait-for"}]]
 "Sometimes, especially during tests, we wish to get a resource outside a `go` block.
 In such cases we wish to block the current thread.
@@ -157,3 +156,79 @@ However, it can be much simpler to just assert on the value of `bar` using a blo
 `wait-for` gives us just that."
 (fact
  (wait-for inj bar) => 2)
+
+[[:chapter {:title "Best Practices"}]]
+"In our opinion, the best way to write modules that use the `di` library for dependency injection is to
+wrap all the code that interacts with the injector (i.e., all code that provides and/or depends on resources) in a single function,
+which we encourage you to call `module`.
+This function will take one argument -- the injector, which will be provided externally."
+
+"For example, imagine we have a module that depends on one resource: `some-number` (a number), and provides two resources:
+1. `plus-some-number` -- a function that adds `some-number` to a given number, and
+2. `times-some-number` -- a function that multiplies `some-number` by a given number.
+We will wrap both providers in a `module` function which will take the injector as argument.
+As convention (borrowed from [jQuery](https://jquery.com) plugins), we will call the injector argument `$`."
+(defn module [$]
+  (provide plus-some-number $
+           (with-dependencies $ [some-number]
+             (fn [x] (+ x some-number))))
+  (provide times-some-number $
+           (with-dependencies $ [some-number]
+             (fn [x] (* x some-number)))))
+
+"Now we can test our module.
+We can call `module` with different injectors, initialized with different `some-number` values, 
+to see that our module behaves as it should in different cases."
+(fact
+ ;; test with 2
+ (let [$ (injector {:some-number 2})]
+   (module $)
+   (let [plus (wait-for $ plus-some-number)
+         times (wait-for $ times-some-number)]
+     (plus 1) => 3
+     (times 1) => 2))
+ ;; test with 3
+ (let [$ (injector {:some-number 3})]
+   (module $)
+   (let [plus (wait-for $ plus-some-number)
+         times (wait-for $ times-some-number)]
+     (plus 1) => 4
+     (times 1) => 3)))
+
+"Now imagine another module that complements our own.
+Let's imagine a module `module2`, which provides `some-number` as 2, and then provides the resource `six` based on
+our functions."
+(defn module2 [$]
+  (provide some-number $
+           2)
+  (provide six $
+           (with-dependencies $ [plus-some-number
+                                 times-some-number
+                                 some-number]
+             (plus-some-number (times-some-number some-number)))))
+
+"(generally there is only need for placing one `module` function in a namespace, so the function can always be called `module`.
+Here we needed a different function to demonstrate how different modules can work together)"
+
+"We can test `module2` by injecting mock functions:"
+(fact
+ (let [$ (injector {:plus-some-number (fn [x] [:plus x])
+                    :times-some-number (fn [x] [:times x])})]
+   (module2 $)
+   (wait-for $ some-number) => 2
+   (wait-for $ six) => [:plus [:times 2]]))
+
+"In production, these two modules need to actually meet each other and cooperate.
+We use a single injector and git it to both of them."
+(fact
+ (let [$ (injector)]
+   (module $)
+   (module2 $)
+   (wait-for $ six) => 6))
+
+"The order in which we inject the different modules does not matter."
+(fact
+ (let [$ (injector)]
+   (module2 $) 
+   (module $)
+   (wait-for $ six) => 6))

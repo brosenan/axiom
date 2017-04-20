@@ -39,8 +39,6 @@
                  (recur)))))))
 
 
-(def the-inj (injector))
-
 (defmacro wait-for [inj key]
   `(let [~'$chan (async/chan)]
      (async/go
