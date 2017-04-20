@@ -22,7 +22,9 @@
                        :email  "brosenan@gmail.com"
                        :url "https://github.com/brosenan/axiom"}
             :output "docs"
-            :files {"cloudlog"
+            :files {"docs"
+                    {:template "docs.html"}
+                    "cloudlog"
                     {:input "libs/cloudlog/test/cloudlog/core_test.clj"
                      :title "cloudlog.core"
                      :subtitle "Rule semantics"}
