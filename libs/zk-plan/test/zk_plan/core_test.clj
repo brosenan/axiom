@@ -1,7 +1,8 @@
 (ns zk-plan.core-test
   (:use midje.sweet)
   (:use [zk-plan.core])
-  (:use [zookeeper :as zk]))
+  (:use [zookeeper :as zk])
+  (:require [di.core :as di]))
 
 [[:chapter {:title "Introduction"}]]
 "`zk-plan` is a tool for orchestrating execution of parallel jobs.
@@ -12,25 +13,46 @@ A worker will only take a task for which all dependencies are met.
 If a task fails it is automatically retried by another worker.
 Eventually, [plan-completed?](#plan-completed) will indicated if all tasks in a given plan have been successfully completed."
 
+[[:chapter {:title "module"}]]
+"The content of this library is provided as a [dependency injection](di.html) module.
+The `zk-plan` resource containing the external API of this library depends on the `zookeeper` resource
+which is a Zookeeper connection object.
+`zookeeper` itself is provided by this module, but it depends on `zookeeper-config`, containing the coordinates of the Zookeeper server."
+(fact
+ (let [$ (di/injector {:zookeeper :zk})] ;; :zk is a mock zookeeper connection object
+   (module $)
+   (def zk-plan (di/wait-for $ zk-plan))))
+
+"The `zk-plan` resource is a map containing function comprising the external API of this library, already addressing a given connection."
+(fact
+ (def create-plan (:create-plan zk-plan))
+ create-plan => fn?
+ (def add-task (:add-task zk-plan))
+ add-task => fn?
+ (def mark-as-ready (:mark-as-ready zk-plan))
+ mark-as-ready => fn?
+ (def worker (:worker zk-plan))
+ worker => fn?
+ (def plan-completed? (:plan-completed? zk-plan))
+ plan-completed? => fn?)
+
 [[:chapter {:title "create-plan"}]]
 "
 **Parameters:**
-- **zk:** the Zookeeper connection object
 - **parent:** the parent node for the new plan
 
 **Returns:** the path to the plan
 It calls zk/createn to create a new zookeeper node"
 (fact
- (create-plan ..zk.. ..parent..) => ..node..
+ (create-plan ..parent..) => ..node..
  (provided
-  (zk/create ..zk.. ..prefix.. :persistent? true :sequential? true) => ..node..
+  (zk/create :zk ..prefix.. :persistent? true :sequential? true) => ..node..
   (str ..parent.. "/plan-") => ..prefix..))
 
 
 [[:chapter {:title "add-task"}]]
 "
 **Parameters:**
-- **zk:** the Zookeeper connection object
 - **plan:** the path to the plan
 - **fn:** the function to be executed
 - **arg-tasks:** a sequence of task paths, which return values are to become arguments for fn
@@ -39,54 +61,52 @@ It calls zk/createn to create a new zookeeper node"
 
 "It creates a sequential node under the plan"
 (fact 
-      (add-task ..zk.. ..plan.. ..fn.. []) => ..task..
+      (add-task ..plan.. ..fn.. []) => ..task..
       (provided
-       (zk/create ..zk.. ..prefix.. :persistent? true :sequential? true) => ..task..
+       (zk/create :zk ..prefix.. :persistent? true :sequential? true) => ..task..
        (str ..plan.. "/task-") => ..prefix..
        (set-initial-clj-data irrelevant irrelevant irrelevant) => irrelevant
-       (mark-as-ready irrelevant irrelevant) => irrelevant))
+       (mark-as-ready-internal irrelevant irrelevant) => irrelevant))
 "It sets the task node's data to contain a serialization of fn"
 (fact
-      (add-task ..zk.. ..plan.. ..fn.. []) => ..task..
+      (add-task ..plan.. ..fn.. []) => ..task..
       (provided
        (zk/create irrelevant irrelevant :persistent? true :sequential? true) => ..task..
-       (set-initial-clj-data ..zk.. ..task.. ..fn..) => irrelevant
-       (mark-as-ready irrelevant irrelevant) => irrelevant))
+       (set-initial-clj-data :zk ..task.. ..fn..) => irrelevant
+       (mark-as-ready-internal irrelevant irrelevant) => irrelevant))
 "It calls add-dependency for each arg-task"
 (fact
-      (add-task ..zk.. ..plan.. ..fn.. [..arg1.. ..arg2.. ..arg3..]) => irrelevant
+      (add-task ..plan.. ..fn.. [..arg1.. ..arg2.. ..arg3..]) => irrelevant
       (provided
        (zk/create irrelevant irrelevant :persistent? true :sequential? true) => ..task..
        (set-initial-clj-data irrelevant irrelevant irrelevant) => irrelevant
-       (add-dependency ..zk.. ..arg1.. ..task..) => irrelevant
-       (add-dependency ..zk.. ..arg2.. ..task..) => irrelevant
-       (add-dependency ..zk.. ..arg3.. ..task..) => irrelevant
-       (mark-as-ready irrelevant irrelevant) => irrelevant))
+       (add-dependency :zk ..arg1.. ..task..) => irrelevant
+       (add-dependency :zk ..arg2.. ..task..) => irrelevant
+       (add-dependency :zk ..arg3.. ..task..) => irrelevant
+       (mark-as-ready-internal irrelevant irrelevant) => irrelevant))
 "It adds a 'ready' node once definition is complete"
 (fact
-      (add-task ..zk.. ..plan.. ..fn.. []) => irrelevant
+      (add-task ..plan.. ..fn.. []) => irrelevant
       (provided
        (zk/create irrelevant irrelevant :persistent? true :sequential? true) => ..task..
        (set-initial-clj-data irrelevant irrelevant irrelevant) => irrelevant
-       (mark-as-ready ..zk.. ..task..) => irrelevant))
+       (mark-as-ready-internal :zk ..task..) => irrelevant))
 
 [[:chapter {:title "mark-as-ready"}]]
 "
 **Parameters:**
-- **zk:** the Zookeeper connection object
 - **task:** the task to be marked as ready
 
 **Returns:** nothing in particular"
 "It creates a child node named 'ready'"
 (fact
-      (mark-as-ready ..zk.. "/foo/bar") => irrelevant
+      (mark-as-ready "/foo/bar") => irrelevant
       (provided
-       (zk/create ..zk.. "/foo/bar/ready" :persistent? true) => true))
+       (zk/create :zk "/foo/bar/ready" :persistent? true) => true))
 
 [[:chapter {:title "worker"}]]
 "
 **Parameters:**
-- **zk:** the Zookeeper connection object
 - **parent:** the parent node of all plans
 - **attributes:** a map with attributes for the behavior of the worker
 
@@ -95,19 +115,19 @@ It calls zk/createn to create a new zookeeper node"
 - calls `get-task-from-any-plan` to get a task to work on
 - if a task is returned (we have something to do), it calls `perform-task` to run it"
 (fact
- (worker ..zk.. ..parent.. ..attrs..) => irrelevant
+ (worker ..parent.. ..attrs..) => irrelevant
  (provided
-  (get-task-from-any-plan ..zk.. ..parent..) => "/foo/bar"
-  (perform-task ..zk.. "/foo/bar") => irrelevant
+  (get-task-from-any-plan :zk ..parent..) => "/foo/bar"
+  (perform-task :zk "/foo/bar") => irrelevant
   (zk/exists irrelevant irrelevant) => nil))
 
 "If `get-task-from-any-plan` returns `nil`, we call `calc-sleep-time` to calculate for how long
 we need to sleep before the next retry.
 We retry until we get a task."
 (fact
- (worker ..zk.. ..parent.. ..attrs..) => irrelevant
+ (worker ..parent.. ..attrs..) => irrelevant
  (provided
-  (get-task-from-any-plan ..zk.. ..parent..) =streams=> [nil nil "/foo/bar"]
+  (get-task-from-any-plan :zk ..parent..) =streams=> [nil nil "/foo/bar"]
   (calc-sleep-time ..attrs.. 0) => 1
   (calc-sleep-time ..attrs.. 1) => 2
   (perform-task irrelevant irrelevant) => irrelevant
@@ -116,12 +136,12 @@ We retry until we get a task."
 "If `perform-task` exists (abnomally) before clearing the task node, 
 we remove the `owner` node from it to allow another task to complete the job"
 (fact
- (worker ..zk.. ..parent.. ..attrs..) => (throws Exception)
+ (worker ..parent.. ..attrs..) => (throws Exception)
  (provided
-  (get-task-from-any-plan ..zk.. ..parent..) => "/foo/bar"
-  (perform-task ..zk.. "/foo/bar") =throws=> (Exception.)
-  (zk/exists ..zk.. "/foo/bar") => {:some "thing"}
-  (zk/delete ..zk.. "/foo/bar/owner") => irrelevant))
+  (get-task-from-any-plan :zk ..parent..) => "/foo/bar"
+  (perform-task :zk "/foo/bar") =throws=> (Exception.)
+  (zk/exists :zk "/foo/bar") => {:some "thing"}
+  (zk/delete :zk "/foo/bar/owner") => irrelevant))
 
 [[:chapter {:title "plan-completed?"}]]
 "
@@ -132,15 +152,15 @@ we remove the `owner` node from it to allow another task to complete the job"
 **Returns:** whether the plan is completed"
 "It returns true if the plan has no tasks in it"
 (fact
- (plan-completed? ..zk.. ..plan..) => true
+ (plan-completed? ..plan..) => true
  (provided
-  (zk/children ..zk.. ..plan..) => '("foo" "bar")))
+  (zk/children :zk ..plan..) => '("foo" "bar")))
 
 "It returns false if there is at least one `task-*` child"
 (fact
- (plan-completed? ..zk.. ..plan..) => false
+ (plan-completed? ..plan..) => false
  (provided
-  (zk/children ..zk.. ..plan..) => '("foo" "task-39893" "bar")))
+  (zk/children :zk ..plan..) => '("foo" "task-39893" "bar")))
 
 [[:chapter {:title "Usage Example"}]]
 "The idea of this test is to stress zk_plan by launching `N` parallel worker threads to execute a randomized
@@ -177,29 +197,30 @@ The function below creates a task function (s-expression) for task `i`"
 
 "We build the plan.  The first `K` tasks are built without arguments.
 The other `M-K` tasks are built with `K` arguments each, which are randomly selected from the range `[0,i)`"
-(defn build-stress-plan [zk parent]
-  (let [plan (create-plan zk parent)]
-
+(defn build-stress-plan [{:keys [create-plan
+                                 add-task
+                                 mark-as-ready]} parent]
+  (let [plan (create-plan parent)]
     (loop [tasks {}
            i 0]
       (if (< i M)
         (let [next-task (if (< i K)
-                          (add-task zk plan `(stress-task-func ~i nil) [])
-                                        ; else
+                          (add-task plan `(stress-task-func ~i nil) [])
+                          ;; else
                           (let [selected (take K (shuffle (range i)))]
-                            (add-task zk plan `(stress-task-func ~i ~(vec selected)) (map tasks selected))))]
+                            (add-task plan `(stress-task-func ~i ~(vec selected)) (map tasks selected))))]
           (recur (assoc tasks i next-task) (inc i)))))
-    (mark-as-ready zk plan)
+    (mark-as-ready plan)
     plan))
 
 "We now deploy `N` workers to execute the plan.
 Each thread runs the `worker` function repeatedly.
 In case of an exception thrown from the worker, we report it, but move on to call `worker` again."
-(defn start-stress-workers [zk parent]
+(defn start-stress-workers [{:keys [worker]} parent]
   (let [threads (map (fn [_] (Thread. (fn []
                                         (loop []
                                           (try
-                                            (worker zk parent {})
+                                            (worker parent {})
                                             (catch Exception e
                                               (.printStackTrace e)))
                                           (recur))))) (range N))]
@@ -220,21 +241,26 @@ In case of an exception thrown from the worker, we report it, but move on to cal
 - Create the plan
 - Wait until the plan is complete
 - Stop the workers"
-(fact :integ ; This is an integration test
- (let [zk (zk/connect "127.0.0.1:2181")
-       parent "/stress"]
-   (zk/delete-all zk "/stress")
-   (zk/create zk parent :persistent? true)
-   (let [threads (start-stress-workers zk parent)
-         plan (build-stress-plan zk parent)]
-     (loop []
-       (when-not (plan-completed? zk plan)
-         (Thread/sleep 100)
-         (recur)))
-     (doseq [m (range M)]
-       (when-not (contains? @workers-completed m)
-         (println "Task " m " was not completed")))
-     (join-stress-workers threads))))
+(fact
+ :integ ; This is an integration test
+ (let [$ (di/injector {:zookeeper-config {:url "127.0.0.1:2181"}})]
+   (module $)
+   (let [zk (di/wait-for $ zookeeper)
+         zk-plan (di/wait-for $ zk-plan)
+         {:keys [plan-completed?]} zk-plan
+         parent "/stress"]
+     (zk/delete-all zk "/stress")
+     (zk/create zk parent :persistent? true)
+     (let [threads (start-stress-workers zk-plan parent)
+           plan (build-stress-plan zk-plan parent)]
+       (loop []
+         (when-not (plan-completed? plan)
+           (Thread/sleep 100)
+           (recur)))
+       (doseq [m (range M)]
+         (when-not (contains? @workers-completed m)
+           (println "Task " m " was not completed")))
+       (join-stress-workers threads)))))
          
 
 [[:chapter {:title "Under the Hood"}]]

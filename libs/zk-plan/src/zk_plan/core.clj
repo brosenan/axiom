@@ -1,8 +1,9 @@
 (ns zk-plan.core
   (:use [zookeeper :as zk])
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [di.core :as di]))
 
-(defn create-plan [zk parent]
+(defn ^:private create-plan [zk parent]
   (zk/create zk (str parent "/plan-") :persistent? true :sequential? true))
 
 (defn to-bytes [str]
@@ -18,15 +19,15 @@
         dep (zk/create zk (str to "/dep-") :persistent? true :sequential? true)]
     (set-initial-clj-data zk prov dep)))
 
-(defn mark-as-ready [zk task]
+(defn  mark-as-ready-internal [zk task]
   (zk/create zk (str task "/ready") :persistent? true))
 
-(defn add-task [zk plan fn arg-tasks]
+(defn ^:private add-task [zk plan fn arg-tasks]
   (let [task (zk/create zk (str plan "/task-") :persistent? true :sequential? true)]
     (set-initial-clj-data zk task fn)
     (doseq [arg arg-tasks]
       (add-dependency zk arg task))
-    (mark-as-ready zk task)
+    (mark-as-ready-internal zk task)
     task))
 
 (defn take-ownership [zk task]
@@ -115,7 +116,7 @@
                                         ; else
           (int val))))))
 
-(defn worker [zk parent attrs]
+(defn ^:private worker [zk parent attrs]
   (loop [count 0]
     (let [task (get-task-from-any-plan zk parent)]
       (if task
@@ -130,6 +131,19 @@
           (recur (inc count)))))))
 
 
-(defn plan-completed? [zk plan]
+(defn  ^:private plan-completed? [zk plan]
   (not (some #(re-matches #"task-\d+" %)
              (zk/children zk plan))))
+
+(defn module [$]
+  (di/provide zookeeper $
+              (di/with-dependencies $ [zookeeper-config]
+                (zk/connect (:url zookeeper-config))))
+
+  (di/provide zk-plan $
+              (di/with-dependencies $ [zookeeper]
+                {:create-plan (partial create-plan zookeeper)
+                 :add-task (partial add-task zookeeper)
+                 :mark-as-ready (partial mark-as-ready-internal zookeeper)
+                 :worker (partial worker zookeeper)
+                 :plan-completed? (partial plan-completed? zookeeper)})))
