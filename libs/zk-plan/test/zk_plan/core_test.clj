@@ -397,6 +397,7 @@ We call execute-function to get the result, and store it as the 'result' child."
 **Parameters:**
 - **zk:** the Zookeeper connection object
 - **node:** the node 
+- **data:** the Clojure s-expression to be stored 
 
 **Returns:** Nothing in particular"
 
@@ -407,7 +408,7 @@ We call execute-function to get the result, and store it as the 'result' child."
        (pr-str ..data..) => ..str..
        (to-bytes ..str..) => ..bytes..
        (zk/set-data ..zk.. ..node.. ..bytes.. irrelevant) => irrelevant))
-"It derives the version number from the existing version"
+"It uses zero as the default version."
 (fact
       (set-initial-clj-data ..zk.. ..node.. ..data..) => irrelevant
       (provided
