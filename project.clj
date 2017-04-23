@@ -52,10 +52,6 @@
                     {:input "libs/dynamo/test/dynamo/core_test.clj"
                      :title "dynamo.core"
                      :subtitle "DynamoDB Integration"}
-                    "dynamo.srv"
-                    {:input "libs/dynamo/test/dynamo/srv_test.clj"
-                     :title "dynamo.srv"
-                     :subtitle "A microservice for Updating DynamoDB Tables"}
                     "permacode"
                     {:input "libs/permacode/test/permacode/core_test.clj"
                      :title "permacode.core"
