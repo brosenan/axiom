@@ -102,32 +102,20 @@ and the request channel.  Once called, it will perform the following:
  (async/close! chan-req)
  (database-retriever chan-req) => false)
 
-[[:chapter {:title "store-fact"}]]
-"`store-fact` is a microservice function that subscribes to all fact events.
-It depends on the following resources:
-1. `serve`: a function that registers it to certain events,
-2. `dynamodb-config`: DynamoDB credentials etc.
-3. `dynamodb-default-throughput`: a map containing default throughput parameters for new tables
-4. `database-tables`: an atom containing a set of the currently-known tables."
+[[:chapter {:title "database-event-storage: A Function for Storing Events" :tag "database-event-storage"}]]
+"`database-event-storage` is a function for storing events in the database."
 
-"Since the function itself is not provided as a resource by itself, we can grab it
-by mocking `serve` to store the event handler function aside."
-(do
-  (def my-store-fact (atom nil))
-  (def partial-event (async/chan))
-  (def table-set (atom #{:foo :bar}))
-  (let [$ (di/injector {:dynamodb-config :config
-                        :serve (fn [func reg]
-                                 (reset! my-store-fact func)
-                                 (async/>!! partial-event reg))
-                        :database-tables table-set
-                        :dynamodb-default-throughput {:read 1 :write 1}})]
-    (module $)))
+"It is a DI resource that depends on the following resources:
+1. `dynamodb-config`: The DynamoDB credentials and coordinates,
+2. `dynamodb-default-throughput`: A map containing the default throughput settings for a new table, and
+3. `database-tables`: An atom holding a set of all tables currently known to exist."
+(let [$ (di/injector {:dynamodb-config :config
+                      :dynamodb-default-throughput :default-throughput
+                      :database-tables (atom #{:foo :bar})})]
+  (module $)
+  (def database-event-storage (di/wait-for $ database-event-storage)))
 
-(fact
- (async/<!! partial-event) => {:kind :fact})
-
-"`store-fact` responds to events by storing them in DynamoDB."
+"`database-event-storage` takes an event and stores it in DynamoDB."
 (fact
  (def my-event {:kind :fact
                 :name "foo"
@@ -137,7 +125,7 @@ by mocking `serve` to store the event handler function aside."
                 :change 1
                 :writers #{}
                 :readers #{}})
- (@my-store-fact my-event) => nil
+ (database-event-storage my-event) => nil
  (provided
   (nippy/freeze {:data [1 2 3 4]
                  :change 1
@@ -150,7 +138,7 @@ by mocking `serve` to store the event handler function aside."
 "If the table does not exist, it is created."
 (fact
  (def my-event2 (assoc my-event :name "baz"))
- (@my-store-fact my-event2) => nil
+ (database-event-storage my-event2) => nil
  (provided
   (nippy/freeze {:data [1 2 3 4]
                  :change 1
@@ -158,41 +146,74 @@ by mocking `serve` to store the event handler function aside."
                  :readers #{}}) => ..bin..
   (far/ensure-table :config :baz [:key :s] ; :key is the partition key
                     {:range-keydef [:ts :n] ; and :ts is the range key
-                     :throughput {:read 1 :write 1}
+                     :throughput :default-throughput
                      :block true}) => irrelevant
   (far/put-item :config :baz {:key "1234"
                               :ts 1000
                               :event ..bin..}) => irrelevant))
 
-"The new table is then added to the set."
-(fact
- @table-set => #{:foo :bar :baz})
-
 "Events with `:name` values that end with \"?\" or \"!\" should not be persisted, and are therefore ignored."
 (fact
- (@my-store-fact (assoc my-event :name "foo?")) => nil
+ (database-event-storage (assoc my-event :name "foo?")) => nil
  (provided
                                         ; No side effect
   )
- (@my-store-fact (assoc my-event :name "bar!")) => nil
+ (database-event-storage (assoc my-event :name "bar!")) => nil
  (provided
                                         ; No side effect
   ))
 
+[[:chapter {:title "store-fact (service): Stores Fact Events" :tag "store-fact"}]]
+"`store-fact` is a microservice function that subscribes to all fact events.
+It depends on the following resources:
+1. `serve`: a function that registers it to certain events,
+2. [database-event-storage](#database-event-storage)."
 
-[[:chapter {:title "database-tables"}]]
-"`database-tables` is an atom containing a set of table keywords currently in the database.
-It depends on:
-1. `dynamodb-config`: the database credentials, and
-2. `dynamodb-get-tables`: a function to get the list of tables.
-The latter is intended for testing and is provided by this module to be `far/list-tables`."
+"The service is merely a serving of `database-event-storage`, registered to all fact events.
+We will demonstrate it by mocking the `serve` function to push its parameters to a channel."
 (fact
- (let [$ (di/injector {:dynamodb-config :config
-                       :dynamodb-get-tables (fn [config]
-                                              [config :foo :bar])})]
+ (let [params (async/chan)
+       $ (di/injector {:serve (fn [f r]
+                                (async/>!! params [f r]))
+                       :database-event-storage :the-storage-func})]
    (module $)
-   (let [tables (di/wait-for $ database-tables)]
-     @tables => #{:foo :bar :config})))
+   (async/<!! params) => [:the-storage-func {:kind :fact}]))
+
+[[:chapter {:title "database-event-storage-chan: A Channel for Storing Events in the Database" :tag "database-event-storage-chan"}]]
+"While [store-fact](#store-fact#) allows us to store system-wide fact events to the database,
+we sometimes wish to store events events without publishing them system-wide.
+`database-event-storage-chan` is a `core.async` *channel* that allows storing of event into the database without
+publishing them system-wide."
+
+"`database-event-storage-chan` depends on the following resources:
+1. [database-event-storage](#database-event-storage)
+2. `dynamodb-event-storage-num-threads`: The number of threads to be spawned for this task."
+
+"In the following example we will demonstrate how it works by mocking `database-event-storage` to conj the given event
+to a sequence stored in an atom."
+(fact
+ (def db (atom '()))
+ (let [$ (di/injector {:database-event-storage (fn [ev]
+                                                 (swap! db #(conj % ev)))
+                       :dynamodb-event-storage-num-threads 2})]
+   (module $)
+   (def database-event-storage-chan (di/wait-for $ database-event-storage-chan))))
+
+"We operate the channel by sending it pairs: `[ev ack]`, where `ev` is the event we wish to store,
+and `ack` is a fresh channel we use to get acknowledgement through.
+Once the event is safely stored, `ack` will be closed."
+
+(fact
+ (let [[ack1 ack2 ack3] (for [_ (range 3)] (async/chan))]
+   (async/>!! database-event-storage-chan [:ev1 ack1])
+   (async/>!! database-event-storage-chan [:ev2 ack2])
+   (async/>!! database-event-storage-chan [:ev3 ack3])
+   (async/alts!! [ack1 (async/timeout 1000)]) => [nil ack1]
+   (async/alts!! [ack2 (async/timeout 1000)]) => [nil ack2]
+   (async/alts!! [ack3 (async/timeout 1000)]) => [nil ack3])
+ (set @db) => #{:ev1 :ev2 :ev3})
+
+
 
 [[:chapter {:title "database-scanner: Scan a Shard of a Table" :tag "database-scanner"}]]
 "For the purpose of data migration we need to process all events in a table.
@@ -317,7 +338,7 @@ retriever thread to complete by reading from it."
  (async/close! req-chan))
 
 [[:chapter {:title "Under the Hood"}]]
-[[:chapter {:title "table-kw"}]]
+[[:section {:title "table-kw"}]]
 "The `taoensso.faraday` library we use uses keywords to convey names of tables and fields.
 In axiom, table names (the `:name` field of an event) originate from keywords, but they may contain characters
 that do not conform to [DynamoDB's naming policy](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.NamingRulesDataTypes.html),
@@ -337,4 +358,18 @@ and in addition, the names used by axiom are fully qualified, and `faraday` only
 (fact
  (table-kw "?,:!@#$%^&*-()") => :___________-__)
 
+
+[[:section {:title "database-tables"}]]
+"`database-tables` is an atom containing a set of table keywords currently in the database.
+It depends on:
+1. `dynamodb-config`: the database credentials, and
+2. `dynamodb-get-tables`: a function to get the list of tables.
+The latter is intended for testing and is provided by this module to be `far/list-tables`."
+(fact
+ (let [$ (di/injector {:dynamodb-config :config
+                       :dynamodb-get-tables (fn [config]
+                                              [config :foo :bar])})]
+   (module $)
+   (let [tables (di/wait-for $ database-tables)]
+     @tables => #{:foo :bar :config})))
 

@@ -54,28 +54,8 @@
                 (partial retriever dynamodb-config)))
   (async/go
     (di/with-dependencies $ [serve
-                             dynamodb-config
-                             database-tables
-                             dynamodb-default-throughput]
-      (serve (fn
-               [ev]
-               (let [name (:name ev)]
-                 (cond (or (str/ends-with? name "?")
-                           (str/ends-with? name "!"))
-                       nil
-                       :else
-                       (let [table-name (table-kw (:name ev))]
-                         (when-not (@database-tables table-name)
-                           (far/ensure-table dynamodb-config table-name [:key :s]
-                                             {:range-keydef [:ts :n]
-                                              :throughput dynamodb-default-throughput
-                                              :block true})
-                           (swap! database-tables #(conj % table-name)))
-                         (let [bin (nippy/freeze (dissoc ev :kind :name :key :ts))]
-                           (far/put-item dynamodb-config table-name {:key (pr-str (:key ev))
-                                                                     :ts (:ts ev)
-                                                                     :event bin})))))
-               nil)
+                             database-event-storage]
+      (serve database-event-storage
              {:kind :fact})))
 
   (di/provide dynamodb-get-tables $
@@ -87,4 +67,41 @@
                 (atom (set (dynamodb-get-tables dynamodb-config)))))
   (di/provide database-scanner $
               (di/with-dependencies $ [dynamodb-config]
-                (partial scanner dynamodb-config))))
+                (partial scanner dynamodb-config)))
+
+  (di/provide database-event-storage $
+              (di/with-dependencies $ [dynamodb-config
+                                       database-tables
+                                       dynamodb-default-throughput]
+      (fn
+        [ev]
+        (let [name (:name ev)]
+          (cond (or (str/ends-with? name "?")
+                    (str/ends-with? name "!"))
+                nil
+                :else
+                (let [table-name (table-kw (:name ev))]
+                  (when-not (@database-tables table-name)
+                    (far/ensure-table dynamodb-config table-name [:key :s]
+                                      {:range-keydef [:ts :n]
+                                       :throughput dynamodb-default-throughput
+                                       :block true})
+                    (swap! database-tables #(conj % table-name)))
+                  (let [bin (nippy/freeze (dissoc ev :kind :name :key :ts))]
+                    (far/put-item dynamodb-config table-name {:key (pr-str (:key ev))
+                                                              :ts (:ts ev)
+                                                              :event bin})))))
+        nil)))
+
+  (di/provide database-event-storage-chan $
+              (di/with-dependencies $ [database-event-storage
+                                       dynamodb-event-storage-num-threads]
+                (let [chan (async/chan)]
+                  (doseq [_ (range dynamodb-event-storage-num-threads)]
+                    (async/thread
+                      (loop []
+                        (let [[ev ack] (async/<!! chan)]
+                          (database-event-storage ev)
+                          (async/close! ack)
+                          (recur)))))
+                  chan))))
