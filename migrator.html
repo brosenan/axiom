@@ -99,7 +99,46 @@
 (..pub.. {:name &quot;axiom/rule&quot;
           :key 'perm.1234ABC/foo}) =&gt; irrelevant
 (..pub.. {:name &quot;axiom/rule&quot;
-          :key 'perm.1234ABC/bar}) =&gt; irrelevant)</code></pre></div><div><span id="rule-tracker"></span><h2><b>3 &nbsp;&nbsp; rule-tracker</b></h2></div><div><p><code>rule-tracker</code> registers to <code>:axiom/rule</code> and tracks the quantity of each rule by summing the <code>:change</code> <a href='cloudlog-events.html#introduction'>field of the event</a>.</p></div><div><span id="under-the-hood"></span><h2><b>4 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="zookeeper-counter-add"></span><h3>4.1 &nbsp;&nbsp; zookeeper-counter-add</h3></div><div><p><code>zookeeper-counter-add</code> depends on the <code>zookeeper</code> resource as dependency, and uses it to implement a global atomic counter.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper :zk})]
+          :key 'perm.1234ABC/bar}) =&gt; irrelevant)</code></pre></div><div><span id="rule-tracker"></span><h2><b>3 &nbsp;&nbsp; rule-tracker</b></h2></div><div><p><code>rule-tracker</code> registers to <code>:axiom/rule</code> and tracks the quantity of each rule by summing the <code>:change</code> <a href='cloudlog-events.html#introduction'>field of the event</a>.</p></div><div><p>It depends on the resources <a href='#zookeeper-counter-add'>zookeeper-counter-add</a> and <code>serve</code>, which we will mock.</p></div><div class="code"><pre><code class="clojure">(def mock-counters (transient {&quot;/rules/perm.1234ABC.foo&quot; 2}))
+ (let [serve-params (async/chan)
+     $ (di/injector {:zookeeper-counter-add (fn [path change]
+                                              (let [old (mock-counters path 0)
+                                                    new (+ old change)]
+                                                (assoc! mock-counters path new)
+                                                new))
+                     :serve (fn [func reg]
+                              (when (= reg {:kind :fact
+                                            :name &quot;axiom/rule&quot;})
+                                (async/&gt;!! serve-params func)))})]
+ (module $)
+ (let [[func chan] (async/alts!! [serve-params
+                                  (async/timeout 1000)])]
+   chan =&gt; serve-params
+   (def rule-tracker func)))</code></pre></div><div><p>The <code>rule-tracker</code> service function is given an <code>:axiom/rule</code> event and a <code>publish</code> function.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
+              :name &quot;axiom/rule&quot;
+              :key 'perm.1234ABC/foo
+              :change 3} (fn publish [ev]
+                           (throw (Exception. &quot;This should not be called&quot;)))) =&gt; nil</code></pre></div><div><p>It calls <code>zookeeper-counter-add</code> to increment the counter corresponding to the rule.</p></div><div class="code"><pre><code class="clojure">(mock-counters &quot;/rules/perm.1234ABC.foo&quot;) =&gt; 5</code></pre></div><div><p>If the rule goes from 0 to a positive count, an <code>:axiom/rule-exists</code> event with <code>:change = 1</code> is published.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
+              :name &quot;axiom/rule&quot;
+              :key 'perm.1234ABC/bar
+              :change 2} ..pub..) =&gt; nil
+ (provided
+(..pub.. {:kind :fact
+          :name &quot;axiom/rule-exists&quot;
+          :key 'perm.1234ABC/bar
+          :change 1}) =&gt; irrelevant)</code></pre></div><div><p>This of-course only happens when the change is positive.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
+              :name &quot;axiom/rule&quot;
+              :key 'perm.1234ABC/baz
+              :change -2} (fn publish [ev]
+                           (throw (Exception. &quot;This should not be called&quot;)))) =&gt; nil</code></pre></div><div><p>If the aggregated value of the rule goes down to 0, an <code>:axiom/rule-exists</code> event with <code>:change = -1</code> is published.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
+              :name &quot;axiom/rule&quot;
+              :key 'perm.1234ABC/foo
+              :change -5} ..pub..) =&gt; nil
+ (provided
+(..pub.. {:kind :fact
+          :name &quot;axiom/rule-exists&quot;
+          :key 'perm.1234ABC/foo
+          :change -1}) =&gt; irrelevant)</code></pre></div><div><span id="under-the-hood"></span><h2><b>4 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="zookeeper-counter-add"></span><h3>4.1 &nbsp;&nbsp; zookeeper-counter-add</h3></div><div><p><code>zookeeper-counter-add</code> depends on the <code>zookeeper</code> resource as dependency, and uses it to implement a global atomic counter.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper :zk})]
   (module $)
   (def zookeeper-counter-add (di/wait-for $ zookeeper-counter-add)))</code></pre></div><div><p><code>zookeeper-counter-add</code> takes a path to a counter and a number to be added. If a node corresponding to the given path does not exist, it is assumed to be equal 0, and is therefore created using the given number. The new value, which is the given number, is returned.</p></div><div class="code"><pre><code class="clojure">(zookeeper-counter-add &quot;/rules/foobar&quot; 3) =&gt; 3
  (provided
