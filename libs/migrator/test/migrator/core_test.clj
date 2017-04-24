@@ -66,4 +66,36 @@ The new value, which is the given number, is returned."
  (provided
   (zk/exists :zk "/rules/foobar") => {:some :values
                                       :version 7}
-  (zkp/get-clj-data :zk "/rules/foobar") => 2))
+  (zkp/get-clj-data :zk "/rules/foobar") => 2
+  (zkp/to-bytes "5") => ..bin..
+  (zk/set-data :zk "/rules/foobar" ..bin.. 7) => irrelevant))
+
+"`zookeeper-counter-add` takes an extra `retries` parameter which defaults to 3.
+If `zk/set-data` throws an exception for any reason, the update is retried.
+This is to account for the possibility of concurrent update."
+(fact
+ (zookeeper-counter-add "/rules/foobar" 3) => 6
+ (provided
+  (zk/exists :zk "/rules/foobar") =streams=> [{:some :values
+                                               :version 7}
+                                              {:some :values
+                                               :version 8}]
+  (zkp/get-clj-data :zk "/rules/foobar") =streams=> [2 3]
+  (zkp/to-bytes "5") => ..bin1..
+  (zk/set-data :zk "/rules/foobar" ..bin1.. 7) =throws=> (Exception. "boo")
+  (zkp/to-bytes "6") => ..bin2..
+  (zk/set-data :zk "/rules/foobar" ..bin2.. 8) => irrelevant))
+
+"When the retries are exhasted, the function throws."
+(fact
+ (zookeeper-counter-add "/rules/foobar" 3) => (throws "boo")
+ (provided
+  (zk/exists :zk "/rules/foobar") =streams=> [{:some :values
+                                               :version 7}
+                                              {:some :values
+                                               :version 8}
+                                              {:some :values
+                                               :version 9}]
+  (zkp/get-clj-data :zk "/rules/foobar") =streams=> [2 3 4]
+  (zkp/to-bytes irrelevant) => irrelevant
+  (zk/set-data :zk "/rules/foobar" irrelevant irrelevant) =throws=> (Exception. "boo")))

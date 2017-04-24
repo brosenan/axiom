@@ -8,16 +8,28 @@
 (defn module [$]
   (di/provide zookeeper-counter-add $
               (di/with-dependencies $ [zookeeper]
-                (fn [path change]
-                  (cond (zk/exists zookeeper path)
-                        (let [old (zkp/get-clj-data zookeeper path)
-                              new (+ old change)]
-                          new)
-                        :else
-                        (do
-                          (zk/create zookeeper path :persistent? true)
-                          (zkp/set-initial-clj-data zookeeper path change)
-                          change)))))
+                (fn zookeeper-counter-add
+                  ([path change retries]
+                   (let [exists (zk/exists zookeeper path)]
+                     (cond exists
+                           (let [old (zkp/get-clj-data zookeeper path)
+                                 new (+ old change)
+                                 new-bin (zkp/to-bytes (pr-str new))]
+                             (try
+                               (zk/set-data zookeeper path new-bin (:version exists))
+                               new
+                               (catch Throwable e
+                                 (cond (> retries 1)
+                                       (zookeeper-counter-add path change (dec retries))
+                                       :else
+                                       (throw e)))))
+                           :else
+                           (do
+                             (zk/create zookeeper path :persistent? true)
+                             (zkp/set-initial-clj-data zookeeper path change)
+                             change))))
+                  ([path change]
+                   (zookeeper-counter-add path change 3)))))
 
   (async/go
     (di/with-dependencies $ [serve]
