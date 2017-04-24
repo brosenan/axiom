@@ -3,7 +3,8 @@
             [di.core :as di]
             [clojure.core.async :as async]
             [zookeeper :as zk]
-            [zk-plan.core :as zkp]))
+            [zk-plan.core :as zkp]
+            [clojure.string :as str]))
 
 (defn module [$]
   (di/provide zookeeper-counter-add $
@@ -33,7 +34,7 @@
 
   (async/go
     (di/with-dependencies $ [serve]
-      (serve (fn
+      (serve (fn extract-version-rules
                [ev publish]
                (let [pubs (perm/module-publics (symbol (:key ev)))]
                  (doseq [[k v] pubs]
@@ -42,4 +43,24 @@
                                :key (symbol (:key ev) (str k))})))))
 
              {:kind :fact
-              :name "axiom/version"}))))
+              :name "axiom/version"}))
+    (di/with-dependencies $ [serve zookeeper-counter-add]
+      (serve (fn rule-tracker
+               [ev publish]
+               (let [path (str "/rules/" (str/replace (:key ev) \/ \.))
+                     new (zookeeper-counter-add path (:change ev))]
+                 (when (and (= new (:change ev))
+                            (> new 0))
+                       (publish {:kind :fact
+                                 :name "axiom/rule-exists"
+                                 :key (:key ev)
+                                 :change 1}))
+                 (when (and (= new 0)
+                            (< (:change ev) 0))
+                       (publish {:kind :fact
+                                 :name "axiom/rule-exists"
+                                 :key (:key ev)
+                                 :change -1}))
+                 nil))
+             {:kind :fact
+              :name "axiom/rule"}))))

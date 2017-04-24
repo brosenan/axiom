@@ -43,6 +43,69 @@ corresponding `:axiom/rule` events."
 [[:chapter {:title "rule-tracker"}]]
 "`rule-tracker` registers to `:axiom/rule` and tracks the quantity of each rule by summing the `:change` [field of the event](cloudlog-events.html#introduction)."
 
+"It depends on the resources [zookeeper-counter-add](#zookeeper-counter-add) and `serve`, which we will mock."
+(fact
+ (def mock-counters (transient {"/rules/perm.1234ABC.foo" 2}))
+ (let [serve-params (async/chan)
+       $ (di/injector {:zookeeper-counter-add (fn [path change]
+                                                (let [old (mock-counters path 0)
+                                                      new (+ old change)]
+                                                  (assoc! mock-counters path new)
+                                                  new))
+                       :serve (fn [func reg]
+                                (when (= reg {:kind :fact
+                                              :name "axiom/rule"})
+                                  (async/>!! serve-params func)))})]
+   (module $)
+   (let [[func chan] (async/alts!! [serve-params
+                                    (async/timeout 1000)])]
+     chan => serve-params
+     (def rule-tracker func))))
+
+"The `rule-tracker` service function is given an `:axiom/rule` event and a `publish` function."
+(fact
+ (rule-tracker {:kind :fact
+                :name "axiom/rule"
+                :key 'perm.1234ABC/foo
+                :change 3} (fn publish [ev]
+                             (throw (Exception. "This should not be called")))) => nil)
+
+"It calls `zookeeper-counter-add` to increment the counter corresponding to the rule."
+(fact
+ (mock-counters "/rules/perm.1234ABC.foo") => 5)
+
+"If the rule goes from 0 to a positive count, an `:axiom/rule-exists` event with `:change = 1` is published."
+(fact
+ (rule-tracker {:kind :fact
+                :name "axiom/rule"
+                :key 'perm.1234ABC/bar
+                :change 2} ..pub..) => nil
+ (provided
+  (..pub.. {:kind :fact
+            :name "axiom/rule-exists"
+            :key 'perm.1234ABC/bar
+            :change 1}) => irrelevant))
+
+"This of-course only happens when the change is positive."
+(fact
+ (rule-tracker {:kind :fact
+                :name "axiom/rule"
+                :key 'perm.1234ABC/baz
+                :change -2} (fn publish [ev]
+                             (throw (Exception. "This should not be called")))) => nil)
+
+"If the aggregated value of the rule goes down to 0, an `:axiom/rule-exists` event with `:change = -1` is published."
+(fact
+ (rule-tracker {:kind :fact
+                :name "axiom/rule"
+                :key 'perm.1234ABC/foo
+                :change -5} ..pub..) => nil
+ (provided
+  (..pub.. {:kind :fact
+            :name "axiom/rule-exists"
+            :key 'perm.1234ABC/foo
+            :change -1}) => irrelevant))
+
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "zookeeper-counter-add"}]]
 "`zookeeper-counter-add` depends on the `zookeeper` resource as dependency, and uses it to implement a global atomic counter."
