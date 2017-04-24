@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 23 April 2017</h5>
+              <h5>Date: 24 April 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#init"><h4>2 &nbsp; init</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>3 &nbsp; extract-version-rules</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>4 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>4.1 &nbsp; zookeeper-counter-add</i></h5></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,14 +80,18 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#init"><h4>2 &nbsp; init</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>3 &nbsp; extract-version-rules</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>4 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>4.1 &nbsp; zookeeper-counter-add</i></h5></a></li>
                 </ul>
               </nav>
           </div>
-          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>migrator</code> is a microservice that listens for events describing new rules being published, and initiates data migration using <a href='zk-plan.html'>zk-plan</a>.</p></div><div><span id="init"></span><h2><b>2 &nbsp;&nbsp; init</b></h2></div><div><p>This service has external dependencies. The <code>init</code> function allows the system to provide these dependencies in terms of a <code>&#95;config</code> map.</p></div><div class="code"><pre><code class="clojure">(init ..config..) =&gt; nil
- (provided
-(reset! _config ..config..) =&gt; irrelevant)</code></pre></div><div><span id="extract-version-rules"></span><h2><b>3 &nbsp;&nbsp; extract-version-rules</b></h2></div><div><p><code>extract-version-rules</code> handles <code>:axiom/version</code> events.</p></div><div class="code"><pre><code class="clojure">(-&gt; #'extract-version-rules meta :reg) =&gt; {:kind :fact
-                                          :name &quot;axiom/version&quot;}</code></pre></div><div><p><code>:axiom/version</code> events report on addition or removal of <code>permacode</code> module versions. <code>extract-version-rules</code> extracts all the rule functions from such a version and publishes corresponding <code>:axiom/rule</code> events.</p></div><div><p>It publishes only rule functions, identified by having a <code>:source-fact</code> meta field.</p></div><div class="code"><pre><code class="clojure">(extract-version-rules {:key &quot;perm.1234ABC&quot;} ..pub..) =&gt; nil
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>migrator</code> is a microservice that listens to events describing new rules being published, and initiates data migration using <a href='zk-plan.html'>zk-plan</a>.</p></div><div><span id="extract-version-rules"></span><h2><b>2 &nbsp;&nbsp; extract-version-rules</b></h2></div><div><p><code>extract-version-rules</code> is a service function which registers to <code>:axiom/version</code> events. As such it depends on the <code>serve</code> function we will mock in order to get hold of the function itself and the registration it is making.</p></div><div class="code"><pre><code class="clojure">(let [reg (async/chan)
+     $ (di/injector {:serve (fn [f r]
+                              (async/&gt;!! reg [f r]))})]
+ (module $)
+ (let [[f r] (async/&lt;!! reg)]
+   r =&gt; {:kind :fact
+         :name &quot;axiom/version&quot;}
+   (def extract-version-rules f)))</code></pre></div><div><p><code>:axiom/version</code> events report on addition or removal of <code>permacode</code> module versions. <code>extract-version-rules</code> extracts all the rule functions from such a version and publishes corresponding <code>:axiom/rule</code> events.</p></div><div><p>It publishes only rule functions, identified by having a <code>:source-fact</code> meta field.</p></div><div class="code"><pre><code class="clojure">(extract-version-rules {:key &quot;perm.1234ABC&quot;} ..pub..) =&gt; nil
  (provided
 (perm/module-publics 'perm.1234ABC) =&gt; {'foo (with-meta (fn []) {:source-fact [&quot;foo&quot; 1]})
                                         'bar (with-meta (fn []) {:source-fact [&quot;bar&quot; 1]})
@@ -95,7 +99,39 @@
 (..pub.. {:name &quot;axiom/rule&quot;
           :key 'perm.1234ABC/foo}) =&gt; irrelevant
 (..pub.. {:name &quot;axiom/rule&quot;
-          :key 'perm.1234ABC/bar}) =&gt; irrelevant)</code></pre></div>
+          :key 'perm.1234ABC/bar}) =&gt; irrelevant)</code></pre></div><div><span id="rule-tracker"></span><h2><b>3 &nbsp;&nbsp; rule-tracker</b></h2></div><div><p><code>rule-tracker</code> registers to <code>:axiom/rule</code> and tracks the quantity of each rule by summing the <code>:change</code> <a href='cloudlog-events.html#introduction'>field of the event</a>.</p></div><div><span id="under-the-hood"></span><h2><b>4 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="zookeeper-counter-add"></span><h3>4.1 &nbsp;&nbsp; zookeeper-counter-add</h3></div><div><p><code>zookeeper-counter-add</code> depends on the <code>zookeeper</code> resource as dependency, and uses it to implement a global atomic counter.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper :zk})]
+  (module $)
+  (def zookeeper-counter-add (di/wait-for $ zookeeper-counter-add)))</code></pre></div><div><p><code>zookeeper-counter-add</code> takes a path to a counter and a number to be added. If a node corresponding to the given path does not exist, it is assumed to be equal 0, and is therefore created using the given number. The new value, which is the given number, is returned.</p></div><div class="code"><pre><code class="clojure">(zookeeper-counter-add &quot;/rules/foobar&quot; 3) =&gt; 3
+ (provided
+(zk/exists :zk &quot;/rules/foobar&quot;) =&gt; nil
+(zk/create :zk &quot;/rules/foobar&quot; :persistent? true) =&gt; &quot;/rules/foobar&quot;
+(zkp/set-initial-clj-data :zk &quot;/rules/foobar&quot; 3) =&gt; irrelevant)</code></pre></div><div><p>If a node exists, its value is updated to add the given number.</p></div><div class="code"><pre><code class="clojure">(zookeeper-counter-add &quot;/rules/foobar&quot; 3) =&gt; 5
+ (provided
+(zk/exists :zk &quot;/rules/foobar&quot;) =&gt; {:some :values
+                                    :version 7}
+(zkp/get-clj-data :zk &quot;/rules/foobar&quot;) =&gt; 2
+(zkp/to-bytes &quot;5&quot;) =&gt; ..bin..
+(zk/set-data :zk &quot;/rules/foobar&quot; ..bin.. 7) =&gt; irrelevant)</code></pre></div><div><p><code>zookeeper-counter-add</code> takes an extra <code>retries</code> parameter which defaults to 3. If <code>zk/set-data</code> throws an exception for any reason, the update is retried. This is to account for the possibility of concurrent update.</p></div><div class="code"><pre><code class="clojure">(zookeeper-counter-add &quot;/rules/foobar&quot; 3) =&gt; 6
+ (provided
+(zk/exists :zk &quot;/rules/foobar&quot;) =streams=&gt; [{:some :values
+                                             :version 7}
+                                            {:some :values
+                                             :version 8}]
+(zkp/get-clj-data :zk &quot;/rules/foobar&quot;) =streams=&gt; [2 3]
+(zkp/to-bytes &quot;5&quot;) =&gt; ..bin1..
+(zk/set-data :zk &quot;/rules/foobar&quot; ..bin1.. 7) =throws=&gt; (Exception. &quot;boo&quot;)
+(zkp/to-bytes &quot;6&quot;) =&gt; ..bin2..
+(zk/set-data :zk &quot;/rules/foobar&quot; ..bin2.. 8) =&gt; irrelevant)</code></pre></div><div><p>When the retries are exhasted, the function throws.</p></div><div class="code"><pre><code class="clojure">(zookeeper-counter-add &quot;/rules/foobar&quot; 3) =&gt; (throws &quot;boo&quot;)
+ (provided
+(zk/exists :zk &quot;/rules/foobar&quot;) =streams=&gt; [{:some :values
+                                             :version 7}
+                                            {:some :values
+                                             :version 8}
+                                            {:some :values
+                                             :version 9}]
+(zkp/get-clj-data :zk &quot;/rules/foobar&quot;) =streams=&gt; [2 3 4]
+(zkp/to-bytes irrelevant) =&gt; irrelevant
+(zk/set-data :zk &quot;/rules/foobar&quot; irrelevant irrelevant) =throws=&gt; (Exception. &quot;boo&quot;))</code></pre></div>
         </div>
       </div>
     </div>

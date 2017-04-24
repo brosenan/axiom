@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 23 April 2017</h5>
+              <h5>Date: 24 April 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -258,11 +258,11 @@
                                       ; It should create a result child node and store the result to it
 (zk/create ..zk.. &quot;/foo/task-1234/result&quot; :persistent? true) =&gt; true
 (set-initial-clj-data ..zk.. &quot;/foo/task-1234/result&quot; 1234.5) =&gt; irrelevant
-(zk/delete-all irrelevant irrelevant) =&gt; irrelevant)</code></pre></div><div><span id="set-initial-clj-data"></span><h3>9.3 &nbsp;&nbsp; set-initial-clj-data</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>node:</strong> the node</li></ul><p><strong>Returns:</strong> Nothing in particular</p></div><div><p>It calls zk/set-data to update the data</p></div><div class="code"><pre><code class="clojure">(set-initial-clj-data ..zk.. ..node.. ..data..) =&gt; irrelevant
+(zk/delete-all irrelevant irrelevant) =&gt; irrelevant)</code></pre></div><div><span id="set-initial-clj-data"></span><h3>9.3 &nbsp;&nbsp; set-initial-clj-data</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>node:</strong> the node</li><li><strong>data:</strong> the Clojure s-expression to be stored</li></ul><p><strong>Returns:</strong> Nothing in particular</p></div><div><p>It calls zk/set-data to update the data</p></div><div class="code"><pre><code class="clojure">(set-initial-clj-data ..zk.. ..node.. ..data..) =&gt; irrelevant
     (provided
      (pr-str ..data..) =&gt; ..str..
      (to-bytes ..str..) =&gt; ..bytes..
-     (zk/set-data ..zk.. ..node.. ..bytes.. irrelevant) =&gt; irrelevant)</code></pre></div><div><p>It derives the version number from the existing version</p></div><div class="code"><pre><code class="clojure">(set-initial-clj-data ..zk.. ..node.. ..data..) =&gt; irrelevant
+     (zk/set-data ..zk.. ..node.. ..bytes.. irrelevant) =&gt; irrelevant)</code></pre></div><div><p>It uses zero as the default version.</p></div><div class="code"><pre><code class="clojure">(set-initial-clj-data ..zk.. ..node.. ..data..) =&gt; irrelevant
     (provided
      (zk/set-data irrelevant irrelevant irrelevant 0) =&gt; irrelevant)</code></pre></div><div><span id="add-dependency"></span><h3>9.4 &nbsp;&nbsp; add-dependency</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>from:</strong> path of the task that provides the dependency</li><li><strong>to:</strong> path of the task that depends on 'from'</li></ul><p><strong>Returns:</strong> nothing in particular</p></div><div><p>It adds sequential children to both the 'from' and the 'to' tasks</p></div><div class="code"><pre><code class="clojure">(add-dependency ..zk.. &quot;/path/from&quot; &quot;/path/to&quot;) =&gt; irrelevant
     (provided
