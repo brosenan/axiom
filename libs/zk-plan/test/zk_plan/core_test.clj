@@ -218,26 +218,6 @@ The other `M-K` tasks are built with `K` arguments each, which are randomly sele
     (mark-as-ready plan)
     plan))
 
-"We now deploy `N` workers to execute the plan.
-Each thread runs the `worker` function repeatedly.
-In case of an exception thrown from the worker, we report it, but move on to call `worker` again."
-(comment (defn start-stress-workers [{:keys [worker]} parent]
-           (let [threads (map (fn [_] (Thread. (fn []
-                                                 (loop []
-                                                   (try
-                                                     (worker parent {} :TBD)
-                                                     (catch Exception e
-                                                       (.printStackTrace e)))
-                                                   (recur))))) (range N))]
-             (doseq [thread threads]
-               (.start thread))
-             threads)))
-
-"To stop all threads we simply `.join` them"
-(comment (defn join-stress-workers [threads]
-           (doseq [thread threads]
-             (.stop thread))))
-
 "Puttint this all together:
 - Using dependency injection:
   - Gain access to a zookeeper client and the `zk-plan` functions
