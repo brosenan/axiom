@@ -169,19 +169,7 @@
                             (add-task plan `(stress-task-func ~i ~(vec selected)) (map tasks selected))))]
           (recur (assoc tasks i next-task) (inc i)))))
     (mark-as-ready plan)
-    plan))</code></pre></div><div><p>We now deploy <code>N</code> workers to execute the plan. Each thread runs the <code>worker</code> function repeatedly. In case of an exception thrown from the worker, we report it, but move on to call <code>worker</code> again.</p></div><div class="code"><pre><code class="clojure">(defn start-stress-workers [{:keys [worker]} parent]
-         (let [threads (map (fn [_] (Thread. (fn []
-                                               (loop []
-                                                 (try
-                                                   (worker parent {} :TBD)
-                                                   (catch Exception e
-                                                     (.printStackTrace e)))
-                                                 (recur))))) (range N))]
-           (doseq [thread threads]
-             (.start thread))
-           threads))</code></pre></div><div><p>To stop all threads we simply <code>.join</code> them</p></div><div class="code"><pre><code class="clojure">(defn join-stress-workers [threads]
-         (doseq [thread threads]
-           (.stop thread)))</code></pre></div><div><p>Puttint this all together:</p><ul><li>Using dependency injection:<ul><li>Gain access to a zookeeper client and the <code>zk-plan</code> functions</li><li>Spawn <code>N</code> worker threads</li></ul></li><li>Clear the parent: <code>/stress</code> if exists</li><li>(Re) Create the parent</li><li>Create the plan</li><li>Wait until the plan is complete</li><li>Go home happy.</li></ul></div><div class="code"><pre><code class="clojure">:integ ; This is an integration test
+    plan))</code></pre></div><div><p>Puttint this all together:</p><ul><li>Using dependency injection:<ul><li>Gain access to a zookeeper client and the <code>zk-plan</code> functions</li><li>Spawn <code>N</code> worker threads</li></ul></li><li>Clear the parent: <code>/stress</code> if exists</li><li>(Re) Create the parent</li><li>Create the plan</li><li>Wait until the plan is complete</li><li>Go home happy.</li></ul></div><div class="code"><pre><code class="clojure">:integ ; This is an integration test
  (let [$ (di/injector {:zookeeper-config {:url &quot;127.0.0.1:2181&quot;}
                      :zk-plan-config {:num-threads N
                                       :parent &quot;/stress&quot;}})]
