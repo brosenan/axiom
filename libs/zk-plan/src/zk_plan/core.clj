@@ -61,7 +61,7 @@
   (let [data (:data (zk/data zk node))]
     (read-string (String. data "UTF-8"))))
 
-(defn execute-function [zk node]
+(defn execute-function [zk node $]
   (let [func (get-clj-data zk node)
         func' (eval func)
         vals (->> (zk/children zk node)
@@ -69,7 +69,7 @@
                   sort
                   (map #(str node "/" %))
                   (map #(get-clj-data zk %)))]
-    (let [res (apply func' vals)]
+    (let [res (apply func' $ vals)]
       res)))
 
 (defn propagate-result [zk prov value]
@@ -82,13 +82,13 @@
 (defn prov? [key]
   (re-matches #"prov-\d+" key))
 
-(defn perform-task [zk task]
+(defn perform-task [zk task $]
   (let [children   (zk/children zk task)
         result-node (str task "/result")
         res (if (contains? (set children) "result")
               (get-clj-data zk result-node)
               ; else
-              (execute-function zk task))]
+              (execute-function zk task $))]
     (when-not (contains? (set children) "result")
       (zk/create zk result-node :persistent? true)
       (set-initial-clj-data zk result-node res))
@@ -116,12 +116,12 @@
                                         ; else
           (int val))))))
 
-(defn ^:private worker [zk parent attrs]
+(defn ^:private worker [zk parent attrs $]
   (loop [count 0]
     (let [task (get-task-from-any-plan zk parent)]
       (if task
         (try
-          (perform-task zk task)
+          (perform-task zk task $)
           (finally
             (when (zk/exists zk task)
               (zk/delete zk (str task "/owner")))))

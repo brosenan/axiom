@@ -109,37 +109,38 @@ It calls zk/createn to create a new zookeeper node"
 **Parameters:**
 - **parent:** the parent node of all plans
 - **attributes:** a map with attributes for the behavior of the worker
+- **$:** a [DI](di.html) injector to be used from within tasks
 
 **Returns:** nothing in particular"
 "It does the following:
 - calls `get-task-from-any-plan` to get a task to work on
 - if a task is returned (we have something to do), it calls `perform-task` to run it"
 (fact
- (worker ..parent.. ..attrs..) => irrelevant
+ (worker ..parent.. ..attrs.. ..$..) => irrelevant
  (provided
   (get-task-from-any-plan :zk ..parent..) => "/foo/bar"
-  (perform-task :zk "/foo/bar") => irrelevant
+  (perform-task :zk "/foo/bar" ..$..) => irrelevant
   (zk/exists irrelevant irrelevant) => nil))
 
 "If `get-task-from-any-plan` returns `nil`, we call `calc-sleep-time` to calculate for how long
 we need to sleep before the next retry.
 We retry until we get a task."
 (fact
- (worker ..parent.. ..attrs..) => irrelevant
+ (worker ..parent.. ..attrs.. ..$..) => irrelevant
  (provided
   (get-task-from-any-plan :zk ..parent..) =streams=> [nil nil "/foo/bar"]
   (calc-sleep-time ..attrs.. 0) => 1
   (calc-sleep-time ..attrs.. 1) => 2
-  (perform-task irrelevant irrelevant) => irrelevant
+  (perform-task irrelevant irrelevant ..$..) => irrelevant
   (zk/exists irrelevant irrelevant) => nil))
 
 "If `perform-task` exists (abnomally) before clearing the task node, 
 we remove the `owner` node from it to allow another task to complete the job"
 (fact
- (worker ..parent.. ..attrs..) => (throws Exception)
+ (worker ..parent.. ..attrs.. ..$..) => (throws Exception)
  (provided
   (get-task-from-any-plan :zk ..parent..) => "/foo/bar"
-  (perform-task :zk "/foo/bar") =throws=> (Exception.)
+  (perform-task :zk "/foo/bar" ..$..) =throws=> (Exception.)
   (zk/exists :zk "/foo/bar") => {:some "thing"}
   (zk/delete :zk "/foo/bar/owner") => irrelevant))
 
@@ -180,7 +181,7 @@ After incrementing, it checks that the value is 1, that is, no other worker is w
 The function compares its arguments against the `expected` vector, and returns its number.
 The function below creates a task function (s-expression) for task `i`"
 (defn stress-task-func [i expected]
-  (fn [& args]
+  (fn [$ & args]
     (println i)
     (let [my-atom (worker-counters i)]
       (try
@@ -220,7 +221,7 @@ In case of an exception thrown from the worker, we report it, but move on to cal
   (let [threads (map (fn [_] (Thread. (fn []
                                         (loop []
                                           (try
-                                            (worker parent {})
+                                            (worker parent {} :TBD)
                                             (catch Exception e
                                               (.printStackTrace e)))
                                           (recur))))) (range N))]
@@ -356,6 +357,7 @@ In case of an exception thrown from the worker, we report it, but move on to cal
 **Parameters:**
 - **zk:** the Zookeeper connection object
 - **task:** path to the task to perform
+- **$:** a DI injector to be passed to the task
 
 **Returns:** Nothing in particular"
 
@@ -363,7 +365,7 @@ In case of an exception thrown from the worker, we report it, but move on to cal
 successfully, and the result has been distributed to all dependent tasks (if any).
 In such a case we remove the task."
 (fact
- (perform-task ..zk.. "/foo/task-1234") => irrelevant
+ (perform-task ..zk.. "/foo/task-1234" ..$..) => irrelevant
  (provided
   (zk/children ..zk.. "/foo/task-1234") => '("result")
   (get-clj-data irrelevant irrelevant) => 123
@@ -372,7 +374,7 @@ In such a case we remove the task."
 "If `prov-*` children exist, it reads the result and distributes it across the tasks
 depending on this task (the corresponding dep-* nodes)"
 (fact
- (perform-task ..zk.. "/foo/task-1234") => irrelevant
+ (perform-task ..zk.. "/foo/task-1234" ..$..) => irrelevant
  (provided
   (zk/children ..zk.. "/foo/task-1234") => '("result" "prov-00000" "prov-0001")
   (get-clj-data ..zk.. "/foo/task-1234/result") => 3.1415
@@ -383,10 +385,10 @@ depending on this task (the corresponding dep-* nodes)"
 "If the task does not have a result, we need to calculate the result ourselves.
 We call execute-function to get the result, and store it as the 'result' child."
 (fact
- (perform-task ..zk.. "/foo/task-1234") => irrelevant
+ (perform-task ..zk.. "/foo/task-1234" ..$..) => irrelevant
  (provided
   (zk/children ..zk.. "/foo/task-1234") => '()
-  (execute-function ..zk.. "/foo/task-1234") => 1234.5
+  (execute-function ..zk.. "/foo/task-1234" ..$..) => 1234.5
                                         ; It should create a result child node and store the result to it
   (zk/create ..zk.. "/foo/task-1234/result" :persistent? true) => true
   (set-initial-clj-data ..zk.. "/foo/task-1234/result" 1234.5) => irrelevant
@@ -460,21 +462,23 @@ We call execute-function to get the result, and store it as the 'result' child."
 **Parameters:**
 - **zk:** the Zookeeper connection object
 - **task:** path to the task node containing arguments for the function  
+- **$:** an injector to be passed to the task function
 
 **Returns:** the return value from the task's function"
 "It reads the function definition from the content of the task node.
 If no parameters exist in the task it executes the function without parameters."
 (fact
- (defn returns-3 [] 3)
- (execute-function ..zk.. ..task..) => 3
+ (defn foo [$])
+ (execute-function ..zk.. ..task.. ..$..) => 4
  (provided
-  (get-clj-data ..zk.. ..task..) => 'returns-3
+  (get-clj-data ..zk.. ..task..) => 'foo
+  (foo ..$..) => 4
   (zk/children ..zk.. ..task..) => '("foo" "task-1234")))
 "It passes the task arguments to the function"
 (fact
- (execute-function ..zk.. "/foo/task-1234") => [1 2 3]
+ (execute-function ..zk.. "/foo/task-1234" ..$..) => [1 2 3]
  (provided
-  (get-clj-data ..zk.. "/foo/task-1234") => '(fn [& args] args)
+  (get-clj-data ..zk.. "/foo/task-1234") => '(fn [$ & args] args)
   (zk/children ..zk.. "/foo/task-1234") => '("arg-00001" "arg-00002" "arg-00000")
   (get-clj-data ..zk.. "/foo/task-1234/arg-00000") => 1
   (get-clj-data ..zk.. "/foo/task-1234/arg-00001") => 2
