@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 24 April 2017</h5>
+              <h5>Date: 25 April 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -120,20 +120,20 @@
      (set-initial-clj-data irrelevant irrelevant irrelevant) =&gt; irrelevant
      (mark-as-ready-internal :zk ..task..) =&gt; irrelevant)</code></pre></div><div><span id="mark-as-ready"></span><h2><b>5 &nbsp;&nbsp; mark-as-ready</b></h2></div><div><p><strong>Parameters:</strong></p><ul><li><strong>task:</strong> the task to be marked as ready</li></ul><p><strong>Returns:</strong> nothing in particular</p></div><div><p>It creates a child node named 'ready'</p></div><div class="code"><pre><code class="clojure">(mark-as-ready &quot;/foo/bar&quot;) =&gt; irrelevant
     (provided
-     (zk/create :zk &quot;/foo/bar/ready&quot; :persistent? true) =&gt; true)</code></pre></div><div><span id="worker"></span><h2><b>6 &nbsp;&nbsp; worker</b></h2></div><div><p><strong>Parameters:</strong></p><ul><li><strong>parent:</strong> the parent node of all plans</li><li><strong>attributes:</strong> a map with attributes for the behavior of the worker</li></ul><p><strong>Returns:</strong> nothing in particular</p></div><div><p>It does the following:</p><ul><li>calls <code>get-task-from-any-plan</code> to get a task to work on</li><li>if a task is returned (we have something to do), it calls <code>perform-task</code> to run it</li></ul></div><div class="code"><pre><code class="clojure">(worker ..parent.. ..attrs..) =&gt; irrelevant
+     (zk/create :zk &quot;/foo/bar/ready&quot; :persistent? true) =&gt; true)</code></pre></div><div><span id="worker"></span><h2><b>6 &nbsp;&nbsp; worker</b></h2></div><div><p><strong>Parameters:</strong></p><ul><li><strong>parent:</strong> the parent node of all plans</li><li><strong>attributes:</strong> a map with attributes for the behavior of the worker</li><li><strong>$:</strong> a <a href='di.html'>DI</a> injector to be used from within tasks</li></ul><p><strong>Returns:</strong> nothing in particular</p></div><div><p>It does the following:</p><ul><li>calls <code>get-task-from-any-plan</code> to get a task to work on</li><li>if a task is returned (we have something to do), it calls <code>perform-task</code> to run it</li></ul></div><div class="code"><pre><code class="clojure">(worker ..parent.. ..attrs.. ..$..) =&gt; irrelevant
  (provided
 (get-task-from-any-plan :zk ..parent..) =&gt; &quot;/foo/bar&quot;
-(perform-task :zk &quot;/foo/bar&quot;) =&gt; irrelevant
-(zk/exists irrelevant irrelevant) =&gt; nil)</code></pre></div><div><p>If <code>get-task-from-any-plan</code> returns <code>nil</code>, we call <code>calc-sleep-time</code> to calculate for how long we need to sleep before the next retry. We retry until we get a task.</p></div><div class="code"><pre><code class="clojure">(worker ..parent.. ..attrs..) =&gt; irrelevant
+(perform-task :zk &quot;/foo/bar&quot; ..$..) =&gt; irrelevant
+(zk/exists irrelevant irrelevant) =&gt; nil)</code></pre></div><div><p>If <code>get-task-from-any-plan</code> returns <code>nil</code>, we call <code>calc-sleep-time</code> to calculate for how long we need to sleep before the next retry. We retry until we get a task.</p></div><div class="code"><pre><code class="clojure">(worker ..parent.. ..attrs.. ..$..) =&gt; irrelevant
  (provided
 (get-task-from-any-plan :zk ..parent..) =streams=&gt; [nil nil &quot;/foo/bar&quot;]
 (calc-sleep-time ..attrs.. 0) =&gt; 1
 (calc-sleep-time ..attrs.. 1) =&gt; 2
-(perform-task irrelevant irrelevant) =&gt; irrelevant
-(zk/exists irrelevant irrelevant) =&gt; nil)</code></pre></div><div><p>If <code>perform-task</code> exists (abnomally) before clearing the task node,  we remove the <code>owner</code> node from it to allow another task to complete the job</p></div><div class="code"><pre><code class="clojure">(worker ..parent.. ..attrs..) =&gt; (throws Exception)
+(perform-task irrelevant irrelevant ..$..) =&gt; irrelevant
+(zk/exists irrelevant irrelevant) =&gt; nil)</code></pre></div><div><p>If <code>perform-task</code> exists (abnomally) before clearing the task node,  we remove the <code>owner</code> node from it to allow another task to complete the job</p></div><div class="code"><pre><code class="clojure">(worker ..parent.. ..attrs.. ..$..) =&gt; (throws Exception)
  (provided
 (get-task-from-any-plan :zk ..parent..) =&gt; &quot;/foo/bar&quot;
-(perform-task :zk &quot;/foo/bar&quot;) =throws=&gt; (Exception.)
+(perform-task :zk &quot;/foo/bar&quot; ..$..) =throws=&gt; (Exception.)
 (zk/exists :zk &quot;/foo/bar&quot;) =&gt; {:some &quot;thing&quot;}
 (zk/delete :zk &quot;/foo/bar/owner&quot;) =&gt; irrelevant)</code></pre></div><div><span id="plan-completed"></span><h2><b>7 &nbsp;&nbsp; plan-completed?</b></h2></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>plan:</strong> the path to the plan</li></ul><p><strong>Returns:</strong> whether the plan is completed</p></div><div><p>It returns true if the plan has no tasks in it</p></div><div class="code"><pre><code class="clojure">(plan-completed? ..plan..) =&gt; true
  (provided
@@ -142,7 +142,7 @@
 (zk/children :zk ..plan..) =&gt; '(&quot;foo&quot; &quot;task-39893&quot; &quot;bar&quot;))</code></pre></div><div><span id="usage-example"></span><h2><b>8 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>The idea of this test is to stress zk_plan by launching <code>N</code> parallel worker threads to execute a randomized plan with <code>M</code> tasks, each depending on <code>K</code> preceding tasks (if such exist).</p></div><div class="code"><pre><code class="clojure">(def N 10) ; the number of workers
 (def M 100) ; the number of tasks
 (def K 10) ; the number of dependencies per task</code></pre></div><div><p>The tasks work against a map of <code>M</code> atoms, one atom per each task.  These atoms count the workers working on this task.</p></div><div class="code"><pre><code class="clojure">(def worker-counters (into {} (map (fn [i] [i (atom 0)]) (range M))))</code></pre></div><div><p>Each task will also report it completed its work by adding its ordinal number to this set.</p></div><div class="code"><pre><code class="clojure">(def workers-completed (atom #{}))</code></pre></div><div><p>Each task begins by incrementing the atom, then sleeps for a while, then decrements the atom. After incrementing, it checks that the value is 1, that is, no other worker is working on the same task. The function compares its arguments against the <code>expected</code> vector, and returns its number. The function below creates a task function (s-expression) for task <code>i</code></p></div><div class="code"><pre><code class="clojure">(defn stress-task-func [i expected]
-  (fn [&amp; args]
+  (fn [$ &amp; args]
     (println i)
     (let [my-atom (worker-counters i)]
       (try
@@ -173,7 +173,7 @@
   (let [threads (map (fn [_] (Thread. (fn []
                                         (loop []
                                           (try
-                                            (worker parent {})
+                                            (worker parent {} :TBD)
                                             (catch Exception e
                                               (.printStackTrace e)))
                                           (recur))))) (range N))]
@@ -241,20 +241,20 @@
 (zk/children ..zk.. &quot;/foo/task-2345&quot;) =&gt; '(&quot;ready&quot;)
 (take-ownership ..zk.. &quot;/foo/task-2345&quot;) =&gt; true)</code></pre></div><div><p>It ignores children of the plan which are not of the form <code>task-&#42;</code></p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. &quot;/foo&quot;) =&gt; nil
  (provided
-(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;bar&quot; &quot;baz&quot; &quot;ready&quot;))</code></pre></div><div><span id="perform-task"></span><h3>9.2 &nbsp;&nbsp; perform-task</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>task:</strong> path to the task to perform</li></ul><p><strong>Returns:</strong> Nothing in particular</p></div><div><p>If the task has a 'result' child and no 'prov-*' children, this means the task completed successfully, and the result has been distributed to all dependent tasks (if any). In such a case we remove the task.</p></div><div class="code"><pre><code class="clojure">(perform-task ..zk.. &quot;/foo/task-1234&quot;) =&gt; irrelevant
+(zk/children ..zk.. &quot;/foo&quot;) =&gt; '(&quot;bar&quot; &quot;baz&quot; &quot;ready&quot;))</code></pre></div><div><span id="perform-task"></span><h3>9.2 &nbsp;&nbsp; perform-task</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>task:</strong> path to the task to perform</li><li><strong>$:</strong> a DI injector to be passed to the task</li></ul><p><strong>Returns:</strong> Nothing in particular</p></div><div><p>If the task has a 'result' child and no 'prov-*' children, this means the task completed successfully, and the result has been distributed to all dependent tasks (if any). In such a case we remove the task.</p></div><div class="code"><pre><code class="clojure">(perform-task ..zk.. &quot;/foo/task-1234&quot; ..$..) =&gt; irrelevant
  (provided
 (zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;result&quot;)
 (get-clj-data irrelevant irrelevant) =&gt; 123
-(zk/delete-all ..zk.. &quot;/foo/task-1234&quot;) =&gt; irrelevant)</code></pre></div><div><p>If <code>prov-&#42;</code> children exist, it reads the result and distributes it across the tasks depending on this task (the corresponding dep-* nodes)</p></div><div class="code"><pre><code class="clojure">(perform-task ..zk.. &quot;/foo/task-1234&quot;) =&gt; irrelevant
+(zk/delete-all ..zk.. &quot;/foo/task-1234&quot;) =&gt; irrelevant)</code></pre></div><div><p>If <code>prov-&#42;</code> children exist, it reads the result and distributes it across the tasks depending on this task (the corresponding dep-* nodes)</p></div><div class="code"><pre><code class="clojure">(perform-task ..zk.. &quot;/foo/task-1234&quot; ..$..) =&gt; irrelevant
  (provided
 (zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;result&quot; &quot;prov-00000&quot; &quot;prov-0001&quot;)
 (get-clj-data ..zk.. &quot;/foo/task-1234/result&quot;) =&gt; 3.1415
 (propagate-result ..zk.. &quot;/foo/task-1234/prov-00000&quot; 3.1415) =&gt; irrelevant
 (propagate-result ..zk.. &quot;/foo/task-1234/prov-0001&quot; 3.1415) =&gt; irrelevant
-(zk/delete-all irrelevant irrelevant) =&gt; irrelevant)</code></pre></div><div><p>If the task does not have a result, we need to calculate the result ourselves. We call execute-function to get the result, and store it as the 'result' child.</p></div><div class="code"><pre><code class="clojure">(perform-task ..zk.. &quot;/foo/task-1234&quot;) =&gt; irrelevant
+(zk/delete-all irrelevant irrelevant) =&gt; irrelevant)</code></pre></div><div><p>If the task does not have a result, we need to calculate the result ourselves. We call execute-function to get the result, and store it as the 'result' child.</p></div><div class="code"><pre><code class="clojure">(perform-task ..zk.. &quot;/foo/task-1234&quot; ..$..) =&gt; irrelevant
  (provided
 (zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '()
-(execute-function ..zk.. &quot;/foo/task-1234&quot;) =&gt; 1234.5
+(execute-function ..zk.. &quot;/foo/task-1234&quot; ..$..) =&gt; 1234.5
                                       ; It should create a result child node and store the result to it
 (zk/create ..zk.. &quot;/foo/task-1234/result&quot; :persistent? true) =&gt; true
 (set-initial-clj-data ..zk.. &quot;/foo/task-1234/result&quot; 1234.5) =&gt; irrelevant
@@ -274,13 +274,14 @@
      (zk/create ..zk.. &quot;/path/to/dep-&quot; :persistent? true :sequential? true) =&gt; ..to-link..
      (set-initial-clj-data ..zk.. ..from-link.. ..to-link..) =&gt; irrelevant)</code></pre></div><div><span id="take-ownership"></span><h3>9.5 &nbsp;&nbsp; take-ownership</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>task:</strong> the task to take ownership over</li></ul><p><strong>Returns:</strong> whether or not we managed to take ownership</p></div><div><p>It tries to add an ephemeral 'owner' node to the task, and return whether it was successful</p></div><div class="code"><pre><code class="clojure">(take-ownership ..zk.. &quot;/foo/task-1234&quot;) =&gt; ..result..
     (provided
-     (zk/create ..zk.. &quot;/foo/task-1234/owner&quot; :persistent? false) =&gt; ..result..)</code></pre></div><div><span id="execute-function"></span><h3>9.6 &nbsp;&nbsp; execute-function</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>task:</strong> path to the task node containing arguments for the function</li></ul><p><strong>Returns:</strong> the return value from the task's function</p></div><div><p>It reads the function definition from the content of the task node. If no parameters exist in the task it executes the function without parameters.</p></div><div class="code"><pre><code class="clojure">(defn returns-3 [] 3)
- (execute-function ..zk.. ..task..) =&gt; 3
+     (zk/create ..zk.. &quot;/foo/task-1234/owner&quot; :persistent? false) =&gt; ..result..)</code></pre></div><div><span id="execute-function"></span><h3>9.6 &nbsp;&nbsp; execute-function</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>task:</strong> path to the task node containing arguments for the function</li><li><strong>$:</strong> an injector to be passed to the task function</li></ul><p><strong>Returns:</strong> the return value from the task's function</p></div><div><p>It reads the function definition from the content of the task node. If no parameters exist in the task it executes the function without parameters.</p></div><div class="code"><pre><code class="clojure">(defn foo [$])
+ (execute-function ..zk.. ..task.. ..$..) =&gt; 4
  (provided
-(get-clj-data ..zk.. ..task..) =&gt; 'returns-3
-(zk/children ..zk.. ..task..) =&gt; '(&quot;foo&quot; &quot;task-1234&quot;))</code></pre></div><div><p>It passes the task arguments to the function</p></div><div class="code"><pre><code class="clojure">(execute-function ..zk.. &quot;/foo/task-1234&quot;) =&gt; [1 2 3]
+(get-clj-data ..zk.. ..task..) =&gt; 'foo
+(foo ..$..) =&gt; 4
+(zk/children ..zk.. ..task..) =&gt; '(&quot;foo&quot; &quot;task-1234&quot;))</code></pre></div><div><p>It passes the task arguments to the function</p></div><div class="code"><pre><code class="clojure">(execute-function ..zk.. &quot;/foo/task-1234&quot; ..$..) =&gt; [1 2 3]
  (provided
-(get-clj-data ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(fn [&amp; args] args)
+(get-clj-data ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(fn [$ &amp; args] args)
 (zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;arg-00001&quot; &quot;arg-00002&quot; &quot;arg-00000&quot;)
 (get-clj-data ..zk.. &quot;/foo/task-1234/arg-00000&quot;) =&gt; 1
 (get-clj-data ..zk.. &quot;/foo/task-1234/arg-00001&quot;) =&gt; 2
