@@ -1,7 +1,8 @@
 (ns zk-plan.core
   (:use [zookeeper :as zk])
   (:require [clojure.string :as str]
-            [di.core :as di]))
+            [di.core :as di]
+            [clojure.core.async :as async]))
 
 (defn ^:private create-plan [zk parent]
   (zk/create zk (str parent "/plan-") :persistent? true :sequential? true))
@@ -146,4 +147,18 @@
                  :add-task (partial add-task zookeeper)
                  :mark-as-ready (partial mark-as-ready-internal zookeeper)
                  :worker (partial worker zookeeper)
-                 :plan-completed? (partial plan-completed? zookeeper)})))
+                 :plan-completed? (partial plan-completed? zookeeper)}))
+
+  (async/go
+    (di/with-dependencies $ [zk-plan zk-plan-config]
+      (let [{:keys [worker]} zk-plan]
+        (let [threads (map (fn [_] (Thread. (fn []
+                                                 (loop []
+                                                   (try
+                                                     (worker (:parent zk-plan-config) {} $)
+                                                     (catch Exception e
+                                                       (.printStackTrace e)))
+                                                   (recur))))) (range (:num-threads zk-plan-config)))]
+             (doseq [thread threads]
+               (.start thread))
+             threads)))))

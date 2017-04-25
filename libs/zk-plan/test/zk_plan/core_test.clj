@@ -36,6 +36,10 @@ which is a Zookeeper connection object.
  (def plan-completed? (:plan-completed? zk-plan))
  plan-completed? => fn?)
 
+"The `module` also spawns worker threads when the `zk-plan-config` resource is available as a map containing the number of threads to spawn
+and the parent node under which plans are created.
+See our [usage example](#usage-example) to see how it is being used."
+
 [[:chapter {:title "create-plan"}]]
 "
 **Parameters:**
@@ -217,34 +221,37 @@ The other `M-K` tasks are built with `K` arguments each, which are randomly sele
 "We now deploy `N` workers to execute the plan.
 Each thread runs the `worker` function repeatedly.
 In case of an exception thrown from the worker, we report it, but move on to call `worker` again."
-(defn start-stress-workers [{:keys [worker]} parent]
-  (let [threads (map (fn [_] (Thread. (fn []
-                                        (loop []
-                                          (try
-                                            (worker parent {} :TBD)
-                                            (catch Exception e
-                                              (.printStackTrace e)))
-                                          (recur))))) (range N))]
-    (doseq [thread threads]
-      (.start thread))
-    threads))
+(comment (defn start-stress-workers [{:keys [worker]} parent]
+           (let [threads (map (fn [_] (Thread. (fn []
+                                                 (loop []
+                                                   (try
+                                                     (worker parent {} :TBD)
+                                                     (catch Exception e
+                                                       (.printStackTrace e)))
+                                                   (recur))))) (range N))]
+             (doseq [thread threads]
+               (.start thread))
+             threads)))
 
 "To stop all threads we simply `.join` them"
-(defn join-stress-workers [threads]
-  (doseq [thread threads]
-    (.stop thread)))
+(comment (defn join-stress-workers [threads]
+           (doseq [thread threads]
+             (.stop thread))))
 
 "Puttint this all together:
-- Connect to an actual Zookeeper
+- Using dependency injection:
+  - Gain access to a zookeeper client and the `zk-plan` functions
+  - Spawn `N` worker threads
 - Clear the parent: `/stress` if exists
 - (Re) Create the parent
-- Start the workers
 - Create the plan
 - Wait until the plan is complete
-- Stop the workers"
+- Go home happy."
 (fact
  :integ ; This is an integration test
- (let [$ (di/injector {:zookeeper-config {:url "127.0.0.1:2181"}})]
+ (let [$ (di/injector {:zookeeper-config {:url "127.0.0.1:2181"}
+                       :zk-plan-config {:num-threads N
+                                        :parent "/stress"}})]
    (module $)
    (let [zk (di/wait-for $ zookeeper)
          zk-plan (di/wait-for $ zk-plan)
@@ -252,16 +259,14 @@ In case of an exception thrown from the worker, we report it, but move on to cal
          parent "/stress"]
      (zk/delete-all zk "/stress")
      (zk/create zk parent :persistent? true)
-     (let [threads (start-stress-workers zk-plan parent)
-           plan (build-stress-plan zk-plan parent)]
+     (let [plan (build-stress-plan zk-plan parent)]
        (loop []
          (when-not (plan-completed? plan)
            (Thread/sleep 100)
            (recur)))
        (doseq [m (range M)]
          (when-not (contains? @workers-completed m)
-           (println "Task " m " was not completed")))
-       (join-stress-workers threads)))))
+           (println "Task " m " was not completed")))))))
          
 
 [[:chapter {:title "Under the Hood"}]]
