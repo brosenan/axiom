@@ -95,7 +95,7 @@
  (def worker (:worker zk-plan))
  worker =&gt; fn?
  (def plan-completed? (:plan-completed? zk-plan))
- plan-completed? =&gt; fn?</code></pre></div><div><span id="create-plan"></span><h2><b>3 &nbsp;&nbsp; create-plan</b></h2></div><div><p><strong>Parameters:</strong></p><ul><li><strong>parent:</strong> the parent node for the new plan</li></ul><p><strong>Returns:</strong> the path to the plan It calls zk/createn to create a new zookeeper node</p></div><div class="code"><pre><code class="clojure">(create-plan ..parent..) =&gt; ..node..
+ plan-completed? =&gt; fn?</code></pre></div><div><p>The <code>module</code> also spawns worker threads when the <code>zk-plan-config</code> resource is available as a map containing the number of threads to spawn and the parent node under which plans are created. See our <a href='#usage-example'>usage example</a> to see how it is being used.</p></div><div><span id="create-plan"></span><h2><b>3 &nbsp;&nbsp; create-plan</b></h2></div><div><p><strong>Parameters:</strong></p><ul><li><strong>parent:</strong> the parent node for the new plan</li></ul><p><strong>Returns:</strong> the path to the plan It calls zk/createn to create a new zookeeper node</p></div><div class="code"><pre><code class="clojure">(create-plan ..parent..) =&gt; ..node..
  (provided
 (zk/create :zk ..prefix.. :persistent? true :sequential? true) =&gt; ..node..
 (str ..parent.. &quot;/plan-&quot;) =&gt; ..prefix..)</code></pre></div><div><span id="add-task"></span><h2><b>4 &nbsp;&nbsp; add-task</b></h2></div><div><p><strong>Parameters:</strong></p><ul><li><strong>plan:</strong> the path to the plan</li><li><strong>fn:</strong> the function to be executed</li><li><strong>arg-tasks:</strong> a sequence of task paths, which return values are to become arguments for fn</li></ul><p><strong>Returns:</strong> path to the new task</p></div><div><p>It creates a sequential node under the plan</p></div><div class="code"><pre><code class="clojure">(add-task ..plan.. ..fn.. []) =&gt; ..task..
@@ -170,19 +170,21 @@
           (recur (assoc tasks i next-task) (inc i)))))
     (mark-as-ready plan)
     plan))</code></pre></div><div><p>We now deploy <code>N</code> workers to execute the plan. Each thread runs the <code>worker</code> function repeatedly. In case of an exception thrown from the worker, we report it, but move on to call <code>worker</code> again.</p></div><div class="code"><pre><code class="clojure">(defn start-stress-workers [{:keys [worker]} parent]
-  (let [threads (map (fn [_] (Thread. (fn []
-                                        (loop []
-                                          (try
-                                            (worker parent {} :TBD)
-                                            (catch Exception e
-                                              (.printStackTrace e)))
-                                          (recur))))) (range N))]
-    (doseq [thread threads]
-      (.start thread))
-    threads))</code></pre></div><div><p>To stop all threads we simply <code>.join</code> them</p></div><div class="code"><pre><code class="clojure">(defn join-stress-workers [threads]
-  (doseq [thread threads]
-    (.stop thread)))</code></pre></div><div><p>Puttint this all together:</p><ul><li>Connect to an actual Zookeeper</li><li>Clear the parent: <code>/stress</code> if exists</li><li>(Re) Create the parent</li><li>Start the workers</li><li>Create the plan</li><li>Wait until the plan is complete</li><li>Stop the workers</li></ul></div><div class="code"><pre><code class="clojure">:integ ; This is an integration test
- (let [$ (di/injector {:zookeeper-config {:url &quot;127.0.0.1:2181&quot;}})]
+         (let [threads (map (fn [_] (Thread. (fn []
+                                               (loop []
+                                                 (try
+                                                   (worker parent {} :TBD)
+                                                   (catch Exception e
+                                                     (.printStackTrace e)))
+                                                 (recur))))) (range N))]
+           (doseq [thread threads]
+             (.start thread))
+           threads))</code></pre></div><div><p>To stop all threads we simply <code>.join</code> them</p></div><div class="code"><pre><code class="clojure">(defn join-stress-workers [threads]
+         (doseq [thread threads]
+           (.stop thread)))</code></pre></div><div><p>Puttint this all together:</p><ul><li>Using dependency injection:<ul><li>Gain access to a zookeeper client and the <code>zk-plan</code> functions</li><li>Spawn <code>N</code> worker threads</li></ul></li><li>Clear the parent: <code>/stress</code> if exists</li><li>(Re) Create the parent</li><li>Create the plan</li><li>Wait until the plan is complete</li><li>Go home happy.</li></ul></div><div class="code"><pre><code class="clojure">:integ ; This is an integration test
+ (let [$ (di/injector {:zookeeper-config {:url &quot;127.0.0.1:2181&quot;}
+                     :zk-plan-config {:num-threads N
+                                      :parent &quot;/stress&quot;}})]
  (module $)
  (let [zk (di/wait-for $ zookeeper)
        zk-plan (di/wait-for $ zk-plan)
@@ -190,16 +192,14 @@
        parent &quot;/stress&quot;]
    (zk/delete-all zk &quot;/stress&quot;)
    (zk/create zk parent :persistent? true)
-   (let [threads (start-stress-workers zk-plan parent)
-         plan (build-stress-plan zk-plan parent)]
+   (let [plan (build-stress-plan zk-plan parent)]
      (loop []
        (when-not (plan-completed? plan)
          (Thread/sleep 100)
          (recur)))
      (doseq [m (range M)]
        (when-not (contains? @workers-completed m)
-         (println &quot;Task &quot; m &quot; was not completed&quot;)))
-     (join-stress-workers threads))))</code></pre></div><div><span id="under-the-hood"></span><h2><b>9 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="get-task"></span><h3>9.1 &nbsp;&nbsp; get-task</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>plan:</strong> the path to the plan</li></ul><p><strong>Returns:</strong> path to the task</p></div><div><p>It returns nil if the plan is empty</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. ..plan..) =&gt; nil
+         (println &quot;Task &quot; m &quot; was not completed&quot;))))))</code></pre></div><div><span id="under-the-hood"></span><h2><b>9 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="get-task"></span><h3>9.1 &nbsp;&nbsp; get-task</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>plan:</strong> the path to the plan</li></ul><p><strong>Returns:</strong> path to the task</p></div><div><p>It returns nil if the plan is empty</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. ..plan..) =&gt; nil
  (provided
 (zk/children ..zk.. ..plan..) =&gt; nil)</code></pre></div><div><p>It returns a task if it does not have <code>dep-&#42;</code> or owner as children</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. &quot;/foo&quot;) =&gt; &quot;/foo/task-1234&quot;
  (provided
