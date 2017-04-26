@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 25 April 2017</h5>
+              <h5>Date: 26 April 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -120,7 +120,8 @@
  (-&gt; &quot;abcd&quot; retr (String. &quot;UTF-8&quot;)) =&gt; &quot;foo bar&quot;)</code></pre></div><div><span id="integration"></span><h2><b>6 &nbsp;&nbsp; Integration</b></h2></div><div><p>Let's create a <code>nippy-multi-hasher</code> pair that uses local files for storage.</p></div><div class="code"><pre><code class="clojure">(def hpair (nippy-multi-hasher (file-store repo)))</code></pre></div><div><p>Now let's hash 100 values into it.</p></div><div class="code"><pre><code class="clojure">(def hashes (let [hasher (first hpair)]
               (into {} (for [x (range 100)]
                          [x (hasher {:number x
-                                     :double (* 2 x)})]))))</code></pre></div><div><p>Now we retrieve each value and check it.</p></div><div class="code"><pre><code class="clojure">(let [unhasher (second hpair)]
+                                     :double (* 2 x)})]))))</code></pre></div><div><p>Now we retrieve each value and check it.</p></div><div class="code"><pre><code class="clojure">:integ ;; This runs only with lein integ
+ (let [unhasher (second hpair)]
  (doseq [[key hash] hashes]
    (unhasher hash) =&gt; {:number key
                        :double (* 2 key)}))</code></pre></div>
