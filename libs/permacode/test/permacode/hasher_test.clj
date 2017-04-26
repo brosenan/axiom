@@ -111,6 +111,7 @@ has read and write permissions.  This is the `repo` directory, where all objects
 
 "Now we retrieve each value and check it."
 (fact
+ :integ ;; This runs only with lein integ
  (let [unhasher (second hpair)]
    (doseq [[key hash] hashes]
      (unhasher hash) => {:number key

@@ -11,6 +11,21 @@
 "`migrator` is a microservice that listens to events describing new rules being published,
 and initiates data migration using [zk-plan](zk-plan.html)."
 
+"Consider for example the `timeline` clause in our [cloudlog documentation](cloudlog.html#joins).
+If we introduce this rule when `:test/follows` and `:test/tweeted` facts already exist, a migration process is necessary to do the following:
+1. Create timeline entries for all the tweets that already have followers.
+2. Create intermediate data so that new followers will receive existing tweets in their timelines.
+3. Create intermediate data so that new tweets will be added to the timelines of existing followers."
+
+"To allow this to happen, we need to go through all the `:test/follows` facts first and create intermediate rule tuples based on them.
+Then we need to go through all the `:test/tweeted` facts and match them against the tuples we generated in the previous step to know
+to which timelines each tweet needs to go."
+
+"Going through all the existing facts with a certain name can be a lengthy process.
+To speed things up we do the following:
+- We use [zk-plan](zk-plan.html) to distribute this work across multiple workers.
+- We [scan the facts](dynamo.html#database-scanner) in the database in shards, to allow different computer nodes to process different pieces of data in parallel."
+
 [[:chapter {:title "extract-version-rules"}]]
 "`extract-version-rules` is a service function which registers to `:axiom/version` events.
 As such it depends on the `serve` function we will mock in order to get hold of the function itself and the registration it is making."
@@ -105,6 +120,10 @@ corresponding `:axiom/rule` events."
             :name "axiom/rule-exists"
             :key 'perm.1234ABC/foo
             :change -1}) => irrelevant))
+
+[[:chapter {:title "rule-migrator"}]]
+"When the [rule-tracker](#rule-tracker) finds out a rule has been introduced (for the first time), a migration process needs to take place
+to process all the existing facts that interact with the new rule, to create all the derived facts and intermediate rule tuples that are the result of this interaction."
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "zookeeper-counter-add"}]]
