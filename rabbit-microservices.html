@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 26 April 2017</h5>
+              <h5>Date: 28 April 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -86,17 +86,20 @@
           </div>
           <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>rabbit-microservices</code> is a library that supports the definition of microservices. It <a href='di.html#provide'>provides</a> the <code>serve</code> function as a <a href='di.html'>resource</a>. In turn, the <code>serve</code> function registers given functions to a subset of the events published through AMQP. It is provided a partial event, and calls the given function on any event that matches the given partial event.</p></div><div><p>The event structure we refer to here is the one discussed in <a href='cloudlog-events.html'>cloudlog-events</a>.</p></div><div><span id="serve"></span><h2><b>2 &nbsp;&nbsp; serve: Register an Event Handler</b></h2></div><div><p><code>serve</code> is a <a href='di.html'>dependency-injection resource</a> which depends on an <code>amqp-service</code> resource (which itself depends on <code>amqp-config</code>).</p></div><div class="code"><pre><code class="clojure">(let [inj (di/injector {:amqp-service {:chan :some-chan}})]
  (module inj)
- (def serve (di/wait-for inj serve)))</code></pre></div><div><p><code>serve</code> is a function that takes a service function and a partial event and does the following:</p><ol><li>Declares a queue, dedicated to this function.</li><li>Binds this queue to the <code>facts</code> exchange, based on the routing key pattern provided by the <code>:reg</code> map.</li><li>Subscribes to this queue using a function that wraps the given function.</li></ol></div><div class="code"><pre><code class="clojure">(serve (fn [ev]) {:kind :fact
-                 :name &quot;foo/bar&quot;}) =&gt; nil
+ (def serve (di/wait-for inj serve)))</code></pre></div><div><p><code>serve</code> is a function that takes a service function and a partial event and does the following:</p><ol><li>Declares a queue, dedicated to this function.</li><li>Binds this queue to the <code>facts</code> exchange, based on the routing key pattern provided by the <code>:reg</code> map.</li><li>Subscribes to this queue using a function that wraps the given function.The name of the queue is derived from the name of the function.This allows load balancing, when different processes with the same micro-services are launched.</li></ol></div><div class="code"><pre><code class="clojure">(defn my-service [ev])
+(defn my-other-service [event publish ack])</code></pre></div><div class="code"><pre><code class="clojure">(serve my-service {:kind :fact
+                  :name &quot;foo/bar&quot;}) =&gt; nil
  (provided
-(lq/declare-server-named :some-chan) =&gt; ..q..
-(lq/bind :some-chan ..q.. facts-exch {:routing-key &quot;f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#&quot;}) =&gt; irrelevant
-(lc/subscribe :some-chan ..q.. irrelevant {:auto-ack true}) =&gt; irrelevant)</code></pre></div><div><p>Auto acknowledgement is disabled when the provided function has three parameters. The third of which is expected to be bound to an explicit <code>ack</code> function.</p></div><div class="code"><pre><code class="clojure">(serve (fn [event publish ack]) {:kind :fact
-                                :name &quot;foo/bar&quot;}) =&gt; nil
+(lq/declare :some-chan &quot;rabbit-microservices.core-test/my-service&quot;) =&gt; irrelevant
+(lq/bind :some-chan &quot;rabbit-microservices.core-test/my-service&quot;
+         facts-exch {:routing-key &quot;f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#&quot;}) =&gt; irrelevant
+(lc/subscribe :some-chan &quot;rabbit-microservices.core-test/my-service&quot; irrelevant {:auto-ack true}) =&gt; irrelevant)</code></pre></div><div><p>Auto acknowledgement is disabled when the provided function has three parameters. The third of which is expected to be bound to an explicit <code>ack</code> function.</p></div><div class="code"><pre><code class="clojure">(serve my-other-service {:kind :fact
+                        :name &quot;foo/bar&quot;}) =&gt; nil
  (provided
-(lq/declare-server-named :some-chan) =&gt; ..q..
-(lq/bind :some-chan ..q.. facts-exch {:routing-key &quot;f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#&quot;}) =&gt; irrelevant
-(lc/subscribe :some-chan ..q.. irrelevant {:auto-ack false}) =&gt; irrelevant)</code></pre></div><div><span id="publish-publish-an-event-from-the-outside"></span><h2><b>3 &nbsp;&nbsp; publish: Publish an Event from the Outside</b></h2></div><div><p><code>publish</code> is a service that allows its users to publish events from outside the context of a service. It depends on <code>amqp-service</code>.</p></div><div class="code"><pre><code class="clojure">(let [inj (di/injector {:amqp-service {:chan :some-chan}})]
+(lq/declare :some-chan &quot;rabbit-microservices.core-test/my-other-service&quot;) =&gt; irrelevant
+(lq/bind :some-chan &quot;rabbit-microservices.core-test/my-other-service&quot;
+         facts-exch {:routing-key &quot;f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#&quot;}) =&gt; irrelevant
+(lc/subscribe :some-chan &quot;rabbit-microservices.core-test/my-other-service&quot; irrelevant {:auto-ack false}) =&gt; irrelevant)</code></pre></div><div><span id="publish-publish-an-event-from-the-outside"></span><h2><b>3 &nbsp;&nbsp; publish: Publish an Event from the Outside</b></h2></div><div><p><code>publish</code> is a service that allows its users to publish events from outside the context of a service. It depends on <code>amqp-service</code>.</p></div><div class="code"><pre><code class="clojure">(let [inj (di/injector {:amqp-service {:chan :some-chan}})]
  (module inj)
  (def publish (di/wait-for inj publish)))</code></pre></div><div class="code"><pre><code class="clojure">(publish ..ev..) =&gt; nil
  (provided
