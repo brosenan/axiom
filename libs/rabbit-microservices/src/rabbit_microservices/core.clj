@@ -76,8 +76,15 @@
       3 (func event publish ack)))
   nil)
 
+(defn func-name [func]
+  (->> func
+       str
+       clojure.repl/demunge
+       (re-find #"[^@]*")))
+
 (defn register-func [service func reg]
-  (let [q (lq/declare-server-named (:chan service))]
+  (let [q (func-name func)]
+    (lq/declare (:chan service) q)
     (lq/bind (:chan service) q facts-exch {:routing-key (event-routing-key reg)})
     (lc/subscribe (:chan service) q (partial handle-event func (:alive service)) {:auto-ack (< (arg-count func) 3)})
     nil))

@@ -30,24 +30,30 @@ It is provided a partial event, and calls the given function on any event that m
 "`serve` is a function that takes a service function and a partial event and does the following:
 1. Declares a queue, dedicated to this function.
 2. Binds this queue to the `facts` exchange, based on the routing key pattern provided by the `:reg` map.
-3. Subscribes to this queue using a function that wraps the given function."
+3. Subscribes to this queue using a function that wraps the given function.
+The name of the queue is derived from the name of the function.
+This allows load balancing, when different processes with the same micro-services are launched."
+(defn my-service [ev])
+(defn my-other-service [event publish ack]) 
 (fact
- (serve (fn [ev]) {:kind :fact
-                   :name "foo/bar"}) => nil
+ (serve my-service {:kind :fact
+                    :name "foo/bar"}) => nil
  (provided
-  (lq/declare-server-named :some-chan) => ..q..
-  (lq/bind :some-chan ..q.. facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
-  (lc/subscribe :some-chan ..q.. irrelevant {:auto-ack true}) => irrelevant))
+  (lq/declare :some-chan "rabbit-microservices.core-test/my-service") => irrelevant
+  (lq/bind :some-chan "rabbit-microservices.core-test/my-service"
+           facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
+  (lc/subscribe :some-chan "rabbit-microservices.core-test/my-service" irrelevant {:auto-ack true}) => irrelevant))
 
 "Auto acknowledgement is disabled when the provided function has three parameters.
 The third of which is expected to be bound to an explicit `ack` function."
 (fact
- (serve (fn [event publish ack]) {:kind :fact
-                                  :name "foo/bar"}) => nil
+ (serve my-other-service {:kind :fact
+                          :name "foo/bar"}) => nil
  (provided
-  (lq/declare-server-named :some-chan) => ..q..
-  (lq/bind :some-chan ..q.. facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
-  (lc/subscribe :some-chan ..q.. irrelevant {:auto-ack false}) => irrelevant))
+  (lq/declare :some-chan "rabbit-microservices.core-test/my-other-service") => irrelevant
+  (lq/bind :some-chan "rabbit-microservices.core-test/my-other-service"
+           facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
+  (lc/subscribe :some-chan "rabbit-microservices.core-test/my-other-service" irrelevant {:auto-ack false}) => irrelevant))
 
 [[:chapter {:title "publish: Publish an Event from the Outside"}]]
 "`publish` is a service that allows its users to publish events from outside the context of a service.
