@@ -89,17 +89,39 @@
     (lc/subscribe (:chan service) q (partial handle-event func (:alive service)) {:auto-ack (< (arg-count func) 3)})
     nil))
 
-(defn module [inj]
-  (di/provide amqp-service inj
-              (di/with-dependencies inj [amqp-config]
+(defn module [$]
+  (di/provide amqp-service $
+              (di/with-dependencies $ [amqp-config]
                 (binding [rmq/*default-config* amqp-config]
                   (create-service))))
 
-  (di/provide serve inj
-              (di/with-dependencies inj [amqp-service]
+  (di/provide serve $
+              (di/with-dependencies $ [declare-service
+                                       assign-service]
+                (fn [func reg]
+                  (let [key (func-name func)]
+                    (declare-service key reg)
+                    (assign-service key func))
+                  nil)))
+
+  (di/provide declare-service $
+              (di/with-dependencies $ [amqp-service]
+                (fn [key reg]
+                  (let [chan (:chan amqp-service)]
+                    (lq/declare chan key)
+                    (lq/bind chan key facts-exch {:routing-key (event-routing-key reg)}))
+                  nil)))
+
+  (di/provide assign-service $
+              (di/with-dependencies $ [amqp-service]
+                (fn [key func]
+                  (lc/subscribe (:chan amqp-service) key (partial handle-event func (:alive amqp-service)) {:auto-ack (< (arg-count func) 3)})
+                  nil)))
+  (di/provide serve' $
+              (di/with-dependencies $ [amqp-service]
                 (partial register-func amqp-service)))
 
-  (di/provide publish inj
-              (di/with-dependencies inj [amqp-service]
+  (di/provide publish $
+              (di/with-dependencies $ [amqp-service]
                 (partial publisher amqp-service))))
 

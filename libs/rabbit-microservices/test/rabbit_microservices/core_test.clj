@@ -20,42 +20,67 @@ It is provided a partial event, and calls the given function on any event that m
 "The event structure we refer to here is the one discussed in [cloudlog-events](cloudlog-events.html)."
 
 [[:chapter {:title "serve: Register an Event Handler" :tag "serve"}]]
-"`serve` is a [dependency-injection resource](di.html) which depends on an `amqp-service` resource (which itself depends on `amqp-config`)."
+"`serve` is a [dependency-injection resource](di.html) which depends on two functions:
+1. [declare-service](#declare-service), and
+2. [assign-service](#assign-service)"
+
+"We will consider the following service function for the examples below:"
+(defn my-service [ev])
+
+"It takes a service function and a partial event, and does the following:
+1. Based on the name of the function, it creates a queue name and calls `declare-service` to declare it.
+2. It then assigns the function to the service by calling `assign-service`."
+(fact
+ (let [calls (transient [])
+       $ (di/injector {:declare-service (fn [key reg] (conj! calls [:declare-service key reg]))
+                       :assign-service (fn [key func] (conj! calls [:assign-service key func]))})]
+   (module $)
+   (let [serve (di/wait-for $ serve)]
+     (serve my-service {:partial :event}) => nil
+     (persistent! calls) => [[:declare-service "rabbit-microservices.core-test/my-service" {:partial :event}]
+                             [:assign-service "rabbit-microservices.core-test/my-service" my-service]])))
+
+
+[[:chapter {:title "declare-service: Declare an AMQP Queue" :tag "declare-service"}]]
+"`declare-service` depends on an `amqp-service` resource (which itself depends on `amqp-config`)."
+(fact
+ (let [$ (di/injector {:amqp-service {:chan :some-chan}})]
+   (module $)
+   (def declare-service (di/wait-for $ declare-service))))
+
+"`declare-service` declares a queue and binds it to the `facts` exchange to receive events matching the given partial event."
+(fact
+ (declare-service "foobar" {:kind :fact
+                            :name "foo/bar"}) => nil
+ (provided
+  (lq/declare :some-chan "foobar") => irrelevant
+  (lq/bind :some-chan "foobar"
+           facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant))
+
+[[:chapter {:title "assign-service: Register an Event Handler" :tag "assign-service"}]]
+"`assign-service` depends on an `amqp-service`."
 (fact
  (let [inj (di/injector {:amqp-service {:chan :some-chan}})]
    (module inj)
-   (def serve (di/wait-for inj serve))))
+   (def assign-service (di/wait-for inj assign-service))))
 
 
-"`serve` is a function that takes a service function and a partial event and does the following:
-1. Declares a queue, dedicated to this function.
-2. Binds this queue to the `facts` exchange, based on the routing key pattern provided by the `:reg` map.
-3. Subscribes to this queue using a function that wraps the given function.
-The name of the queue is derived from the name of the function.
-This allows load balancing, when different processes with the same micro-services are launched."
-(defn my-service [ev])
-(defn my-other-service [event publish ack]) 
+"`assign-service` takes a key that was previously [declared](#declare-service) and a service function,
+and subscribes to this queue using a function that wraps the given function."
 (fact
- (serve my-service {:kind :fact
-                    :name "foo/bar"}) => nil
+ (assign-service "foobar" my-service) => nil
  (provided
-  (lq/declare :some-chan "rabbit-microservices.core-test/my-service") => irrelevant
-  (lq/bind :some-chan "rabbit-microservices.core-test/my-service"
-           facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
-  (lc/subscribe :some-chan "rabbit-microservices.core-test/my-service" irrelevant {:auto-ack true}) => irrelevant))
+  (lc/subscribe :some-chan "foobar" irrelevant {:auto-ack true}) => irrelevant))
 
 "Auto acknowledgement is disabled when the provided function has three parameters.
 The third of which is expected to be bound to an explicit `ack` function."
+(defn my-other-service [event publish ack]) 
 (fact
- (serve my-other-service {:kind :fact
-                          :name "foo/bar"}) => nil
+ (assign-service "foobar" my-other-service) => nil
  (provided
-  (lq/declare :some-chan "rabbit-microservices.core-test/my-other-service") => irrelevant
-  (lq/bind :some-chan "rabbit-microservices.core-test/my-other-service"
-           facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant
-  (lc/subscribe :some-chan "rabbit-microservices.core-test/my-other-service" irrelevant {:auto-ack false}) => irrelevant))
+  (lc/subscribe :some-chan "foobar" irrelevant {:auto-ack false}) => irrelevant))
 
-[[:chapter {:title "publish: Publish an Event from the Outside"}]]
+[[:chapter {:title "publish: Publish an Event from the Outside" :tag "publish"}]]
 "`publish` is a service that allows its users to publish events from outside the context of a service.
 It depends on `amqp-service`."
 (fact
