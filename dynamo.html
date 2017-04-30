@@ -166,12 +166,15 @@
  (database-event-storage (assoc my-event :name &quot;bar!&quot;)) =&gt; nil
  (provided
                                       ; No side effect
-)</code></pre></div><div><span id="store-fact"></span><h2><b>4 &nbsp;&nbsp; store-fact (service): Stores Fact Events</b></h2></div><div><p><code>store-fact</code> is a microservice function that subscribes to all fact events. It depends on the following resources:</p><ol><li><code>serve</code>: a function that registers it to certain events,</li><li><a href='#database-event-storage'>database-event-storage</a>.</li></ol></div><div><p>The service is merely a serving of <code>database-event-storage</code>, registered to all fact events. We will demonstrate it by mocking the <code>serve</code> function to push its parameters to a channel.</p></div><div class="code"><pre><code class="clojure">(let [params (async/chan)
-     $ (di/injector {:serve (fn [f r]
-                              (async/&gt;!! params [f r]))
+)</code></pre></div><div><span id="store-fact"></span><h2><b>4 &nbsp;&nbsp; store-fact (service): Stores Fact Events</b></h2></div><div><p><code>store-fact</code> is a microservice function that subscribes to all fact events. It depends on the following resources:</p><ol><li><code>declare-service</code>: a function that creates a queue and binds it to receive certain events</li><li><code>assign-service</code>: a function that registers it to certain events,</li><li><a href='#database-event-storage'>database-event-storage</a>.</li></ol></div><div><p>The service is merely a serving of <code>database-event-storage</code>, registered to all fact events. We will demonstrate it by mocking the <code>serve</code> function to push its parameters to a channel.</p></div><div class="code"><pre><code class="clojure">(let [calls (async/chan)
+     $ (di/injector {:declare-service (fn [key reg] (async/&gt;!! calls [:declare-service key reg]))
+                     :assign-service (fn [key func] (async/&gt;!! calls [:assign-service key func]))
                      :database-event-storage :the-storage-func})]
  (module $)
- (async/&lt;!! params) =&gt; [:the-storage-func {:kind :fact}])</code></pre></div><div><span id="database-event-storage-chan"></span><h2><b>5 &nbsp;&nbsp; database-event-storage-chan: A Channel for Storing Events in the Database</b></h2></div><div><p>While <a href='#store-fact#'>store-fact</a> allows us to store system-wide fact events to the database, we sometimes wish to store events events without publishing them system-wide. <code>database-event-storage-chan</code> is a <code>core.async</code> <em>channel</em> that allows storing of event into the database without publishing them system-wide.</p></div><div><p><code>database-event-storage-chan</code> depends on the following resources:</p><ol><li><a href='#database-event-storage'>database-event-storage</a></li><li><code>dynamodb-event-storage-num-threads</code>: The number of threads to be spawned for this task.</li></ol></div><div><p>In the following example we will demonstrate how it works by mocking <code>database-event-storage</code> to conj the given event to a sequence stored in an atom.</p></div><div class="code"><pre><code class="clojure">(def db (atom '()))
+ (async/alts!! [calls
+                (async/timeout 1000)]) =&gt; [[:declare-service &quot;database-event-storage&quot; {:kind :fact}] calls]
+ (async/alts!! [calls
+                (async/timeout 1000)]) =&gt; [[:assign-service &quot;database-event-storage&quot; :the-storage-func] calls])</code></pre></div><div><span id="database-event-storage-chan"></span><h2><b>5 &nbsp;&nbsp; database-event-storage-chan: A Channel for Storing Events in the Database</b></h2></div><div><p>While <a href='#store-fact#'>store-fact</a> allows us to store system-wide fact events to the database, we sometimes wish to store events events without publishing them system-wide. <code>database-event-storage-chan</code> is a <code>core.async</code> <em>channel</em> that allows storing of event into the database without publishing them system-wide.</p></div><div><p><code>database-event-storage-chan</code> depends on the following resources:</p><ol><li><a href='#database-event-storage'>database-event-storage</a></li><li><code>dynamodb-event-storage-num-threads</code>: The number of threads to be spawned for this task.</li></ol></div><div><p>In the following example we will demonstrate how it works by mocking <code>database-event-storage</code> to conj the given event to a sequence stored in an atom.</p></div><div class="code"><pre><code class="clojure">(def db (atom '()))
  (let [$ (di/injector {:database-event-storage (fn [ev]
                                                (swap! db #(conj % ev)))
                      :dynamodb-event-storage-num-threads 2})]
@@ -203,11 +206,19 @@
                      :name ..table..
                      :key 2
                      :ts 2000
-                     :data [2 3 4]}) =&gt; irrelevant)</code></pre></div><div><span id="usage-example"></span><h2><b>7 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>To see that this library can actually connect to DynamoDB we will use <code>store-fact</code> to create a few events in different tables, and then use <code>database-chan</code> to retrieve some of them.</p></div><div><p>We will use a <a href='http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html'>local DynamoDB</a> exposed on the local host on port 8006. Our configuration is as follows (we follow <a href='https://github.com/ptaoussanis/faraday#connecting'>these</a> instructions:</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
+                     :data [2 3 4]}) =&gt; irrelevant)</code></pre></div><div><span id="usage-example"></span><h2><b>7 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>To see that this library can actually connect to DynamoDB we will use the <code>store-fact</code> service to create a few events in different tables, and then use <code>database-chan</code> to retrieve some of them.</p></div><div><p>We will use a <a href='http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html'>local DynamoDB</a> exposed on the local host on port 8006. Our configuration is as follows (we follow <a href='https://github.com/ptaoussanis/faraday#connecting'>these</a> instructions:</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
  (def client-opts
  {:access-key &quot;FOO&quot;
   :secret-key &quot;BAR&quot;
-  :endpoint &quot;http://localhost:8006&quot;})</code></pre></div><div><p>Now let's create a bunch of events with different <code>:name</code>, <code>:key</code> and <code>:ts</code> values.</p></div><div class="code"><pre><code class="clojure">(def events
+  :endpoint &quot;http://localhost:8006&quot;})</code></pre></div><div><p>We will use a real <a href='rabbit-microservices.html'>rabbitmq microservice</a> to store the facts in the database. We will use <a href='di.html'>dependency injection</a> to initialize the needed services.</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
+ (let [$ (di/injector {:dynamodb-config client-opts
+                     :num-database-retriever-threads 1
+                     :dynamodb-default-throughput {:read 1 :write 1}
+                     :amqp-config langohr.core/*default-config*})]
+ (module $)
+ (rabbit-microservices.core/module $)
+ (def req-chan (di/wait-for $ database-chan))
+ (def publish (di/wait-for $ publish)))</code></pre></div><div><p>Now let's create a bunch of events with different <code>:name</code>, <code>:key</code> and <code>:ts</code> values.</p></div><div class="code"><pre><code class="clojure">(def events
   (for [name [&quot;foo/foo&quot; &quot;foo/bar&quot; &quot;bar/baz&quot;]
         key [&quot;x&quot; :y [&quot;z&quot;]]
         ts [1000 2000 3000]]
@@ -217,20 +228,10 @@
        :key key
        :ts ts
        :data data
-       :change 1})))</code></pre></div><div><p>Let's inject some dependencies to get <code>store-fact</code> and <code>database-chan</code>:</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
- (def store-fact (atom nil))
- (let [chan (async/chan)
-     $ (di/injector {:dynamodb-config client-opts
-                     :num-database-retriever-threads 1
-                     :dynamodb-default-throughput {:read 1 :write 1}
-                     :serve (fn [func reg]
-                              (reset! store-fact func)
-                              (async/close! chan))})]
- (module $)
- (def req-chan (di/wait-for $ database-chan))
- (async/&lt;!! chan))</code></pre></div><div><p>Now we use <code>store-fact</code> to store all these events.</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
+       :change 1})))</code></pre></div><div><p>We will <a href='rabbit-microservices.html#publish'>publish</a> each event to have the <a href='#store-fact'>store-fact service</a> store them to DynamoDB.</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
  (doseq [ev events]
- (@store-fact ev))</code></pre></div><div><p>Out of all the events we created, we are interested in the ones with <code>:name = foo/foo</code> and `:key = ["z"]</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
+ (publish ev))</code></pre></div><div><p>Let's wait to give all the events time to get stored.</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
+ (Thread/sleep 5000)</code></pre></div><div><p>Out of all the events we created, we are interested in the ones with <code>:name = foo/foo</code> and `:key = ["z"]</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
  (let [res-chan (async/chan 1000)]
  (async/&gt;!! req-chan [{:kind :fact
                        :name &quot;foo/foo&quot;
@@ -262,7 +263,7 @@
                                            res-chan]
  (async/alts!! [res-chan
                 (async/timeout 1000)]) =&gt; [nil
-                                           res-chan])</code></pre></div><div><p>We shut down the service by closing the request channel, and then waiting for the retriever thread to complete by reading from it.</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
+                                           res-chan])</code></pre></div><div><p>We shut down the service by closing the request channel.</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
  (async/close! req-chan)</code></pre></div><div><span id="under-the-hood"></span><h2><b>8 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="table-kw"></span><h3>8.1 &nbsp;&nbsp; table-kw</h3></div><div><p>The <code>taoensso.faraday</code> library we use uses keywords to convey names of tables and fields. In axiom, table names (the <code>:name</code> field of an event) originate from keywords, but they may contain characters that do not conform to <a href='http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.NamingRulesDataTypes.html'>DynamoDB's naming policy</a>, and in addition, the names used by axiom are fully qualified, and <code>faraday</code> only takes the <code>name</code>.</p></div><div><p>To overcome this, the function <code>table-kw</code> converts the <code>:name</code> attribute of an event to a <code>faraday</code>-compatible keyword.</p></div><div><p>By default, it simply converts a string to a keyword.</p></div><div class="code"><pre><code class="clojure">(table-kw &quot;foo&quot;) =&gt; :foo</code></pre></div><div><p>If the name contains a '/' it is converted to a '.', so that applying <code>name</code> to it will retain the prefix.</p></div><div class="code"><pre><code class="clojure">(name (table-kw &quot;foo/bar&quot;)) =&gt; &quot;foo.bar&quot;</code></pre></div><div><p>Other illegal characters are converted to an underscore ('_').</p></div><div class="code"><pre><code class="clojure">(table-kw &quot;?,:!@#$%^&amp;*-()&quot;) =&gt; :___________-__</code></pre></div><div><span id="database-tables"></span><h3>8.2 &nbsp;&nbsp; database-tables</h3></div><div><p><code>database-tables</code> is an atom containing a set of table keywords currently in the database. It depends on:</p><ol><li><code>dynamodb-config</code>: the database credentials, and</li><li><code>dynamodb-get-tables</code>: a function to get the list of tables.The latter is intended for testing and is provided by this module to be <code>far/list-tables</code>.</li></ol></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:dynamodb-config :config
                      :dynamodb-get-tables (fn [config]
                                             [config :foo :bar])})]
