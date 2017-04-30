@@ -53,10 +53,13 @@
               (di/with-dependencies $ [dynamodb-config]
                 (partial retriever dynamodb-config)))
   (async/go
-    (di/with-dependencies $ [serve
+    (di/with-dependencies $ [declare-service
+                             assign-service
                              database-event-storage]
-      (serve database-event-storage
-             {:kind :fact})))
+      (declare-service "database-event-storage"
+                       {:kind :fact})
+      (assign-service "database-event-storage"
+                      database-event-storage)))
 
   (di/provide dynamodb-get-tables $
               far/list-tables)

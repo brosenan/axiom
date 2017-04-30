@@ -4,7 +4,9 @@
             [clojure.core.async :as async]
             [taoensso.faraday :as far]
             [taoensso.nippy :as nippy]
-            [di.core :as di]))
+            [di.core :as di]
+            [langohr.core]
+            [rabbit-microservices.core]))
 
 
 [[:chapter {:title "database-chan: A Channel for Database Queries" :tag "database-chan"}]]
@@ -166,18 +168,22 @@ and the request channel.  Once called, it will perform the following:
 [[:chapter {:title "store-fact (service): Stores Fact Events" :tag "store-fact"}]]
 "`store-fact` is a microservice function that subscribes to all fact events.
 It depends on the following resources:
-1. `serve`: a function that registers it to certain events,
-2. [database-event-storage](#database-event-storage)."
+1. `declare-service`: a function that creates a queue and binds it to receive certain events
+2. `assign-service`: a function that registers it to certain events,
+3. [database-event-storage](#database-event-storage)."
 
 "The service is merely a serving of `database-event-storage`, registered to all fact events.
 We will demonstrate it by mocking the `serve` function to push its parameters to a channel."
 (fact
- (let [params (async/chan)
-       $ (di/injector {:serve (fn [f r]
-                                (async/>!! params [f r]))
+ (let [calls (async/chan)
+       $ (di/injector {:declare-service (fn [key reg] (async/>!! calls [:declare-service key reg]))
+                       :assign-service (fn [key func] (async/>!! calls [:assign-service key func]))
                        :database-event-storage :the-storage-func})]
    (module $)
-   (async/<!! params) => [:the-storage-func {:kind :fact}]))
+   (async/alts!! [calls
+                  (async/timeout 1000)]) => [[:declare-service "database-event-storage" {:kind :fact}] calls]
+   (async/alts!! [calls
+                  (async/timeout 1000)]) => [[:assign-service "database-event-storage" :the-storage-func] calls]))
 
 [[:chapter {:title "database-event-storage-chan: A Channel for Storing Events in the Database" :tag "database-event-storage-chan"}]]
 "While [store-fact](#store-fact#) allows us to store system-wide fact events to the database,
@@ -249,7 +255,7 @@ It is blocking, and is therefore assumed to be working from within its own threa
                        :data [2 3 4]}) => irrelevant))
 
 [[:chapter {:title "Usage Example"}]]
-"To see that this library can actually connect to DynamoDB we will use `store-fact` to create a few events in different
+"To see that this library can actually connect to DynamoDB we will use the `store-fact` service to create a few events in different
 tables, and then use `database-chan` to retrieve some of them."
 
 "We will use a [local DynamoDB](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html) exposed on the local host on port 8006.
@@ -260,6 +266,19 @@ Our configuration is as follows (we follow [these](https://github.com/ptaoussani
    {:access-key "FOO"
     :secret-key "BAR"
     :endpoint "http://localhost:8006"}))
+
+"We will use a real [rabbitmq microservice](rabbit-microservices.html) to store the facts in the database.
+We will use [dependency injection](di.html) to initialize the needed services."
+(fact
+ :integ ; Does not run on usual CI testing
+ (let [$ (di/injector {:dynamodb-config client-opts
+                       :num-database-retriever-threads 1
+                       :dynamodb-default-throughput {:read 1 :write 1}
+                       :amqp-config langohr.core/*default-config*})]
+   (module $)
+   (rabbit-microservices.core/module $)
+   (def req-chan (di/wait-for $ database-chan))
+   (def publish (di/wait-for $ publish))))
 
 "Now let's create a bunch of events with different `:name`, `:key` and `:ts` values."
 (def events
@@ -274,26 +293,16 @@ Our configuration is as follows (we follow [these](https://github.com/ptaoussani
        :data data
        :change 1})))
 
-"Let's inject some dependencies to get `store-fact` and `database-chan`:"
-(fact
- :integ ; Does not run on usual CI testing
- (def store-fact (atom nil))
- (let [chan (async/chan)
-       $ (di/injector {:dynamodb-config client-opts
-                       :num-database-retriever-threads 1
-                       :dynamodb-default-throughput {:read 1 :write 1}
-                       :serve (fn [func reg]
-                                (reset! store-fact func)
-                                (async/close! chan))})]
-   (module $)
-   (def req-chan (di/wait-for $ database-chan))
-   (async/<!! chan)))
-
-"Now we use `store-fact` to store all these events."
+"We will [publish](rabbit-microservices.html#publish) each event to have the [store-fact service](#store-fact) store them to DynamoDB."
 (fact
  :integ ; Does not run on usual CI testing
  (doseq [ev events]
-   (@store-fact ev)))
+   (publish ev)))
+
+"Let's wait to give all the events time to get stored."
+(fact
+ :integ ; Does not run on usual CI testing
+ (Thread/sleep 5000))
 
 "Out of all the events we created, we are interested in the ones with `:name = foo/foo` and `:key = [\"z\"]"
 (fact
@@ -331,8 +340,7 @@ Our configuration is as follows (we follow [these](https://github.com/ptaoussani
                   (async/timeout 1000)]) => [nil
                                              res-chan]))
 
-"We shut down the service by closing the request channel, and then waiting for the
-retriever thread to complete by reading from it."
+"We shut down the service by closing the request channel."
 (fact
  :integ ; Does not run on usual CI testing
  (async/close! req-chan))

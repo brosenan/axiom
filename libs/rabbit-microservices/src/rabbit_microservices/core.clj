@@ -82,13 +82,6 @@
        clojure.repl/demunge
        (re-find #"[^@]*")))
 
-(defn register-func [service func reg]
-  (let [q (func-name func)]
-    (lq/declare (:chan service) q)
-    (lq/bind (:chan service) q facts-exch {:routing-key (event-routing-key reg)})
-    (lc/subscribe (:chan service) q (partial handle-event func (:alive service)) {:auto-ack (< (arg-count func) 3)})
-    nil))
-
 (defn module [$]
   (di/provide amqp-service $
               (di/with-dependencies $ [amqp-config]
@@ -117,9 +110,6 @@
                 (fn [key func]
                   (lc/subscribe (:chan amqp-service) key (partial handle-event func (:alive amqp-service)) {:auto-ack (< (arg-count func) 3)})
                   nil)))
-  (di/provide serve' $
-              (di/with-dependencies $ [amqp-service]
-                (partial register-func amqp-service)))
 
   (di/provide publish $
               (di/with-dependencies $ [amqp-service]

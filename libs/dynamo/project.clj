@@ -6,7 +6,9 @@
                  [com.taoensso/nippy "2.13.0"]
                  [rabbit-microservices "0.0.1-SNAPSHOT"]
                  [org.clojure/core.async "0.3.442"]]
-  :profiles {:dev {:dependencies [[midje "1.7.0"]]}
+  :profiles {:dev {:dependencies [[midje "1.7.0"]
+                                  [com.novemberain/langohr "3.6.1"]
+                                  [rabbit-microservices "0.0.1-SNAPSHOT"]]}
              :midje {}})
 
   
