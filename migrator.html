@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 30 April 2017</h5>
+              <h5>Date: 02 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -99,22 +99,25 @@
 (..pub.. {:name &quot;axiom/rule&quot;
           :key 'perm.1234ABC/foo}) =&gt; irrelevant
 (..pub.. {:name &quot;axiom/rule&quot;
-          :key 'perm.1234ABC/bar}) =&gt; irrelevant)</code></pre></div><div><span id="rule-tracker"></span><h2><b>3 &nbsp;&nbsp; rule-tracker</b></h2></div><div><p><code>rule-tracker</code> registers to <code>:axiom/rule</code> and tracks the quantity of each rule by summing the <code>:change</code> <a href='cloudlog-events.html#introduction'>field of the event</a>.</p></div><div><p>It depends on the resources <a href='#zookeeper-counter-add'>zookeeper-counter-add</a> and <code>serve</code>, which we will mock.</p></div><div class="code"><pre><code class="clojure">(def mock-counters (transient {&quot;/rules/perm.1234ABC.foo&quot; 2}))
- (let [serve-params (async/chan)
-     $ (di/injector {:zookeeper-counter-add (fn [path change]
+          :key 'perm.1234ABC/bar}) =&gt; irrelevant)</code></pre></div><div><span id="rule-tracker"></span><h2><b>3 &nbsp;&nbsp; rule-tracker</b></h2></div><div><p><code>rule-tracker</code> registers to <code>:axiom/rule</code> and tracks the quantity of each rule by summing the <code>:change</code> <a href='cloudlog-events.html#introduction'>field of the event</a>.</p></div><div><p>It depends on the resources <a href='#zookeeper-counter-add'>zookeeper-counter-add</a> <code>declare-service</code> and <code>assign-service</code>, which we will mock.</p></div><div class="code"><pre><code class="clojure">(def mock-counters (transient {&quot;/rules/perm.1234ABC.foo&quot; 2}))
+ (def calls (async/chan))
+ (let [$ (di/injector {:zookeeper-counter-add (fn [path change]
                                               (let [old (mock-counters path 0)
                                                     new (+ old change)]
                                                 (assoc! mock-counters path new)
                                                 new))
-                     :serve (fn [func reg]
-                              (when (= reg {:kind :fact
-                                            :name &quot;axiom/rule&quot;})
-                                (async/&gt;!! serve-params func)))})]
+                     :declare-service (fn [key reg] (async/&gt;!! calls [:declare-service key reg]))
+                     :assign-service (fn [key func] (async/&gt;!! calls [:assign-service key func]))})]
  (module $)
- (let [[func chan] (async/alts!! [serve-params
+ (let [[call chan] (async/alts!! [calls
                                   (async/timeout 1000)])]
-   chan =&gt; serve-params
-   (def rule-tracker func)))</code></pre></div><div><p>The <code>rule-tracker</code> service function is given an <code>:axiom/rule</code> event and a <code>publish</code> function.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
+   chan =&gt; calls
+   call =&gt; [:declare-service &quot;migrator.core/rule-tracker&quot; {:kind :fact
+                                                           :name &quot;axiom/rule&quot;}]))</code></pre></div><div><p>The function <code>rule-tracker</code> is the second argument given to <code>assign-service</code>.</p></div><div class="code"><pre><code class="clojure">(let [[call chan] (async/alts!! [calls
+                                (async/timeout 1000)])]
+ chan =&gt; calls
+ (take 2 call) =&gt; [:assign-service &quot;migrator.core/rule-tracker&quot;]
+ (def rule-tracker (call 2)))</code></pre></div><div><p>The <code>rule-tracker</code> service function is given an <code>:axiom/rule</code> event and a <code>publish</code> function.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
               :name &quot;axiom/rule&quot;
               :key 'perm.1234ABC/foo
               :change 3} (fn publish [ev]
