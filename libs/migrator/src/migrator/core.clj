@@ -43,24 +43,27 @@
                                :key (symbol (:key ev) (str k))})))))
 
              {:kind :fact
-              :name "axiom/version"}))
-    (di/with-dependencies $ [serve zookeeper-counter-add]
-      (serve (fn rule-tracker
-               [ev publish]
-               (let [path (str "/rules/" (str/replace (:key ev) \/ \.))
-                     new (zookeeper-counter-add path (:change ev))]
-                 (when (and (= new (:change ev))
-                            (> new 0))
-                       (publish {:kind :fact
-                                 :name "axiom/rule-exists"
-                                 :key (:key ev)
-                                 :change 1}))
-                 (when (and (= new 0)
-                            (< (:change ev) 0))
-                       (publish {:kind :fact
-                                 :name "axiom/rule-exists"
-                                 :key (:key ev)
-                                 :change -1}))
-                 nil))
-             {:kind :fact
-              :name "axiom/rule"}))))
+              :name "axiom/version"})))
+  (async/go
+    (di/with-dependencies $ [zookeeper-counter-add
+                             declare-service
+                             assign-service]
+      (declare-service "migrator.core/rule-tracker" {:kind :fact :name "axiom/rule"})
+      (assign-service "migrator.core/rule-tracker"
+                      (fn rule-tracker
+                        [ev publish]
+                        (let [path (str "/rules/" (str/replace (:key ev) \/ \.))
+                              new (zookeeper-counter-add path (:change ev))]
+                          (when (and (= new (:change ev))
+                                     (> new 0))
+                            (publish {:kind :fact
+                                      :name "axiom/rule-exists"
+                                      :key (:key ev)
+                                      :change 1}))
+                          (when (and (= new 0)
+                                     (< (:change ev) 0))
+                            (publish {:kind :fact
+                                      :name "axiom/rule-exists"
+                                      :key (:key ev)
+                                      :change -1}))
+                          nil))))))

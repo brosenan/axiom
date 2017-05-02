@@ -58,24 +58,31 @@ corresponding `:axiom/rule` events."
 [[:chapter {:title "rule-tracker"}]]
 "`rule-tracker` registers to `:axiom/rule` and tracks the quantity of each rule by summing the `:change` [field of the event](cloudlog-events.html#introduction)."
 
-"It depends on the resources [zookeeper-counter-add](#zookeeper-counter-add) and `serve`, which we will mock."
+"It depends on the resources [zookeeper-counter-add](#zookeeper-counter-add) `declare-service` and `assign-service`, which we will mock."
 (fact
  (def mock-counters (transient {"/rules/perm.1234ABC.foo" 2}))
- (let [serve-params (async/chan)
-       $ (di/injector {:zookeeper-counter-add (fn [path change]
+ (def calls (async/chan))
+ (let [$ (di/injector {:zookeeper-counter-add (fn [path change]
                                                 (let [old (mock-counters path 0)
                                                       new (+ old change)]
                                                   (assoc! mock-counters path new)
                                                   new))
-                       :serve (fn [func reg]
-                                (when (= reg {:kind :fact
-                                              :name "axiom/rule"})
-                                  (async/>!! serve-params func)))})]
+                       :declare-service (fn [key reg] (async/>!! calls [:declare-service key reg]))
+                       :assign-service (fn [key func] (async/>!! calls [:assign-service key func]))})]
    (module $)
-   (let [[func chan] (async/alts!! [serve-params
+   (let [[call chan] (async/alts!! [calls
                                     (async/timeout 1000)])]
-     chan => serve-params
-     (def rule-tracker func))))
+     chan => calls
+     call => [:declare-service "migrator.core/rule-tracker" {:kind :fact
+                                                             :name "axiom/rule"}])))
+
+"The function `rule-tracker` is the second argument given to `assign-service`."
+(fact
+ (let [[call chan] (async/alts!! [calls
+                                  (async/timeout 1000)])]
+   chan => calls
+   (take 2 call) => [:assign-service "migrator.core/rule-tracker"]
+   (def rule-tracker (call 2))))
 
 "The `rule-tracker` service function is given an `:axiom/rule` event and a `publish` function."
 (fact
