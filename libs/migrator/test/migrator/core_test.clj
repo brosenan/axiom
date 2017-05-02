@@ -188,3 +188,30 @@ This is to account for the possibility of concurrent update."
   (zkp/get-clj-data :zk "/rules/foobar") =streams=> [2 3 4]
   (zkp/to-bytes irrelevant) => irrelevant
   (zk/set-data :zk "/rules/foobar" irrelevant irrelevant) =throws=> (Exception. "boo")))
+
+[[:section {:title "fact-declarer"}]]
+"`fact-declarer` is used to declare the service that will accept events related to a certain fact.
+We call it before we start migration based on that fact so that new events related to this fact that come
+during the migration process are accumulated in the queue.
+Once the migration is done, [functions assigned to it](rabbit-microservices.html#assign-service) will receive
+these events as well as new ones, so there will not be any data loss."
+
+"`fact-declarer` is a generator function that takes the name of the rule and the link number (as a unique identifier)
+and the name of the fact to be declared."
+(fact
+ (def decl-my-fact (fact-declarer "my-rule" 2 "my-fact")))
+
+"The returned fact declarer is intended to be used in a [zk-plan](zk-plan.html), as a [task](zk-plan.html#add-task) function.
+As such, it needs to accept one or more arguments.
+It ignores all but the first one, which is an injector (`$`) passed to it directly by `zk-plan`."
+
+"The injector must be able to resolve the resource `declare-service` (e.g., [the one implemented for RabbitMQ](rabbit-microservices.html#declare-service)).
+We will mock it here."
+(fact
+ (let [calls (async/chan 10)
+       $ (di/injector {:declare-service (fn [key reg] (async/>!! calls [:declare-service key reg]))})]
+   (decl-my-fact $ :some :args :that :are :ignored)
+   ;; Assert the calls
+   (async/alts!! [calls
+                  (async/timeout 1000)]) => [[:declare-service "fact-for-rule/my-rule!2" {:kind :fact
+                                                                                          :name "my-fact"}] calls]))

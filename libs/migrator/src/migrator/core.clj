@@ -6,6 +6,12 @@
             [zk-plan.core :as zkp]
             [clojure.string :as str]))
 
+(defn fact-declarer [rule link fact]
+  (fn [$ & args]
+    (di/with-dependencies!! $ [declare-service]
+      (declare-service (str "fact-for-rule/" rule "!" link) {:kind :fact
+                                                             :name fact}))))
+
 (defn module [$]
   (di/provide zookeeper-counter-add $
               (di/with-dependencies $ [zookeeper]
