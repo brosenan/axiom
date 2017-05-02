@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>5.2 &nbsp; fact-declarer</i></h5></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,7 +80,7 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>5.2 &nbsp; fact-declarer</i></h5></a></li>
                 </ul>
               </nav>
           </div>
@@ -173,7 +173,13 @@
                                              :version 9}]
 (zkp/get-clj-data :zk &quot;/rules/foobar&quot;) =streams=&gt; [2 3 4]
 (zkp/to-bytes irrelevant) =&gt; irrelevant
-(zk/set-data :zk &quot;/rules/foobar&quot; irrelevant irrelevant) =throws=&gt; (Exception. &quot;boo&quot;))</code></pre></div>
+(zk/set-data :zk &quot;/rules/foobar&quot; irrelevant irrelevant) =throws=&gt; (Exception. &quot;boo&quot;))</code></pre></div><div><span id="fact-declarer"></span><h3>5.2 &nbsp;&nbsp; fact-declarer</h3></div><div><p><code>fact-declarer</code> is used to declare the service that will accept events related to a certain fact. We call it before we start migration based on that fact so that new events related to this fact that come during the migration process are accumulated in the queue. Once the migration is done, <a href='rabbit-microservices.html#assign-service'>functions assigned to it</a> will receive these events as well as new ones, so there will not be any data loss.</p></div><div><p><code>fact-declarer</code> is a generator function that takes the name of the rule and the link number (as a unique identifier) and the name of the fact to be declared.</p></div><div class="code"><pre><code class="clojure">(def decl-my-fact (fact-declarer &quot;my-rule&quot; 2 &quot;my-fact&quot;))</code></pre></div><div><p>The returned fact declarer is intended to be used in a <a href='zk-plan.html'>zk-plan</a>, as a <a href='zk-plan.html#add-task'>task</a> function. As such, it needs to accept one or more arguments. It ignores all but the first one, which is an injector (<code>$</code>) passed to it directly by <code>zk-plan</code>.</p></div><div><p>The injector must be able to resolve the resource <code>declare-service</code> (e.g., <a href='rabbit-microservices.html#declare-service'>the one implemented for RabbitMQ</a>). We will mock it here.</p></div><div class="code"><pre><code class="clojure">(let [calls (async/chan 10)
+     $ (di/injector {:declare-service (fn [key reg] (async/&gt;!! calls [:declare-service key reg]))})]
+ (decl-my-fact $ :some :args :that :are :ignored)
+ ;; Assert the calls
+ (async/alts!! [calls
+                (async/timeout 1000)]) =&gt; [[:declare-service &quot;fact-for-rule/my-rule!2&quot; {:kind :fact
+                                                                                        :name &quot;my-fact&quot;}] calls])</code></pre></div>
         </div>
       </div>
     </div>
