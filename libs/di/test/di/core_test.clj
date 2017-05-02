@@ -157,6 +157,20 @@ However, it can be much simpler to just assert on the value of `bar` using a blo
 (fact
  (wait-for inj bar) => 2)
 
+[[:chapter {:title "with-dependencies!!"}]]
+"Sometimes it using a `go` block is inapplicable in places where dependencies are needed.
+One example is if we implement a callback function that depends on dependencies, and the callback
+is expected to return after having calculated what it needs to.
+For such cases, `with-dependencies!!` acts similarly to `with-dependencies`, only that
+it delays the current thread until the value is calculated, and thus it does not have to be called from within a `go` block."
+(fact
+ (def inj (injector))
+ (provide foo inj
+          (async/<! (async/timeout 1))
+          1)
+ (with-dependencies!! inj [foo]
+   (+ foo 2)) => 3)
+
 [[:chapter {:title "Best Practices"}]]
 "In our opinion, the best way to write modules that use the `di` library for dependency injection is to
 wrap all the code that interacts with the injector (i.e., all code that provides and/or depends on resources) in a single function,

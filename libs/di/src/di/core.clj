@@ -46,3 +46,9 @@
                  (with-dependencies ~inj [~key]
                    ~key)))
      (async/<!! ~'$chan)))
+
+(defmacro with-dependencies!! [inj deps & exprs]
+  `(let [~'$chan (async/chan)]
+     (async/go
+       (async/>!! ~'$chan (with-dependencies ~inj ~deps ~@exprs)))
+     (async/<!! ~'$chan)))
