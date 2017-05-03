@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 02 May 2017</h5>
+              <h5>Date: 03 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>5.2 &nbsp; fact-declarer</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>5.2 &nbsp; fact-declarer</i></h5></a><a class="section" data-scroll="" href="#initial-migrator"><h5><i>5.3 &nbsp; initial-migrator</i></h5></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,11 +80,13 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>5.2 &nbsp; fact-declarer</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>5.2 &nbsp; fact-declarer</i></h5></a><a class="section" data-scroll="" href="#initial-migrator"><h5><i>5.3 &nbsp; initial-migrator</i></h5></a></li>
                 </ul>
               </nav>
           </div>
-          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>migrator</code> is a microservice that listens to events describing new rules being published, and initiates data migration using <a href='zk-plan.html'>zk-plan</a>.</p></div><div><p>Consider for example the <code>timeline</code> clause in our <a href='cloudlog.html#joins'>cloudlog documentation</a>. If we introduce this rule when <code>:test/follows</code> and <code>:test/tweeted</code> facts already exist, a migration process is necessary to do the following:</p><ol><li>Create timeline entries for all the tweets that already have followers.</li><li>Create intermediate data so that new followers will receive existing tweets in their timelines.</li><li>Create intermediate data so that new tweets will be added to the timelines of existing followers.</li></ol></div><div><p>To allow this to happen, we need to go through all the <code>:test/follows</code> facts first and create intermediate rule tuples based on them. Then we need to go through all the <code>:test/tweeted</code> facts and match them against the tuples we generated in the previous step to know to which timelines each tweet needs to go.</p></div><div><p>Going through all the existing facts with a certain name can be a lengthy process. To speed things up we do the following:</p><ul><li>We use <a href='zk-plan.html'>zk-plan</a> to distribute this work across multiple workers.</li><li>We <a href='dynamo.html#database-scanner'>scan the facts</a> in the database in shards, to allow different computer nodes to process different pieces of data in parallel.</li></ul></div><div><span id="extract-version-rules"></span><h2><b>2 &nbsp;&nbsp; extract-version-rules</b></h2></div><div><p><code>extract-version-rules</code> is a service function which registers to <code>:axiom/version</code> events. As such it depends on the <code>serve</code> function we will mock in order to get hold of the function itself and the registration it is making.</p></div><div class="code"><pre><code class="clojure">(let [reg (async/chan)
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>migrator</code> is a microservice that listens to events describing new rules being published, and initiates data migration using <a href='zk-plan.html'>zk-plan</a>.</p></div><div><p>Consider for example the <code>timeline</code> clause originally introduced in our <a href='cloudlog.html#joins'>cloudlog documentation</a>.</p></div><div class="code"><pre><code class="clojure">(clg/defrule timeline [user tweet]
+  [:test/follows user author] (clg/by-anyone)
+  [:test/tweeted author tweet] (clg/by-anyone))</code></pre></div><div><p>If we introduce this rule when <code>:test/follows</code> and <code>:test/tweeted</code> facts already exist, a migration process is necessary to do the following:</p><ol><li>Create timeline entries for all the tweets that already have followers.</li><li>Create intermediate data so that new followers will receive existing tweets in their timelines.</li><li>Create intermediate data so that new tweets will be added to the timelines of existing followers.</li></ol></div><div><p>To allow this to happen, we need to go through all the <code>:test/follows</code> facts first and create intermediate rule tuples based on them. Then we need to go through all the <code>:test/tweeted</code> facts and match them against the tuples we generated in the previous step to know to which timelines each tweet needs to go.</p></div><div><p>Going through all the existing facts with a certain name can be a lengthy process. To speed things up we do the following:</p><ul><li>We use <a href='zk-plan.html'>zk-plan</a> to distribute this work across multiple workers.</li><li>We <a href='dynamo.html#database-scanner'>scan the facts</a> in the database in shards, to allow different computer nodes to process different pieces of data in parallel.</li></ul></div><div><span id="extract-version-rules"></span><h2><b>2 &nbsp;&nbsp; extract-version-rules</b></h2></div><div><p><code>extract-version-rules</code> is a service function which registers to <code>:axiom/version</code> events. As such it depends on the <code>serve</code> function we will mock in order to get hold of the function itself and the registration it is making.</p></div><div class="code"><pre><code class="clojure">(let [reg (async/chan)
      $ (di/injector {:serve (fn [f r]
                               (async/&gt;!! reg [f r]))})]
  (module $)
@@ -179,7 +181,43 @@
  ;; Assert the calls
  (async/alts!! [calls
                 (async/timeout 1000)]) =&gt; [[:declare-service &quot;fact-for-rule/my-rule!2&quot; {:kind :fact
-                                                                                        :name &quot;my-fact&quot;}] calls])</code></pre></div>
+                                                                                        :name &quot;my-fact&quot;}] calls])</code></pre></div><div><span id="initial-migrator"></span><h3>5.3 &nbsp;&nbsp; initial-migrator</h3></div><div><p><code>initial-migrator</code> creates a migration function for link 0 of a rule. Link 0 is special in that it only depends on a fact, creates rule tuples based on fact tuples. Other links also depend on previous rule tuples.</p></div><div><p><code>initial-migrator</code> takes the name of a rule, the name of its source fact and the rule's writer-set as well as a shard number and the total number of shards being used. It returns a closure (function) that operates from within a <a href='zk-plan.html'>zk-plan</a>.</p></div><div class="code"><pre><code class="clojure">(def my-migrator (initial-migrator &quot;perm.ABC/my-rule&quot; &quot;test/follows&quot; #{:some-writer} 2 6))</code></pre></div><div><p>The migration process requires a <code>database-scanner</code> (e.g., <a href='dynamo.html#database-scanner'>this</a>) to scan given shard of the given table (fact). We mock this function by providing <code>:test/follows</code> facts for Alice, who follows Bob, Charlie and Dave. </p></div><div class="code"><pre><code class="clojure">(defn mock-scanner [name shard shards chan]
+  (when-not (= [name shard shards] [&quot;test/follows&quot; 2 6])
+    (throw (Exception. (str &quot;Unexpected args in mock-scanner: &quot; [name shard shards]))))
+  (doseq [followee [&quot;bob&quot; &quot;charlie&quot; &quot;dave&quot;]]
+    (async/&gt;!! chan {:kind :fact
+                     :name name
+                     :key &quot;alice&quot;
+                     :data [followee]
+                     :change 1}))
+  (async/close! chan))</code></pre></div><div><p>To store the resulting tuples it depends on a <code>database-event-storage-chan</code> (e.g., <a href='dynamo.html#database-event-storage-chan'>this</a>), a channel to which all generated events need to be sent.</p></div><div class="code"><pre><code class="clojure">(def rule-tuple-chan (async/chan 10))</code></pre></div><div><p>As a <code>zk-plan</code> task function, the first argument of the returned closure (<code>my-migrator</code> in our case), is expected to be an injector (<code>$</code>), and all other arguments should be ignored. Once called, it will use <a href='permacode.html#eval-symbol'>permacode.core/eval-symbol</a> to get the rule function. It will evaluate this function on each result comming from the <code>database-scanner</code>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-scanner mock-scanner
+                     :database-event-storage-chan rule-tuple-chan})]
+ (my-migrator $ :ignored) =&gt; nil
+ (provided
+  (perm/eval-symbol 'perm.ABC/my-rule) =&gt; timeline))</code></pre></div><div><p>The migrator function should push to <code>database-event-storage-chan</code> rule events. In our case, these should be one per each fact.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [rule-tuple-chan
+              (async/timeout 1000)]) =&gt; [{:change 1
+                                          :data [&quot;alice&quot; &quot;bob&quot;]
+                                          :key &quot;bob&quot;
+                                          :kind :rule
+                                          :name &quot;migrator.core-test/timeline!0&quot;
+                                          :readers nil
+                                          :writers #{:some-writer}} rule-tuple-chan]
+(async/alts!! [rule-tuple-chan
+              (async/timeout 1000)]) =&gt; [{:change 1
+                                          :data [&quot;alice&quot; &quot;charlie&quot;]
+                                          :key &quot;charlie&quot;
+                                          :kind :rule
+                                          :name &quot;migrator.core-test/timeline!0&quot;
+                                          :readers nil
+                                          :writers #{:some-writer}} rule-tuple-chan]
+  (async/alts!! [rule-tuple-chan
+              (async/timeout 1000)]) =&gt; [{:change 1
+                                          :data [&quot;alice&quot; &quot;dave&quot;]
+                                          :key &quot;dave&quot;
+                                          :kind :rule
+                                          :name &quot;migrator.core-test/timeline!0&quot;
+                                          :readers nil
+                                          :writers #{:some-writer}} rule-tuple-chan]</code></pre></div>
         </div>
       </div>
     </div>

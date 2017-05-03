@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 02 May 2017</h5>
+              <h5>Date: 03 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -206,7 +206,7 @@
                      :name ..table..
                      :key 2
                      :ts 2000
-                     :data [2 3 4]}) =&gt; irrelevant)</code></pre></div><div><span id="usage-example"></span><h2><b>7 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>To see that this library can actually connect to DynamoDB we will use the <code>store-fact</code> service to create a few events in different tables, and then use <code>database-chan</code> to retrieve some of them.</p></div><div><p>We will use a <a href='http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html'>local DynamoDB</a> exposed on the local host on port 8006. Our configuration is as follows (we follow <a href='https://github.com/ptaoussanis/faraday#connecting'>these</a> instructions:</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
+                     :data [2 3 4]}) =&gt; irrelevant)</code></pre></div><div><p><strong>TODO:</strong> Close the channel.</p></div><div><span id="usage-example"></span><h2><b>7 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>To see that this library can actually connect to DynamoDB we will use the <code>store-fact</code> service to create a few events in different tables, and then use <code>database-chan</code> to retrieve some of them.</p></div><div><p>We will use a <a href='http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html'>local DynamoDB</a> exposed on the local host on port 8006. Our configuration is as follows (we follow <a href='https://github.com/ptaoussanis/faraday#connecting'>these</a> instructions:</p></div><div class="code"><pre><code class="clojure">:integ ; Does not run on usual CI testing
  (def client-opts
  {:access-key &quot;FOO&quot;
   :secret-key &quot;BAR&quot;
