@@ -64,6 +64,7 @@
 
 (defn execute-function [zk node $]
   (let [func (get-clj-data zk node)
+        _ (println "executing function: " func)
         func' (eval func)
         vals (->> (zk/children zk node)
                   (filter #(re-matches #"arg-\d+" %))

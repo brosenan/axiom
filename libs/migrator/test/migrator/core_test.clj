@@ -9,7 +9,8 @@
             [cloudlog.core :as clg]
             [rabbit-microservices.core :as rms]
             [zk-plan.core :as zkp]
-            [dynamo.core :as dyn]))
+            [dynamo.core :as dyn]
+            [zookeeper :as zk]))
 
 [[:chapter {:title "Introduction"}]]
 "`migrator` is a microservice that listens to events describing new rules being published,
@@ -58,10 +59,12 @@ corresponding `:axiom/rule` events."
   (perm/module-publics 'perm.1234ABC) => {'foo (with-meta (fn []) {:source-fact ["foo" 1]})
                                           'bar (with-meta (fn []) {:source-fact ["bar" 1]})
                                           'baz (fn [])} ; baz will not be published
-  (..pub.. {:name "axiom/rule"
+  (..pub.. {:kind :fact
+            :name "axiom/rule"
             :key 'perm.1234ABC/foo
             :data []}) => irrelevant
-  (..pub.. {:name "axiom/rule"
+  (..pub.. {:kind :fact
+            :name "axiom/rule"
             :key 'perm.1234ABC/bar
             :data []}) => irrelevant))
 
@@ -201,15 +204,15 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
   (perm/eval-symbol 'perm.1234ABC/timeline) => timeline)
  (persistent! calls)
  => [[:create-plan "/my-plans"]
-     [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 0) []] ;; => 1
-     [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 0 3) [1]] ;; => 2
-     [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 1 3) [1]] ;; => 3
-     [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 2 3) [1]] ;; => 4
-     [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 1) [2 3 4]] ;; => 5
-     [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 0 3) [5]] ;; => 6
-     [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 1 3) [5]] ;; => 7
-     [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 2 3) [5]] ;; => 8
-     [:add-task :plan-node `(migration-end-notifier perm.1234ABC/timeline #{:some-writers}) [6 7 8]] ;; => 9
+     [:add-task :plan-node `(fact-declarer 'perm.1234ABC/timeline 0) []] ;; => 1
+     [:add-task :plan-node `(initial-migrator 'perm.1234ABC/timeline #{:some-writers} 0 3) [1]] ;; => 2
+     [:add-task :plan-node `(initial-migrator 'perm.1234ABC/timeline #{:some-writers} 1 3) [1]] ;; => 3
+     [:add-task :plan-node `(initial-migrator 'perm.1234ABC/timeline #{:some-writers} 2 3) [1]] ;; => 4
+     [:add-task :plan-node `(fact-declarer 'perm.1234ABC/timeline 1) [2 3 4]] ;; => 5
+     [:add-task :plan-node `(link-migrator 'perm.1234ABC/timeline 1 #{:some-writers} 0 3) [5]] ;; => 6
+     [:add-task :plan-node `(link-migrator 'perm.1234ABC/timeline 1 #{:some-writers} 1 3) [5]] ;; => 7
+     [:add-task :plan-node `(link-migrator 'perm.1234ABC/timeline 1 #{:some-writers} 2 3) [5]] ;; => 8
+     [:add-task :plan-node `(migration-end-notifier 'perm.1234ABC/timeline #{:some-writers}) [6 7 8]] ;; => 9
      [:mark-as-ready :plan-node]])
 
 [[:chapter {:title "Usage Example"}]]
@@ -219,19 +222,22 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
 (def config
   {:zookeeper-config {:url "127.0.0.1:2181"}
    :zk-plan-config {:num-threads 3
-                    :parent "/migrations"}
+                    :parent "/my-plans"}
    :dynamodb-config {:access-key "FOO"
                      :secret-key "BAR"
                      :endpoint "http://localhost:8006"}
    :num-database-retriever-threads 1
    :dynamodb-default-throughput {:read 1 :write 1}
+   :dynamodb-event-storage-num-threads 3
    :amqp-config {:username "guest"
                  :password "guest"
                  :vhost "/"
                  :host "localhost"
-                 :port 5672}})
+                 :port 5672}
+   :migration-config {:number-of-shards 3
+                      :plan-prefix "/my-plans"}})
 
-"Now create an injector based on the config, and inject dependencies to the migrator and its dependencies."
+"We now create an injector based on the config, and inject dependencies to the migrator and its dependencies."
 (fact
  :integ
  (def $ (di/injector config))
@@ -239,6 +245,17 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
  (rms/module $)
  (zkp/module $)
  (dyn/module $))
+
+"Let's create the root elements we need in Zookeeper"
+(fact
+ :integ
+ (di/with-dependencies!! $ [zookeeper]
+   (when (zk/exists zookeeper "/rules")
+     (zk/delete-all zookeeper "/rules"))
+   (zk/create zookeeper "/rules" :persistent? true)
+   (when (zk/exists zookeeper "/my-plans")
+     (zk/delete-all zookeeper "/my-plans"))
+   (zk/create zookeeper "/my-plans" :persistent? true)))
 
 "The next step would be to generate test data.
 We will start with tweets:"
@@ -287,11 +304,46 @@ We will start with tweets:"
 The following service function listens to such events and for the rule `followee-tweets` it closes a channel to indicate it is done."
 (fact
  :integ
- (def done (async/chan)))
+ (def done (async/chan))
+ (di/with-dependencies!! $ [serve]
+   (serve (fn [ev]
+            (when (= (name (:key ev)) "followee-tweets")
+              (async/close! done)))
+          {:kind :fact
+           :name "axiom/rule-ready"})
+   :not-nil))
 
-"Now we are ready for the migration.
-All we need to do is publish a version "
+"To kick the migration, we need to publish an `axiom/version` event with a version of the example application."
+(comment (fact
+          :integ
+          (di/with-dependencies!! $ [publish]
+            (publish {:kind :fact
+                      :name "axiom/version"
+                      :key "perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt"
+                      :data []
+                      :ts 1000
+                      :change 1
+                      :writers #{:my-app}
+                      :readers #{}})
+            :not-nil)))
 
+(fact
+ :integ
+ (di/with-dependencies!! $ [publish]
+   (publish {:kind :fact
+             :name "axiom/rule"
+             :key 'perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt/followee-tweets
+             :data []
+             :ts 1000
+             :change 1
+             :writers #{:my-app}
+             :readers #{}})
+   :not-nil))
+
+"So now we wait for the migration to complete"
+(fact
+ :integ
+ (async/<!! done))
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "zookeeper-counter-add"}]]
 "`zookeeper-counter-add` depends on the `zookeeper` resource as dependency, and uses it to implement a global atomic counter."

@@ -143,8 +143,7 @@
           content (unhasher hash)
           [ns' name & clauses] (first content)]
       (validate content white-listed-ns)
-      (try
-        (in-ns module)
+      (binding [*ns* (create-ns module)]
         (refer-clojure :only (vec (set/union core-white-list top-level-symbols)))
         (doseq [[req' & specs] clauses
                 spec specs]
@@ -152,9 +151,7 @@
             (apply perm-require spec)
             ; else
             (require (vec spec))))
-        (eval (cons 'do (rest content)))
-        (finally
-          (in-ns old-ns)))))
+        (eval (cons 'do (rest content))))))
   (when-not (nil? as)
     (alias as module)))
 

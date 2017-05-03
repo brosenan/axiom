@@ -13,7 +13,8 @@
     (di/with-dependencies!! $ [declare-service]
       (let [rulefunc (perm/eval-symbol rule)]
         (declare-service (str "fact-for-rule/" rule "!" link) {:kind :fact
-                                                               :name (clg/fact-table (-> rulefunc meta :source-fact))})))
+                                                               :name (clg/fact-table (-> rulefunc meta :source-fact))}))
+      :not-nil)
     nil))
 
 (defn initial-migrator [rule writers shard shards]
@@ -103,7 +104,8 @@
                (let [pubs (perm/module-publics (symbol (:key ev)))]
                  (doseq [[k v] pubs]
                    (when (-> v meta :source-fact)
-                     (publish {:name "axiom/rule"
+                     (publish {:kind :fact
+                               :name "axiom/rule"
                                :key (symbol (:key ev) (str k))
                                :data []})))))
 
@@ -153,15 +155,15 @@
                                  link 0
                                  deps []]
                             (cond (nil? rulefunc)
-                                  (add-task plan `(migration-end-notifier ~rule ~writers) deps)
+                                  (add-task plan `(migration-end-notifier '~rule ~writers) deps)
                                   :else
-                                  (let [singleton-task (add-task plan `(fact-declarer ~rule ~link) deps)
+                                  (let [singleton-task (add-task plan `(fact-declarer '~rule ~link) deps)
                                         tasks (for [shard (range shards)]
                                                 (add-task plan
                                                           (cond (= link 0)
-                                                                `(initial-migrator ~rule ~writers ~shard ~shards)
+                                                                `(initial-migrator '~rule ~writers ~shard ~shards)
                                                                 :else
-                                                                `(link-migrator ~rule ~link ~writers ~shard ~shards))
+                                                                `(link-migrator '~rule ~link ~writers ~shard ~shards))
                                                           [singleton-task]))]
                                     (recur (-> rulefunc meta :continuation) (inc link) (doall tasks)))))
                           (mark-as-ready plan))

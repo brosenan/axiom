@@ -70,6 +70,7 @@
                   (when @alive
                     (lb/publish chan facts-exch (event-routing-key ev) (nippy/freeze (merge event ev)) meta-attrs)))
         ack (fn [] (my-ack chan (:delivery-tag meta-attrs)))]
+    (println "handling: " event " by: " (clojure.repl/demunge (str func)))
     (case (arg-count func)
       1 (func event)
       2 (func event publish)

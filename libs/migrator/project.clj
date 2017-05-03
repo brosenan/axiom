@@ -1,7 +1,7 @@
 (defproject migrator "0.0.1-SNAPSHOT"
   :description "Cool new project to do things and stuff"
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [permacode "0.1.1-SNAPSHOT"]
+                 [permacode "MONOLITH-SNAPSHOT"]
                  [zookeeper-clj "0.9.4"]
                  [zk-plan "0.0.1-SNAPSHOT"]
                  [cloudlog-events "0.1.0-SNAPSHOT"]]
