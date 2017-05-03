@@ -7,7 +7,7 @@
                  [cloudlog-events "0.1.0-SNAPSHOT"]]
   :monolith/inherit true
   :profiles {:dev {:dependencies [[midje "1.7.0"]
-                                  [cloudlog "0.1.0-SNAPSHOT"]]}
+                                  [cloudlog "MONOLOTH-SNAPSHOT"]]}
              :midje {}})
 
   

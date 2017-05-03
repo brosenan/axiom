@@ -209,6 +209,9 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
      [:add-task :plan-node `(migration-end-notifier perm.1234ABC/timeline #{:some-writers}) [6 7 8]] ;; => 9
      [:mark-as-ready :plan-node]])
 
+[[:chapter {:title "Usage Example"}]]
+"In this example we will migrate the rules provided in the associated example"
+
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "zookeeper-counter-add"}]]
 "`zookeeper-counter-add` depends on the `zookeeper` resource as dependency, and uses it to implement a global atomic counter."
