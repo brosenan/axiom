@@ -531,6 +531,13 @@ This should be done lazily, so that additional plans must not be queried."
   (zk/exists ..zk.. "/foo/task-2345/ready") => {:some-key "value"}
   (get-task ..zk.. "/foo/task-2345") => ..task..))
 
+
+"If the parent does not exist, `nil` should be returned."
+(fact
+ (get-task-from-any-plan ..zk.. "/foo") => nil
+ (provided
+  (zk/children ..zk.. "/foo") => false))
+
 [[:section {:title "calc-sleep-time"}]]
 "
 **Parameters:**

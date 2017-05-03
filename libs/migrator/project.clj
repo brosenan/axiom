@@ -8,7 +8,10 @@
   :monolith/inherit true
   :profiles {:dev {:dependencies [[midje "1.7.0"]
                                   [cloudlog "MONOLITH-SNAPSHOT"]
-                                  [examples "MONOLITH-SNAPSHOT"]]}
+                                  [examples "MONOLITH-SNAPSHOT"]
+                                  [zk-plan "0.0.1-SNAPSHOT"]
+                                  [rabbit-microservices "0.0.1-SNAPSHOT"]
+                                  [dynamo "0.0.1-SNAPSHOT"]]}
              :midje {}})
 
   

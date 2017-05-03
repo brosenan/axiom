@@ -98,12 +98,12 @@
   (zk/delete-all zk task))
 
 (defn get-task-from-any-plan [zk parent]
-  (let [plans (->> (zk/children zk parent)
-                   (map #(str parent "/" %)))
-        ready-plans (filter (fn [plan] (zk/exists zk (str plan "/ready"))) plans)
-        tasks (map #(get-task zk %) ready-plans)]
-    (some identity tasks)
-))
+  (let [plans (zk/children zk parent)]
+    (when plans
+      (let [plans (map (partial str parent "/") plans)
+            ready-plans (filter (fn [plan] (zk/exists zk (str plan "/ready"))) plans)
+            tasks (map (partial get-task zk) ready-plans)]
+        (some identity tasks)))))
 
 (defn calc-sleep-time [attrs count]
   (let [max (:max attrs 10000)]
@@ -111,10 +111,10 @@
            i 0]
       (if (> val max)
         max
-                                        ; else
+        ;; else
         (if (< i count)
           (recur (* val (:increase attrs 1.5)) (inc i))
-                                        ; else
+          ;; else
           (int val))))))
 
 (defn ^:private worker [zk parent attrs $]

@@ -6,7 +6,10 @@
             [clojure.core.async :as async]
             [zk-plan.core :as zkp]
             [zookeeper :as zk]
-            [cloudlog.core :as clg]))
+            [cloudlog.core :as clg]
+            [rabbit-microservices.core :as rms]
+            [zk-plan.core :as zkp]
+            [dynamo.core :as dyn]))
 
 [[:chapter {:title "Introduction"}]]
 "`migrator` is a microservice that listens to events describing new rules being published,
@@ -214,10 +217,80 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
 
 "First, we need to provide configuration to connect to Zookeeper, RabbitMQ and DynamoDB (local)."
 (def config
-  {:zookeeper-config {:url "localhost:2128"}
-   :dynamodb-config    {:access-key "FOO"
-                        :secret-key "BAR"
-                        :endpoint "http://localhost:8006"}})
+  {:zookeeper-config {:url "127.0.0.1:2181"}
+   :zk-plan-config {:num-threads 3
+                    :parent "/migrations"}
+   :dynamodb-config {:access-key "FOO"
+                     :secret-key "BAR"
+                     :endpoint "http://localhost:8006"}
+   :num-database-retriever-threads 1
+   :dynamodb-default-throughput {:read 1 :write 1}
+   :amqp-config {:username "guest"
+                 :password "guest"
+                 :vhost "/"
+                 :host "localhost"
+                 :port 5672}})
+
+"Now create an injector based on the config, and inject dependencies to the migrator and its dependencies."
+(fact
+ :integ
+ (def $ (di/injector config))
+ (module $)
+ (rms/module $)
+ (zkp/module $)
+ (dyn/module $))
+
+"The next step would be to generate test data.
+We will start with tweets:"
+(fact
+ :integ
+ (def users ["alice" "bob" "charlie"])
+ (def time (atom 1000))
+ (di/with-dependencies!! $ [publish]
+   (doseq [greeting ["hello" "hi" "howdy"]
+           greeted ["world" "clojure" "axiom"]
+           user users]
+     (publish {:kind :fact
+               :name "test/tweeted"
+               :key user
+               :data [(str greeting " " greeted " from " user)]
+               :ts @time
+               :change 1
+               :writers #{[:user= user]}
+               :readers #{}})
+     (swap! time inc))
+   :not-nil))
+
+"Now let's create a full-factorial following matrix (everyone follows everyone else."
+(fact
+ :integ
+ (di/with-dependencies!! $ [publish]
+   (doseq [u1 users
+           u2 users]
+     (publish {:kind :fact
+               :name "test/follows"
+               :key u1
+               :data [u2]
+               :ts @time
+               :change 1
+               :writers #{[:user= u1]}
+               :readers #{}})
+     (swap! time inc))
+   :not-nil))
+
+"Let's give the microservices a few seconds to store all the facts."
+(fact
+ :integ
+ (Thread/sleep 5000))
+
+"To know when our migration is complete we need to listen to `axiom/rule-ready` events.
+The following service function listens to such events and for the rule `followee-tweets` it closes a channel to indicate it is done."
+(fact
+ :integ
+ (def done (async/chan)))
+
+"Now we are ready for the migration.
+All we need to do is publish a version "
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "zookeeper-counter-add"}]]
