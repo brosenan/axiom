@@ -196,16 +196,18 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
                 :change 1}) => nil
  (provided
   (perm/eval-symbol 'perm.1234ABC/timeline) => timeline)
- (persistent! calls) => [[:create-plan "/my-plans"]
-                         [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 0) []] ;; => 1
-                         [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 0 3) [1]] ;; => 2
-                         [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 1 3) [1]] ;; => 3
-                         [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 2 3) [1]] ;; => 4
-                         [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 1) [2 3 4]] ;; => 5
-                         [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 0 3) [5]] ;; => 6
-                         [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 1 3) [5]] ;; => 7
-                         [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 2 3) [5]] ;; => 8
-                         ])
+ (persistent! calls)
+ => [[:create-plan "/my-plans"]
+     [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 0) []] ;; => 1
+     [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 0 3) [1]] ;; => 2
+     [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 1 3) [1]] ;; => 3
+     [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 2 3) [1]] ;; => 4
+     [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 1) [2 3 4]] ;; => 5
+     [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 0 3) [5]] ;; => 6
+     [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 1 3) [5]] ;; => 7
+     [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 2 3) [5]] ;; => 8
+     [:add-task :plan-node `(migration-end-notifier perm.1234ABC/timeline #{:some-writers}) [6 7 8]] ;; => 9
+     [:mark-as-ready :plan-node]])
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "zookeeper-counter-add"}]]
@@ -397,25 +399,26 @@ These events are similar to the ones we got from the [initial-migrator](#initial
  (async/go
    (loop []
      (let [[query out-chan] (async/<! mock-db-chan)]
-       ;; The query is for rule tuples of link 0
-       (when-not (= (:name query) "migrator.core-test/timeline!0")
-         (throw (Exception. (str "Wrong fact in query: " (:name query)))))
-       (async/>! out-chan {:change 1
-                           :data ["alice" (:key query)]
-                           :key (:key query)
-                           :kind :rule
-                           :name "migrator.core-test/timeline!0"
-                           :readers nil
-                           :writers #{:some-writer}})
-       (async/>! out-chan {:change 1
-                           :data ["eve" (:key query)]
-                           :key (:key query)
-                           :kind :rule
-                           :name "migrator.core-test/timeline!0"
-                           :readers nil
-                           :writers #{:some-writer}})
-       (async/close! out-chan))
-     (recur))))
+       (when-not (nil? query)
+         ;; The query is for rule tuples of link 0
+         (when-not (= (:name query) "migrator.core-test/timeline!0")
+           (throw (Exception. (str "Wrong fact in query: " (:name query)))))
+         (async/>! out-chan {:change 1
+                             :data ["alice" (:key query)]
+                             :key (:key query)
+                             :kind :rule
+                             :name "migrator.core-test/timeline!0"
+                             :readers nil
+                             :writers #{:some-writer}})
+         (async/>! out-chan {:change 1
+                             :data ["eve" (:key query)]
+                             :key (:key query)
+                             :kind :rule
+                             :name "migrator.core-test/timeline!0"
+                             :readers nil
+                             :writers #{:some-writer}})
+         (async/close! out-chan)
+         (recur))))))
 
 "Once more, we will need a `database-event-storage-chan` (e.g., [this](dynamo.html#database-event-storage-chan))
 to store the events we get."
@@ -485,3 +488,34 @@ are pushed to the `database-event-storage-chan`."
                                             :change 1
                                             :readers nil
                                             :writers #{:some-writer}} mock-store-chan])
+
+"For good citizenship, let's close the mock `database-chan` and allow the service we started shut down."
+(fact
+ (async/close! mock-db-chan))
+
+[[:section {:title "migration-end-notifier"}]]
+"[rule-migrator](#rule-migrator) finishes when a plan is created and is ready to be executed.
+However, the actual migration operation only starts at that point.
+We therefore need a way to tell other parts of *axiom* that the rule has been migrated,
+once migration is complete.
+For this purpose, the plan will include a final piece: `migration-end-notifier`, which
+will [publish](rabbit-microservices.html#publish) a `axiom/rule-ready` event holding the
+rule identifier as its `:key`."
+(fact
+ (def my-end-notifier (migration-end-notifier 'perm.ABC123/my-rule #{:some-writer})))
+
+"The returned closure (`my-end-notifier`) takes an injector and any number of other parameters.
+From the injector it takes the `publish` resource to publish the desired event."
+(fact
+ (def events (transient []))
+ (let [$ (di/injector {:publish (fn [ev] (conj! events ev))})]
+   (my-end-notifier $ :some :other :params)))
+
+"Once called it should `publish` an `axiom/rule-ready` event."
+(fact
+ (persistent! events) => [{:kind :fact
+                           :name "axiom/rule-ready"
+                           :key 'perm.ABC123/my-rule
+                           :data []
+                           :change 1
+                           :writers #{:some-writer}}])

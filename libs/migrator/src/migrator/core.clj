@@ -59,6 +59,17 @@
 
     nil))
 
+(defn migration-end-notifier [rule writers]
+  (fn [$ & args]
+    (di/with-dependencies!! $ [publish]
+      (publish {:kind :fact
+                :name "axiom/rule-ready"
+                :key rule
+                :data []
+                :change 1
+                :writers writers})
+      :not-nil)))
+
 (defn module [$]
   (di/provide zookeeper-counter-add $
               (di/with-dependencies $ [zookeeper]
@@ -141,14 +152,17 @@
                           (loop [rulefunc rulefunc
                                  link 0
                                  deps []]
-                            (when-not (nil? rulefunc)
-                              (let [singleton-task (add-task plan `(fact-declarer ~rule ~link) deps)
-                                    tasks (for [shard (range shards)]
-                                            (add-task plan
-                                                      (cond (= link 0)
-                                                            `(initial-migrator ~rule ~writers ~shard ~shards)
-                                                            :else
-                                                            `(link-migrator ~rule ~link ~writers ~shard ~shards))
-                                                      [singleton-task]))]
-                                (recur (-> rulefunc meta :continuation) (inc link) (doall tasks))))))
+                            (cond (nil? rulefunc)
+                                  (add-task plan `(migration-end-notifier ~rule ~writers) deps)
+                                  :else
+                                  (let [singleton-task (add-task plan `(fact-declarer ~rule ~link) deps)
+                                        tasks (for [shard (range shards)]
+                                                (add-task plan
+                                                          (cond (= link 0)
+                                                                `(initial-migrator ~rule ~writers ~shard ~shards)
+                                                                :else
+                                                                `(link-migrator ~rule ~link ~writers ~shard ~shards))
+                                                          [singleton-task]))]
+                                    (recur (-> rulefunc meta :continuation) (inc link) (doall tasks)))))
+                          (mark-as-ready plan))
                         nil)))))
