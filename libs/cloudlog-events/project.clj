@@ -6,7 +6,7 @@
   :monolith/inherit true
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/core.async "0.2.395"]
-                 [cloudlog "0.1.0-SNAPSHOT"]]
+                 [cloudlog "MONOLITH-SNAPSHOT"]]
   :profiles {:dev {:dependencies [[midje "1.8.3"]
                                   [im.chit/lucid.publish "1.2.8"]
                                   [im.chit/hara.string.prose "2.4.8"]]

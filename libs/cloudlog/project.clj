@@ -1,4 +1,4 @@
-(defproject cloudlog "0.1.0-SNAPSHOT"
+(defproject cloudlog "MONOLITH-SNAPSHOT"
   :description "FIXME: write description"
   :url "http://example.combolton/FIXME"
   :license {:name "Eclipse Public License"

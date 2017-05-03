@@ -15,12 +15,11 @@
             "autotest" ["midje" ":autotest" ":filter" "-integ"]
             "integ" ["midje" ":filter" "integ"]
             "einteg" ["monolith" "each" "integ"]
-            "epub" ["with-profile" "+perm" "monolith" "each" "permacode" "publish"]}
+            "epub" ["monolith" "each" "permacode" "publish"]}
   :monolith {:project-dirs ["libs/*"]
              :inherit [:aliases :plugins]}
   :profiles {:dev {:dependencies [[im.chit/lucid.publish "1.2.8"]
-                                  [im.chit/hara.string.prose "2.4.8"]]}
-             :perm {:plugins [[permacode "MONOLITH-SNAPSHOT"]]}}
+                                  [im.chit/hara.string.prose "2.4.8"]]}}
   :publish {:theme  "bolton"
             :template {:site   "axiom"
                        :author "Boaz Rosenan"
