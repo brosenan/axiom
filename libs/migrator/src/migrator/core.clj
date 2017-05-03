@@ -4,13 +4,32 @@
             [clojure.core.async :as async]
             [zookeeper :as zk]
             [zk-plan.core :as zkp]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [cloudlog-events.core :as ev]))
 
 (defn fact-declarer [rule link fact]
   (fn [$ & args]
     (di/with-dependencies!! $ [declare-service]
       (declare-service (str "fact-for-rule/" rule "!" link) {:kind :fact
                                                              :name fact}))))
+
+(defn initial-migrator [rule fact writers shard shards]
+  (fn [$ & args]
+    (di/with-dependencies!! $ [database-scanner
+                               database-event-storage-chan]
+      (let [rule (perm/eval-symbol (read-string rule))
+            em (ev/emitter rule writers)
+            inp (async/chan 10)]
+        (database-scanner fact shard shards inp)
+        (loop []
+          (let [ev (async/<! inp)]
+            (when-not (nil? ev)
+              (let [out (em ev)]
+                (doseq [ev out]
+                  (async/>! database-event-storage-chan ev)))
+              (recur)))))
+      :not-nil)
+    nil))
 
 (defn module [$]
   (di/provide zookeeper-counter-add $

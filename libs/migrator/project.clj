@@ -3,9 +3,11 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [permacode "0.1.1-SNAPSHOT"]
                  [zookeeper-clj "0.9.4"]
-                 [zk-plan "0.0.1-SNAPSHOT"]]
+                 [zk-plan "0.0.1-SNAPSHOT"]
+                 [cloudlog-events "0.1.0-SNAPSHOT"]]
   :monolith/inherit true
-  :profiles {:dev {:dependencies [[midje "1.7.0"]]}
+  :profiles {:dev {:dependencies [[midje "1.7.0"]
+                                  [cloudlog "0.1.0-SNAPSHOT"]]}
              :midje {}})
 
   

@@ -254,6 +254,8 @@ It is blocking, and is therefore assumed to be working from within its own threa
                        :ts 2000
                        :data [2 3 4]}) => irrelevant))
 
+"**TODO:** Close the channel."
+
 [[:chapter {:title "Usage Example"}]]
 "To see that this library can actually connect to DynamoDB we will use the `store-fact` service to create a few events in different
 tables, and then use `database-chan` to retrieve some of them."

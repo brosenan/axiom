@@ -5,14 +5,19 @@
             [di.core :as di]
             [clojure.core.async :as async]
             [zk-plan.core :as zkp]
-            [zookeeper :as zk]))
+            [zookeeper :as zk]
+            [cloudlog.core :as clg]))
 
 [[:chapter {:title "Introduction"}]]
 "`migrator` is a microservice that listens to events describing new rules being published,
 and initiates data migration using [zk-plan](zk-plan.html)."
 
-"Consider for example the `timeline` clause in our [cloudlog documentation](cloudlog.html#joins).
-If we introduce this rule when `:test/follows` and `:test/tweeted` facts already exist, a migration process is necessary to do the following:
+"Consider for example the `timeline` clause originally introduced in our [cloudlog documentation](cloudlog.html#joins)."
+(clg/defrule timeline [user tweet]
+  [:test/follows user author] (clg/by-anyone)
+  [:test/tweeted author tweet] (clg/by-anyone))
+
+"If we introduce this rule when `:test/follows` and `:test/tweeted` facts already exist, a migration process is necessary to do the following:
 1. Create timeline entries for all the tweets that already have followers.
 2. Create intermediate data so that new followers will receive existing tweets in their timelines.
 3. Create intermediate data so that new tweets will be added to the timelines of existing followers."
@@ -215,3 +220,69 @@ We will mock it here."
    (async/alts!! [calls
                   (async/timeout 1000)]) => [[:declare-service "fact-for-rule/my-rule!2" {:kind :fact
                                                                                           :name "my-fact"}] calls]))
+
+[[:section {:title "initial-migrator"}]]
+"`initial-migrator` creates a migration function for link 0 of a rule.
+Link 0 is special in that it only depends on a fact, creates rule tuples based on fact tuples.
+Other links also depend on previous rule tuples."
+
+"`initial-migrator` takes the name of a rule, the name of its source fact and the rule's writer-set
+as well as a shard number and the total number of shards being used.
+It returns a closure (function) that operates from within a [zk-plan](zk-plan.html)."
+(def my-migrator (initial-migrator "perm.ABC/my-rule" "test/follows" #{:some-writer} 2 6))
+
+"The migration process requires a `database-scanner` (e.g., [this](dynamo.html#database-scanner)) to scan given shard of the given table (fact).
+We mock this function by providing `:test/follows` facts for Alice, who follows Bob, Charlie and Dave. "
+(defn mock-scanner [name shard shards chan]
+  (when-not (= [name shard shards] ["test/follows" 2 6])
+    (throw (Exception. (str "Unexpected args in mock-scanner: " [name shard shards]))))
+  (doseq [followee ["bob" "charlie" "dave"]]
+    (async/>!! chan {:kind :fact
+                     :name name
+                     :key "alice"
+                     :data [followee]
+                     :change 1}))
+  (async/close! chan))
+
+"To store the resulting tuples it depends on a `database-event-storage-chan` (e.g., [this](dynamo.html#database-event-storage-chan)),
+a channel to which all generated events need to be sent."
+(def rule-tuple-chan (async/chan 10))
+
+"As a `zk-plan` task function, the first argument of the returned closure (`my-migrator` in our case), is expected to be an injector (`$`),
+and all other arguments should be ignored.
+Once called, it will use [permacode.core/eval-symbol](permacode.html#eval-symbol) to get the rule function.
+It will evaluate this function on each result comming from the `database-scanner`."
+(fact
+ (let [$ (di/injector {:database-scanner mock-scanner
+                       :database-event-storage-chan rule-tuple-chan})]
+   (my-migrator $ :ignored) => nil
+   (provided
+    (perm/eval-symbol 'perm.ABC/my-rule) => timeline)))
+
+"The migrator function should push to `database-event-storage-chan` rule events.
+In our case, these should be one per each fact."
+(fact
+ (async/alts!! [rule-tuple-chan
+                (async/timeout 1000)]) => [{:change 1
+                                            :data ["alice" "bob"]
+                                            :key "bob"
+                                            :kind :rule
+                                            :name "migrator.core-test/timeline!0"
+                                            :readers nil
+                                            :writers #{:some-writer}} rule-tuple-chan]
+  (async/alts!! [rule-tuple-chan
+                (async/timeout 1000)]) => [{:change 1
+                                            :data ["alice" "charlie"]
+                                            :key "charlie"
+                                            :kind :rule
+                                            :name "migrator.core-test/timeline!0"
+                                            :readers nil
+                                            :writers #{:some-writer}} rule-tuple-chan]
+    (async/alts!! [rule-tuple-chan
+                (async/timeout 1000)]) => [{:change 1
+                                            :data ["alice" "dave"]
+                                            :key "dave"
+                                            :kind :rule
+                                            :name "migrator.core-test/timeline!0"
+                                            :readers nil
+                                            :writers #{:some-writer}} rule-tuple-chan])
