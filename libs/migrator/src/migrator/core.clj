@@ -8,11 +8,13 @@
             [cloudlog-events.core :as ev]
             [cloudlog.core :as clg]))
 
-(defn fact-declarer [rule link fact]
+(defn fact-declarer [rule link]
   (fn [$ & args]
     (di/with-dependencies!! $ [declare-service]
-      (declare-service (str "fact-for-rule/" rule "!" link) {:kind :fact
-                                                             :name fact}))))
+      (let [rulefunc (perm/eval-symbol rule)]
+        (declare-service (str "fact-for-rule/" rule "!" link) {:kind :fact
+                                                               :name (clg/fact-table (-> rulefunc meta :source-fact))})))
+    nil))
 
 (defn initial-migrator [rule writers shard shards]
   (fn [$ & args]
@@ -91,7 +93,8 @@
                  (doseq [[k v] pubs]
                    (when (-> v meta :source-fact)
                      (publish {:name "axiom/rule"
-                               :key (symbol (:key ev) (str k))})))))
+                               :key (symbol (:key ev) (str k))
+                               :data []})))))
 
              {:kind :fact
               :name "axiom/version"})))
@@ -110,11 +113,42 @@
                             (publish {:kind :fact
                                       :name "axiom/rule-exists"
                                       :key (:key ev)
+                                      :data []
                                       :change 1}))
                           (when (and (= new 0)
                                      (< (:change ev) 0))
                             (publish {:kind :fact
                                       :name "axiom/rule-exists"
                                       :key (:key ev)
+                                      :data []
                                       :change -1}))
-                          nil))))))
+                          nil)))))
+  (async/go
+    (di/with-dependencies $ [zk-plan
+                             declare-service
+                             assign-service
+                             migration-config]
+      (declare-service "migrator.core/rule-migrator" {:kind :fact
+                                                      :name "axiom/rule-exists"})
+      (assign-service "migrator.core/rule-migrator"
+                      (fn [ev]
+                        (let [rule (:key ev)
+                              rulefunc (perm/eval-symbol rule)
+                              shards (:number-of-shards migration-config)
+                              {:keys [create-plan add-task mark-as-ready]} zk-plan
+                              writers (:writers ev)
+                              plan (create-plan (:plan-prefix migration-config))]
+                          (loop [rulefunc rulefunc
+                                 link 0
+                                 deps []]
+                            (when-not (nil? rulefunc)
+                              (let [singleton-task (add-task plan `(fact-declarer ~rule ~link) deps)
+                                    tasks (for [shard (range shards)]
+                                            (add-task plan
+                                                      (cond (= link 0)
+                                                            `(initial-migrator ~rule ~writers ~shard ~shards)
+                                                            :else
+                                                            `(link-migrator ~rule ~link ~writers ~shard ~shards))
+                                                      [singleton-task]))]
+                                (recur (-> rulefunc meta :continuation) (inc link) (doall tasks))))))
+                        nil)))))

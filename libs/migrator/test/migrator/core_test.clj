@@ -56,9 +56,11 @@ corresponding `:axiom/rule` events."
                                           'bar (with-meta (fn []) {:source-fact ["bar" 1]})
                                           'baz (fn [])} ; baz will not be published
   (..pub.. {:name "axiom/rule"
-            :key 'perm.1234ABC/foo}) => irrelevant
+            :key 'perm.1234ABC/foo
+            :data []}) => irrelevant
   (..pub.. {:name "axiom/rule"
-            :key 'perm.1234ABC/bar}) => irrelevant))
+            :key 'perm.1234ABC/bar
+            :data []}) => irrelevant))
 
 [[:chapter {:title "rule-tracker"}]]
 "`rule-tracker` registers to `:axiom/rule` and tracks the quantity of each rule by summing the `:change` [field of the event](cloudlog-events.html#introduction)."
@@ -94,6 +96,7 @@ corresponding `:axiom/rule` events."
  (rule-tracker {:kind :fact
                 :name "axiom/rule"
                 :key 'perm.1234ABC/foo
+                :data []
                 :change 3} (fn publish [ev]
                              (throw (Exception. "This should not be called")))) => nil)
 
@@ -106,11 +109,13 @@ corresponding `:axiom/rule` events."
  (rule-tracker {:kind :fact
                 :name "axiom/rule"
                 :key 'perm.1234ABC/bar
+                :data []
                 :change 2} ..pub..) => nil
  (provided
   (..pub.. {:kind :fact
             :name "axiom/rule-exists"
             :key 'perm.1234ABC/bar
+            :data []
             :change 1}) => irrelevant))
 
 "This of-course only happens when the change is positive."
@@ -118,6 +123,7 @@ corresponding `:axiom/rule` events."
  (rule-tracker {:kind :fact
                 :name "axiom/rule"
                 :key 'perm.1234ABC/baz
+                :data []
                 :change -2} (fn publish [ev]
                              (throw (Exception. "This should not be called")))) => nil)
 
@@ -131,11 +137,75 @@ corresponding `:axiom/rule` events."
   (..pub.. {:kind :fact
             :name "axiom/rule-exists"
             :key 'perm.1234ABC/foo
+            :data []
             :change -1}) => irrelevant))
 
 [[:chapter {:title "rule-migrator"}]]
 "When the [rule-tracker](#rule-tracker) finds out a rule has been introduced (for the first time), a migration process needs to take place
 to process all the existing facts that interact with the new rule, to create all the derived facts and intermediate rule tuples that are the result of this interaction."
+
+"`rule-migrator` is the service function responsible for this.
+It depends on [zk-plan](zk-plan.html#module), which it uses to create the migration plan.
+We will mock this module with functions that record their own operation, so that we will later be able to view the plan that was created."
+(fact
+ (def calls (transient []))
+ (def last-task (atom 0))
+ (def mock-zk-plan
+   {:create-plan (fn [parent]
+                   (conj! calls [:create-plan parent])
+                   :plan-node)
+    :add-task (fn [plan func args]
+                (conj! calls [:add-task plan func args])
+                (swap! last-task inc)
+                @last-task)
+    :mark-as-ready (fn [node]
+                     (conj! calls [:mark-as-ready node]))}))
+
+"With this mock, `calls` will contain a list of the calls that were made.
+`create-plan` always returns `:plan-node`, and `add-task` returns an ordinal number."
+
+"Since `rule-migrator` is a service, we mock `declare-service` and `assign-service` to get the actual function.
+We also provides it a `migration-config` resource containing the `:number-of-shards` parameter, determining how much parallelism we wish to have."
+(fact
+ (let [calls-chan (async/chan 10)
+       $ (di/injector {:declare-service (fn [key reg] (async/>!! calls-chan [:declare-service key reg]))
+                       :assign-service (fn [key func] (async/>!! calls-chan [:assign-service key func]))
+                       :zk-plan mock-zk-plan
+                       :migration-config {:number-of-shards 3
+                                          :plan-prefix "/my-plans"}})]
+   (module $)
+   (async/alts!! [calls-chan
+                  (async/timeout 1000)]) => [[:declare-service "migrator.core/rule-migrator" {:kind :fact
+                                                                                              :name "axiom/rule-exists"}] calls-chan]
+   (let [[call ch] (async/alts!! [calls-chan
+                                  (async/timeout 1000)])]
+     ch => calls-chan
+     (take 2 call) => [:assign-service "migrator.core/rule-migrator"]
+     (def migrate-rule (call 2)))))
+
+"Now, if we call the migration function `migrate-rule` on a rule, it will create a plan for migrating it.
+The plan will include singleton [fact-declarer](#fact-declarer) tasks that will start collecting events to be processed by the given rule
+once the migration is complete; a first phase of [initial-migrators](#initial-migrator) to process link 0 of the rule
+and any number of [link-migrator](#link-migrator) phases to process the rest of the links."
+(fact
+ (migrate-rule {:kind :fact
+                :name "axiom/rule-exists"
+                :key 'perm.1234ABC/timeline
+                :date []
+                :writers #{:some-writers}
+                :change 1}) => nil
+ (provided
+  (perm/eval-symbol 'perm.1234ABC/timeline) => timeline)
+ (persistent! calls) => [[:create-plan "/my-plans"]
+                         [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 0) []] ;; => 1
+                         [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 0 3) [1]] ;; => 2
+                         [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 1 3) [1]] ;; => 3
+                         [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 2 3) [1]] ;; => 4
+                         [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 1) [2 3 4]] ;; => 5
+                         [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 0 3) [5]] ;; => 6
+                         [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 1 3) [5]] ;; => 7
+                         [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 2 3) [5]] ;; => 8
+                         ])
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "zookeeper-counter-add"}]]
@@ -201,10 +271,9 @@ during the migration process are accumulated in the queue.
 Once the migration is done, [functions assigned to it](rabbit-microservices.html#assign-service) will receive
 these events as well as new ones, so there will not be any data loss."
 
-"`fact-declarer` is a generator function that takes the name of the rule and the link number (as a unique identifier)
-and the name of the fact to be declared."
+"`fact-declarer` is a generator function that takes the name of the rule and the link number (as a unique identifier)"
 (fact
- (def decl-my-fact (fact-declarer "my-rule" 2 "my-fact")))
+ (def decl-my-fact (fact-declarer 'perm.ABC123/my-rule 2)))
 
 "The returned fact declarer is intended to be used in a [zk-plan](zk-plan.html), as a [task](zk-plan.html#add-task) function.
 As such, it needs to accept one or more arguments.
@@ -215,11 +284,13 @@ We will mock it here."
 (fact
  (let [calls (async/chan 10)
        $ (di/injector {:declare-service (fn [key reg] (async/>!! calls [:declare-service key reg]))})]
-   (decl-my-fact $ :some :args :that :are :ignored)
+   (decl-my-fact $ :some :args :that :are :ignored) => nil
+   (provided
+    (perm/eval-symbol 'perm.ABC123/my-rule) => timeline)
    ;; Assert the calls
    (async/alts!! [calls
-                  (async/timeout 1000)]) => [[:declare-service "fact-for-rule/my-rule!2" {:kind :fact
-                                                                                          :name "my-fact"}] calls]))
+                  (async/timeout 1000)]) => [[:declare-service "fact-for-rule/perm.ABC123/my-rule!2" {:kind :fact
+                                                                                          :name "test/follows"}] calls]))
 
 [[:section {:title "initial-migrator"}]]
 "`initial-migrator` creates a migration function for link 0 of a rule.
