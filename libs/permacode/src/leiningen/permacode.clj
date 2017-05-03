@@ -13,7 +13,7 @@
 (defn publish
   "Publish the current version of the project as permacode"
   [project & namespaces-to-show]
-  (let [hashes (apply merge (for [dir (:source-paths project)]
+  (let [hashes (apply merge (for [dir (:permacode-paths project [])]
                               (publish/hash-all (get-hasher project) (io/file dir))))
         hashes (if (empty? namespaces-to-show)
                  hashes

@@ -1,4 +1,4 @@
-(defproject permacode "0.1.1-SNAPSHOT"
+(defproject permacode "MONOLITH-SNAPSHOT"
   :description "A pure dialect of Clojure with content-addressed modules"
   :url "http://github.com/brosenan/permacode"
   :license {:name "Eclipse Public License"
@@ -10,8 +10,5 @@
                  [aysylu/loom "1.0.0"]]
   :profiles {:dev {:dependencies [[midje "1.8.3"]
                                   [im.chit/lucid.publish "1.2.8"]
-                                  [im.chit/hara.string.prose "2.4.8"]]
-                   :plugins [[lein-midje "3.2.1"]
-                             [lein-pprint "1.1.2"]
-                             [permacode/permacode "0.1.0-SNAPSHOT"]]}}
+                                  [im.chit/hara.string.prose "2.4.8"]]}}
   :repositories [["releases" {:url "https://clojars.org/repo"}]])

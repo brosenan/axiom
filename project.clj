@@ -6,16 +6,21 @@
   :dependencies [[org.clojure/clojure "1.8.0"]]
   :plugins [[lein-monolith "0.3.2"]
             [lein-cprint "1.2.0"]
-            [lein-midje "3.2.1"]]
-  :aliases {"im" ["do" ["midje" ":filter" "-integ"] ["install"]]
+            [lein-midje "3.2.1"]
+            [permacode "MONOLITH-SNAPSHOT"]]
+  :aliases {"im" ["do"
+                  ["midje" ":filter" "-integ"]
+                  ["install"]]
             "eim" ["monolith" "each" "im"]
             "autotest" ["midje" ":autotest" ":filter" "-integ"]
             "integ" ["midje" ":filter" "integ"]
-            "einteg" ["monolith" "each" "integ"]}
+            "einteg" ["monolith" "each" "integ"]
+            "epub" ["with-profile" "+perm" "monolith" "each" "permacode" "publish"]}
   :monolith {:project-dirs ["libs/*"]
-             :inherit [:aliases]}
+             :inherit [:aliases :plugins]}
   :profiles {:dev {:dependencies [[im.chit/lucid.publish "1.2.8"]
-                                  [im.chit/hara.string.prose "2.4.8"]]}}
+                                  [im.chit/hara.string.prose "2.4.8"]]}
+             :perm {:plugins [[permacode "MONOLITH-SNAPSHOT"]]}}
   :publish {:theme  "bolton"
             :template {:site   "axiom"
                        :author "Boaz Rosenan"
