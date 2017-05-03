@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>5.2 &nbsp; fact-declarer</i></h5></a><a class="section" data-scroll="" href="#initial-migrator"><h5><i>5.3 &nbsp; initial-migrator</i></h5></a><a class="section" data-scroll="" href="#link-migrator"><h5><i>5.4 &nbsp; link-migrator</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>5.2 &nbsp; fact-declarer</i></h5></a><a class="section" data-scroll="" href="#initial-migrator"><h5><i>5.3 &nbsp; initial-migrator</i></h5></a><a class="section" data-scroll="" href="#link-migrator"><h5><i>5.4 &nbsp; link-migrator</i></h5></a><a class="section" data-scroll="" href="#migration-end-notifier"><h5><i>5.5 &nbsp; migration-end-notifier</i></h5></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,7 +80,7 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>5.2 &nbsp; fact-declarer</i></h5></a><a class="section" data-scroll="" href="#initial-migrator"><h5><i>5.3 &nbsp; initial-migrator</i></h5></a><a class="section" data-scroll="" href="#link-migrator"><h5><i>5.4 &nbsp; link-migrator</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>5.2 &nbsp; fact-declarer</i></h5></a><a class="section" data-scroll="" href="#initial-migrator"><h5><i>5.3 &nbsp; initial-migrator</i></h5></a><a class="section" data-scroll="" href="#link-migrator"><h5><i>5.4 &nbsp; link-migrator</i></h5></a><a class="section" data-scroll="" href="#migration-end-notifier"><h5><i>5.5 &nbsp; migration-end-notifier</i></h5></a></li>
                 </ul>
               </nav>
           </div>
@@ -183,16 +183,18 @@
               :change 1}) =&gt; nil
  (provided
 (perm/eval-symbol 'perm.1234ABC/timeline) =&gt; timeline)
- (persistent! calls) =&gt; [[:create-plan &quot;/my-plans&quot;]
-                       [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 0) []] ;; =&gt; 1
-                       [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 0 3) [1]] ;; =&gt; 2
-                       [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 1 3) [1]] ;; =&gt; 3
-                       [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 2 3) [1]] ;; =&gt; 4
-                       [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 1) [2 3 4]] ;; =&gt; 5
-                       [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 0 3) [5]] ;; =&gt; 6
-                       [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 1 3) [5]] ;; =&gt; 7
-                       [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 2 3) [5]] ;; =&gt; 8
-                       ]</code></pre></div><div><span id="under-the-hood"></span><h2><b>5 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="zookeeper-counter-add"></span><h3>5.1 &nbsp;&nbsp; zookeeper-counter-add</h3></div><div><p><code>zookeeper-counter-add</code> depends on the <code>zookeeper</code> resource as dependency, and uses it to implement a global atomic counter.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper :zk})]
+ (persistent! calls)
+ =&gt; [[:create-plan &quot;/my-plans&quot;]
+   [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 0) []] ;; =&gt; 1
+   [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 0 3) [1]] ;; =&gt; 2
+   [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 1 3) [1]] ;; =&gt; 3
+   [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 2 3) [1]] ;; =&gt; 4
+   [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 1) [2 3 4]] ;; =&gt; 5
+   [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 0 3) [5]] ;; =&gt; 6
+   [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 1 3) [5]] ;; =&gt; 7
+   [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 2 3) [5]] ;; =&gt; 8
+   [:add-task :plan-node `(migration-end-notifier perm.1234ABC/timeline #{:some-writers}) [6 7 8]] ;; =&gt; 9
+   [:mark-as-ready :plan-node]]</code></pre></div><div><span id="under-the-hood"></span><h2><b>5 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="zookeeper-counter-add"></span><h3>5.1 &nbsp;&nbsp; zookeeper-counter-add</h3></div><div><p><code>zookeeper-counter-add</code> depends on the <code>zookeeper</code> resource as dependency, and uses it to implement a global atomic counter.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper :zk})]
   (module $)
   (def zookeeper-counter-add (di/wait-for $ zookeeper-counter-add)))</code></pre></div><div><p><code>zookeeper-counter-add</code> takes a path to a counter and a number to be added. If a node corresponding to the given path does not exist, it is assumed to be equal 0, and is therefore created using the given number. The new value, which is the given number, is returned.</p></div><div class="code"><pre><code class="clojure">(zookeeper-counter-add &quot;/rules/foobar&quot; 3) =&gt; 3
  (provided
@@ -281,25 +283,26 @@
  (async/go
  (loop []
    (let [[query out-chan] (async/&lt;! mock-db-chan)]
-     ;; The query is for rule tuples of link 0
-     (when-not (= (:name query) &quot;migrator.core-test/timeline!0&quot;)
-       (throw (Exception. (str &quot;Wrong fact in query: &quot; (:name query)))))
-     (async/&gt;! out-chan {:change 1
-                         :data [&quot;alice&quot; (:key query)]
-                         :key (:key query)
-                         :kind :rule
-                         :name &quot;migrator.core-test/timeline!0&quot;
-                         :readers nil
-                         :writers #{:some-writer}})
-     (async/&gt;! out-chan {:change 1
-                         :data [&quot;eve&quot; (:key query)]
-                         :key (:key query)
-                         :kind :rule
-                         :name &quot;migrator.core-test/timeline!0&quot;
-                         :readers nil
-                         :writers #{:some-writer}})
-     (async/close! out-chan))
-   (recur)))</code></pre></div><div><p>Once more, we will need a <code>database-event-storage-chan</code> (e.g., <a href='dynamo.html#database-event-storage-chan'>this</a>) to store the events we get.</p></div><div class="code"><pre><code class="clojure">(def mock-store-chan (async/chan 10))</code></pre></div><div><p>The closure we got from <code>link-migrator</code> (<code>my-link-migrator</code> in our case) takes an injector as a first argument, and ignores all others. It calls <a href='permacode.html#eval-symbol'>permacode.core/eval-symbol</a> to get the rule and then creates a <a href='cloudlog-events.html#matcher'>matcher</a> based on it.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-scanner mock-scanner
+     (when-not (nil? query)
+       ;; The query is for rule tuples of link 0
+       (when-not (= (:name query) &quot;migrator.core-test/timeline!0&quot;)
+         (throw (Exception. (str &quot;Wrong fact in query: &quot; (:name query)))))
+       (async/&gt;! out-chan {:change 1
+                           :data [&quot;alice&quot; (:key query)]
+                           :key (:key query)
+                           :kind :rule
+                           :name &quot;migrator.core-test/timeline!0&quot;
+                           :readers nil
+                           :writers #{:some-writer}})
+       (async/&gt;! out-chan {:change 1
+                           :data [&quot;eve&quot; (:key query)]
+                           :key (:key query)
+                           :kind :rule
+                           :name &quot;migrator.core-test/timeline!0&quot;
+                           :readers nil
+                           :writers #{:some-writer}})
+       (async/close! out-chan)
+       (recur)))))</code></pre></div><div><p>Once more, we will need a <code>database-event-storage-chan</code> (e.g., <a href='dynamo.html#database-event-storage-chan'>this</a>) to store the events we get.</p></div><div class="code"><pre><code class="clojure">(def mock-store-chan (async/chan 10))</code></pre></div><div><p>The closure we got from <code>link-migrator</code> (<code>my-link-migrator</code> in our case) takes an injector as a first argument, and ignores all others. It calls <a href='permacode.html#eval-symbol'>permacode.core/eval-symbol</a> to get the rule and then creates a <a href='cloudlog-events.html#matcher'>matcher</a> based on it.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-scanner mock-scanner
                      :database-chan mock-db-chan
                      :database-event-storage-chan mock-store-chan})]
  (my-link-migrator $ :ignored) =&gt; nil
@@ -352,7 +355,14 @@
                                           :data [&quot;dave&quot; &quot;hello&quot;]
                                           :change 1
                                           :readers nil
-                                          :writers #{:some-writer}} mock-store-chan]</code></pre></div>
+                                          :writers #{:some-writer}} mock-store-chan]</code></pre></div><div><p>For good citizenship, let's close the mock <code>database-chan</code> and allow the service we started shut down.</p></div><div class="code"><pre><code class="clojure">(async/close! mock-db-chan)</code></pre></div><div><span id="migration-end-notifier"></span><h3>5.5 &nbsp;&nbsp; migration-end-notifier</h3></div><div><p><a href='#rule-migrator'>rule-migrator</a> finishes when a plan is created and is ready to be executed. However, the actual migration operation only starts at that point. We therefore need a way to tell other parts of <em>axiom</em> that the rule has been migrated, once migration is complete. For this purpose, the plan will include a final piece: <code>migration-end-notifier</code>, which will <a href='rabbit-microservices.html#publish'>publish</a> a <code>axiom/rule-ready</code> event holding the rule identifier as its <code>:key</code>.</p></div><div class="code"><pre><code class="clojure">(def my-end-notifier (migration-end-notifier 'perm.ABC123/my-rule #{:some-writer}))</code></pre></div><div><p>The returned closure (<code>my-end-notifier</code>) takes an injector and any number of other parameters. From the injector it takes the <code>publish</code> resource to publish the desired event.</p></div><div class="code"><pre><code class="clojure">(def events (transient []))
+ (let [$ (di/injector {:publish (fn [ev] (conj! events ev))})]
+ (my-end-notifier $ :some :other :params))</code></pre></div><div><p>Once called it should <code>publish</code> an <code>axiom/rule-ready</code> event.</p></div><div class="code"><pre><code class="clojure">(persistent! events) =&gt; [{:kind :fact
+                         :name &quot;axiom/rule-ready&quot;
+                         :key 'perm.ABC123/my-rule
+                         :data []
+                         :change 1
+                         :writers #{:some-writer}}]</code></pre></div>
         </div>
       </div>
     </div>
