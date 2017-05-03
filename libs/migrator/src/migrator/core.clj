@@ -5,7 +5,8 @@
             [zookeeper :as zk]
             [zk-plan.core :as zkp]
             [clojure.string :as str]
-            [cloudlog-events.core :as ev]))
+            [cloudlog-events.core :as ev]
+            [cloudlog.core :as clg]))
 
 (defn fact-declarer [rule link fact]
   (fn [$ & args]
@@ -13,14 +14,14 @@
       (declare-service (str "fact-for-rule/" rule "!" link) {:kind :fact
                                                              :name fact}))))
 
-(defn initial-migrator [rule fact writers shard shards]
+(defn initial-migrator [rule writers shard shards]
   (fn [$ & args]
     (di/with-dependencies!! $ [database-scanner
                                database-event-storage-chan]
-      (let [rule (perm/eval-symbol (read-string rule))
+      (let [rule (perm/eval-symbol rule)
             em (ev/emitter rule writers)
             inp (async/chan 10)]
-        (database-scanner fact shard shards inp)
+        (database-scanner (-> rule meta :source-fact clg/fact-table) shard shards inp)
         (loop []
           (let [ev (async/<! inp)]
             (when-not (nil? ev)
@@ -29,6 +30,31 @@
                   (async/>! database-event-storage-chan ev)))
               (recur)))))
       :not-nil)
+    nil))
+
+(defn link-migrator [rule link writers shard shards]
+  (fn [$ & args]
+    (di/with-dependencies!! $ [database-chan
+                               database-scanner]
+      (let [rule (perm/eval-symbol rule)
+            matcher (ev/matcher rule link database-chan)
+            scan-chan (async/chan 100)]
+        (database-scanner (ev/source-fact-table rule link) shard shards scan-chan)
+        (loop []
+          (let [ev (async/<! scan-chan)
+                out-chan (async/chan)]
+            (when-not (nil? ev)
+              (matcher ev out-chan)
+              (di/with-dependencies!! $ [database-event-storage-chan]
+                (loop []
+                  (let [ev (async/<! out-chan)]
+                    (when-not (nil? ev)
+                      (async/>! database-event-storage-chan ev)
+                      (recur))))
+                :not-nil)
+              (recur)))))
+      :not-nil)
+
     nil))
 
 (defn module [$]

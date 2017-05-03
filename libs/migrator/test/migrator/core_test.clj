@@ -13,7 +13,7 @@
 and initiates data migration using [zk-plan](zk-plan.html)."
 
 "Consider for example the `timeline` clause originally introduced in our [cloudlog documentation](cloudlog.html#joins)."
-(clg/defrule timeline [user tweet]
+(clg/defrule timeline [user author tweet]
   [:test/follows user author] (clg/by-anyone)
   [:test/tweeted author tweet] (clg/by-anyone))
 
@@ -226,10 +226,13 @@ We will mock it here."
 Link 0 is special in that it only depends on a fact, creates rule tuples based on fact tuples.
 Other links also depend on previous rule tuples."
 
-"`initial-migrator` takes the name of a rule, the name of its source fact and the rule's writer-set
-as well as a shard number and the total number of shards being used.
+"`initial-migrator` takes the following arguments:
+1. `rule`: The name of a rule (as a symbol).
+2. `writers`: The rule's writer-set
+3. `shard`: The shard number
+4. `shards`: The total number of shards being used.
 It returns a closure (function) that operates from within a [zk-plan](zk-plan.html)."
-(def my-migrator (initial-migrator "perm.ABC/my-rule" "test/follows" #{:some-writer} 2 6))
+(def my-migrator (initial-migrator 'perm.ABC/my-rule #{:some-writer} 2 6))
 
 "The migration process requires a `database-scanner` (e.g., [this](dynamo.html#database-scanner)) to scan given shard of the given table (fact).
 We mock this function by providing `:test/follows` facts for Alice, who follows Bob, Charlie and Dave. "
@@ -286,3 +289,128 @@ In our case, these should be one per each fact."
                                             :name "migrator.core-test/timeline!0"
                                             :readers nil
                                             :writers #{:some-writer}} rule-tuple-chan])
+
+[[:section {:title "link-migrator"}]]
+"For links other than 0, migration requires applying a [matcher](cloudlog-events.html#matcher).
+A matcher takes one event (a fact event in our case), and matches it against all matching events
+(rule events in our case).
+We need to provide a `database-chan` to allow the matcher to cross reference facts and rules."
+
+"The `link-migrator` function takes the following arguments:
+1. `rule`: The rule to be migrated.
+2. `link`: The link number within the rule (> 0).
+3. `writers`: The rule's writer set.
+4. `shard`: The shard number to be processed by this node.
+5. `shards`: The overall number of shards.
+It returns a closure to be processed as a `zk-plan` task."
+(def my-link-migrator (link-migrator 'perm.ABC/my-rule 1 #{:my-writers} 3 17))
+
+"For the migration process we will need a `database-scanner` that will provide fact events.
+We will mock one to produce `:test/tweeted` facts, stating that Bob, Charlie and Dave all tweeted 'hello'."
+(defn mock-scanner [name shard shards chan]
+  (when-not (= [name shard shards] ["test/tweeted" 3 17])
+    (throw (Exception. (str "Unexpected args in mock-scanner: " [name shard shards]))))
+  (doseq [user ["bob" "charlie" "dave"]]
+    (async/>!! chan {:kind :fact
+                     :name name
+                     :key user
+                     :data ["hello"]
+                     :change 1}))
+  (async/close! chan))
+
+"We also need to provide a `database-chan` (e.g., [this](dynamo.html#database-chan)), which in our case,
+will answer that regardless of who was making the tweet, both Alice and Eve are followers.
+These events are similar to the ones we got from the [initial-migrator](#initial-migrator)."
+(fact
+ (def mock-db-chan (async/chan 10))
+ (async/go
+   (loop []
+     (let [[query out-chan] (async/<! mock-db-chan)]
+       ;; The query is for rule tuples of link 0
+       (when-not (= (:name query) "migrator.core-test/timeline!0")
+         (throw (Exception. (str "Wrong fact in query: " (:name query)))))
+       (async/>! out-chan {:change 1
+                           :data ["alice" (:key query)]
+                           :key (:key query)
+                           :kind :rule
+                           :name "migrator.core-test/timeline!0"
+                           :readers nil
+                           :writers #{:some-writer}})
+       (async/>! out-chan {:change 1
+                           :data ["eve" (:key query)]
+                           :key (:key query)
+                           :kind :rule
+                           :name "migrator.core-test/timeline!0"
+                           :readers nil
+                           :writers #{:some-writer}})
+       (async/close! out-chan))
+     (recur))))
+
+"Once more, we will need a `database-event-storage-chan` (e.g., [this](dynamo.html#database-event-storage-chan))
+to store the events we get."
+(def mock-store-chan (async/chan 10))
+
+"The closure we got from `link-migrator` (`my-link-migrator` in our case) takes an injector as a first argument, and ignores all others.
+It calls [permacode.core/eval-symbol](permacode.html#eval-symbol) to get the rule and then creates a [matcher](cloudlog-events.html#matcher)
+based on it."
+(fact
+ (let [$ (di/injector {:database-scanner mock-scanner
+                       :database-chan mock-db-chan
+                       :database-event-storage-chan mock-store-chan})]
+   (my-link-migrator $ :ignored) => nil
+   (provided
+    (perm/eval-symbol 'perm.ABC/my-rule) => timeline)))
+
+"The migration function reads all fact events from the scanner, 
+for each event it consults the `database-chan` for matching rule tuples, and the resulting events (timeline facts in our case)
+are pushed to the `database-event-storage-chan`."
+(fact
+ ;; For Bob
+ (async/alts!! [mock-store-chan
+                (async/timeout 1000)]) => [{:kind :fact
+                                            :name "migrator.core-test/timeline"
+                                            :key "alice"
+                                            :data ["bob" "hello"]
+                                            :change 1
+                                            :readers nil
+                                            :writers #{:some-writer}} mock-store-chan]
+  (async/alts!! [mock-store-chan
+                (async/timeout 1000)]) => [{:kind :fact
+                                            :name "migrator.core-test/timeline"
+                                            :key "eve"
+                                            :data ["bob" "hello"]
+                                            :change 1
+                                            :readers nil
+                                            :writers #{:some-writer}} mock-store-chan]
+   (async/alts!! [mock-store-chan
+                (async/timeout 1000)]) => [{:kind :fact
+                                            :name "migrator.core-test/timeline"
+                                            :key "alice"
+                                            :data ["charlie" "hello"]
+                                            :change 1
+                                            :readers nil
+                                            :writers #{:some-writer}} mock-store-chan]
+  (async/alts!! [mock-store-chan
+                (async/timeout 1000)]) => [{:kind :fact
+                                            :name "migrator.core-test/timeline"
+                                            :key "eve"
+                                            :data ["charlie" "hello"]
+                                            :change 1
+                                            :readers nil
+                                            :writers #{:some-writer}} mock-store-chan]
+   (async/alts!! [mock-store-chan
+                (async/timeout 1000)]) => [{:kind :fact
+                                            :name "migrator.core-test/timeline"
+                                            :key "alice"
+                                            :data ["dave" "hello"]
+                                            :change 1
+                                            :readers nil
+                                            :writers #{:some-writer}} mock-store-chan]
+  (async/alts!! [mock-store-chan
+                (async/timeout 1000)]) => [{:kind :fact
+                                            :name "migrator.core-test/timeline"
+                                            :key "eve"
+                                            :data ["dave" "hello"]
+                                            :change 1
+                                            :readers nil
+                                            :writers #{:some-writer}} mock-store-chan])
