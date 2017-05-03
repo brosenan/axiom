@@ -210,7 +210,14 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
      [:mark-as-ready :plan-node]])
 
 [[:chapter {:title "Usage Example"}]]
-"In this example we will migrate the rules provided in the associated example"
+"In this example we will migrate the rules provided in our [tweetlog example](https://github.com/brosenan/axiom/blob/master/libs/examples/test/examples/tweetlog_test.clj)."
+
+"First, we need to provide configuration to connect to Zookeeper, RabbitMQ and DynamoDB (local)."
+(def config
+  {:zookeeper-config {:url "localhost:2128"}
+   :dynamodb-config    {:access-key "FOO"
+                        :secret-key "BAR"
+                        :endpoint "http://localhost:8006"}})
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "zookeeper-counter-add"}]]
