@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 03 May 2017</h5>
+              <h5>Date: 04 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>5.2 &nbsp; fact-declarer</i></h5></a><a class="section" data-scroll="" href="#initial-migrator"><h5><i>5.3 &nbsp; initial-migrator</i></h5></a><a class="section" data-scroll="" href="#link-migrator"><h5><i>5.4 &nbsp; link-migrator</i></h5></a><a class="section" data-scroll="" href="#migration-end-notifier"><h5><i>5.5 &nbsp; migration-end-notifier</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#usage-example"><h4>5 &nbsp; Usage Example</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>6 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>6.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>6.2 &nbsp; fact-declarer</i></h5></a><a class="section" data-scroll="" href="#initial-migrator"><h5><i>6.3 &nbsp; initial-migrator</i></h5></a><a class="section" data-scroll="" href="#link-migrator"><h5><i>6.4 &nbsp; link-migrator</i></h5></a><a class="section" data-scroll="" href="#migration-end-notifier"><h5><i>6.5 &nbsp; migration-end-notifier</i></h5></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,7 +80,7 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>5.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>5.2 &nbsp; fact-declarer</i></h5></a><a class="section" data-scroll="" href="#initial-migrator"><h5><i>5.3 &nbsp; initial-migrator</i></h5></a><a class="section" data-scroll="" href="#link-migrator"><h5><i>5.4 &nbsp; link-migrator</i></h5></a><a class="section" data-scroll="" href="#migration-end-notifier"><h5><i>5.5 &nbsp; migration-end-notifier</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#extract-version-rules"><h4>2 &nbsp; extract-version-rules</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-tracker"><h4>3 &nbsp; rule-tracker</h4></a></li><li><a class="chapter" data-scroll="" href="#rule-migrator"><h4>4 &nbsp; rule-migrator</h4></a></li><li><a class="chapter" data-scroll="" href="#usage-example"><h4>5 &nbsp; Usage Example</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>6 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#zookeeper-counter-add"><h5><i>6.1 &nbsp; zookeeper-counter-add</i></h5></a><a class="section" data-scroll="" href="#fact-declarer"><h5><i>6.2 &nbsp; fact-declarer</i></h5></a><a class="section" data-scroll="" href="#initial-migrator"><h5><i>6.3 &nbsp; initial-migrator</i></h5></a><a class="section" data-scroll="" href="#link-migrator"><h5><i>6.4 &nbsp; link-migrator</i></h5></a><a class="section" data-scroll="" href="#migration-end-notifier"><h5><i>6.5 &nbsp; migration-end-notifier</i></h5></a></li>
                 </ul>
               </nav>
           </div>
@@ -98,10 +98,12 @@
 (perm/module-publics 'perm.1234ABC) =&gt; {'foo (with-meta (fn []) {:source-fact [&quot;foo&quot; 1]})
                                         'bar (with-meta (fn []) {:source-fact [&quot;bar&quot; 1]})
                                         'baz (fn [])} ; baz will not be published
-(..pub.. {:name &quot;axiom/rule&quot;
+(..pub.. {:kind :fact
+          :name &quot;axiom/rule&quot;
           :key 'perm.1234ABC/foo
           :data []}) =&gt; irrelevant
-(..pub.. {:name &quot;axiom/rule&quot;
+(..pub.. {:kind :fact
+          :name &quot;axiom/rule&quot;
           :key 'perm.1234ABC/bar
           :data []}) =&gt; irrelevant)</code></pre></div><div><span id="rule-tracker"></span><h2><b>3 &nbsp;&nbsp; rule-tracker</b></h2></div><div><p><code>rule-tracker</code> registers to <code>:axiom/rule</code> and tracks the quantity of each rule by summing the <code>:change</code> <a href='cloudlog-events.html#introduction'>field of the event</a>.</p></div><div><p>It depends on the resources <a href='#zookeeper-counter-add'>zookeeper-counter-add</a> <code>declare-service</code> and <code>assign-service</code>, which we will mock.</p></div><div class="code"><pre><code class="clojure">(def mock-counters (transient {&quot;/rules/perm.1234ABC.foo&quot; 2}))
  (def calls (async/chan))
@@ -185,16 +187,104 @@
 (perm/eval-symbol 'perm.1234ABC/timeline) =&gt; timeline)
  (persistent! calls)
  =&gt; [[:create-plan &quot;/my-plans&quot;]
-   [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 0) []] ;; =&gt; 1
-   [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 0 3) [1]] ;; =&gt; 2
-   [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 1 3) [1]] ;; =&gt; 3
-   [:add-task :plan-node `(initial-migrator perm.1234ABC/timeline #{:some-writers} 2 3) [1]] ;; =&gt; 4
-   [:add-task :plan-node `(fact-declarer perm.1234ABC/timeline 1) [2 3 4]] ;; =&gt; 5
-   [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 0 3) [5]] ;; =&gt; 6
-   [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 1 3) [5]] ;; =&gt; 7
-   [:add-task :plan-node `(link-migrator perm.1234ABC/timeline 1 #{:some-writers} 2 3) [5]] ;; =&gt; 8
-   [:add-task :plan-node `(migration-end-notifier perm.1234ABC/timeline #{:some-writers}) [6 7 8]] ;; =&gt; 9
-   [:mark-as-ready :plan-node]]</code></pre></div><div><span id="under-the-hood"></span><h2><b>5 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="zookeeper-counter-add"></span><h3>5.1 &nbsp;&nbsp; zookeeper-counter-add</h3></div><div><p><code>zookeeper-counter-add</code> depends on the <code>zookeeper</code> resource as dependency, and uses it to implement a global atomic counter.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper :zk})]
+   [:add-task :plan-node `(fact-declarer 'perm.1234ABC/timeline 0) []] ;; =&gt; 1
+   [:add-task :plan-node `(initial-migrator 'perm.1234ABC/timeline #{:some-writers} 0 3) [1]] ;; =&gt; 2
+   [:add-task :plan-node `(initial-migrator 'perm.1234ABC/timeline #{:some-writers} 1 3) [1]] ;; =&gt; 3
+   [:add-task :plan-node `(initial-migrator 'perm.1234ABC/timeline #{:some-writers} 2 3) [1]] ;; =&gt; 4
+   [:add-task :plan-node `(fact-declarer 'perm.1234ABC/timeline 1) [2 3 4]] ;; =&gt; 5
+   [:add-task :plan-node `(link-migrator 'perm.1234ABC/timeline 1 #{:some-writers} 0 3) [5]] ;; =&gt; 6
+   [:add-task :plan-node `(link-migrator 'perm.1234ABC/timeline 1 #{:some-writers} 1 3) [5]] ;; =&gt; 7
+   [:add-task :plan-node `(link-migrator 'perm.1234ABC/timeline 1 #{:some-writers} 2 3) [5]] ;; =&gt; 8
+   [:add-task :plan-node `(migration-end-notifier 'perm.1234ABC/timeline #{:some-writers}) [6 7 8]] ;; =&gt; 9
+   [:mark-as-ready :plan-node]]</code></pre></div><div><span id="usage-example"></span><h2><b>5 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>In this example we will migrate the rules provided in our <a href='https://github.com/brosenan/axiom/blob/master/libs/examples/test/examples/tweetlog_test.clj'>tweetlog example</a>.</p></div><div><p>First, we need to provide configuration to connect to Zookeeper, RabbitMQ and DynamoDB (local).</p></div><div class="code"><pre><code class="clojure">(def config
+  {:zookeeper-config {:url &quot;127.0.0.1:2181&quot;}
+   :zk-plan-config {:num-threads 3
+                    :parent &quot;/my-plans&quot;}
+   :dynamodb-config {:access-key &quot;FOO&quot;
+                     :secret-key &quot;BAR&quot;
+                     :endpoint &quot;http://localhost:8006&quot;}
+   :num-database-retriever-threads 1
+   :dynamodb-default-throughput {:read 1 :write 1}
+   :dynamodb-event-storage-num-threads 3
+   :amqp-config {:username &quot;guest&quot;
+                 :password &quot;guest&quot;
+                 :vhost &quot;/&quot;
+                 :host &quot;localhost&quot;
+                 :port 5672}
+   :migration-config {:number-of-shards 3
+                      :plan-prefix &quot;/my-plans&quot;}})</code></pre></div><div><p>We now create an injector based on the config, and inject dependencies to the migrator and its dependencies.</p></div><div class="code"><pre><code class="clojure">:integ
+ (def $ (di/injector config))
+ (module $)
+ (rms/module $)
+ (zkp/module $)
+ (dyn/module $)</code></pre></div><div><p>Let's create the root elements we need in Zookeeper</p></div><div class="code"><pre><code class="clojure">:integ
+ (di/with-dependencies!! $ [zookeeper]
+ (when (zk/exists zookeeper &quot;/rules&quot;)
+   (zk/delete-all zookeeper &quot;/rules&quot;))
+ (zk/create zookeeper &quot;/rules&quot; :persistent? true)
+ (when (zk/exists zookeeper &quot;/my-plans&quot;)
+   (zk/delete-all zookeeper &quot;/my-plans&quot;))
+ (zk/create zookeeper &quot;/my-plans&quot; :persistent? true))</code></pre></div><div><p>The next step would be to generate test data. We will start with tweets:</p></div><div class="code"><pre><code class="clojure">:integ
+ (def users [&quot;alice&quot; &quot;bob&quot; &quot;charlie&quot;])
+ (def time (atom 1000))
+ (di/with-dependencies!! $ [publish]
+ (doseq [greeting [&quot;hello&quot; &quot;hi&quot; &quot;howdy&quot;]
+         greeted [&quot;world&quot; &quot;clojure&quot; &quot;axiom&quot;]
+         user users]
+   (publish {:kind :fact
+             :name &quot;test/tweeted&quot;
+             :key user
+             :data [(str greeting &quot; &quot; greeted &quot; from &quot; user)]
+             :ts @time
+             :change 1
+             :writers #{[:user= user]}
+             :readers #{}})
+   (swap! time inc))
+ :not-nil)</code></pre></div><div><p>Now let's create a full-factorial following matrix (everyone follows everyone else.</p></div><div class="code"><pre><code class="clojure">:integ
+ (di/with-dependencies!! $ [publish]
+ (doseq [u1 users
+         u2 users]
+   (publish {:kind :fact
+             :name &quot;test/follows&quot;
+             :key u1
+             :data [u2]
+             :ts @time
+             :change 1
+             :writers #{[:user= u1]}
+             :readers #{}})
+   (swap! time inc))
+ :not-nil)</code></pre></div><div><p>Let's give the microservices a few seconds to store all the facts.</p></div><div class="code"><pre><code class="clojure">:integ
+ (Thread/sleep 5000)</code></pre></div><div><p>To know when our migration is complete we need to listen to <code>axiom/rule-ready</code> events. The following service function listens to such events and for the rule <code>followee-tweets</code> it closes a channel to indicate it is done.</p></div><div class="code"><pre><code class="clojure">:integ
+ (def done (async/chan))
+ (di/with-dependencies!! $ [serve]
+ (serve (fn [ev]
+          (when (= (name (:key ev)) &quot;followee-tweets&quot;)
+            (async/close! done)))
+        {:kind :fact
+         :name &quot;axiom/rule-ready&quot;})
+ :not-nil)</code></pre></div><div><p>To kick the migration, we need to publish an <code>axiom/version</code> event with a version of the example application.</p></div><div class="code"><pre><code class="clojure">(fact
+        :integ
+        (di/with-dependencies!! $ [publish]
+          (publish {:kind :fact
+                    :name &quot;axiom/version&quot;
+                    :key &quot;perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt&quot;
+                    :data []
+                    :ts 1000
+                    :change 1
+                    :writers #{:my-app}
+                    :readers #{}})
+          :not-nil))</code></pre></div><div class="code"><pre><code class="clojure">:integ
+ (di/with-dependencies!! $ [publish]
+ (publish {:kind :fact
+           :name &quot;axiom/rule&quot;
+           :key 'perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt/followee-tweets
+           :data []
+           :ts 1000
+           :change 1
+           :writers #{:my-app}
+           :readers #{}})
+ :not-nil)</code></pre></div><div><p>So now we wait for the migration to complete</p></div><div class="code"><pre><code class="clojure">:integ
+ (async/&lt;!! done)</code></pre></div><div><span id="under-the-hood"></span><h2><b>6 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="zookeeper-counter-add"></span><h3>6.1 &nbsp;&nbsp; zookeeper-counter-add</h3></div><div><p><code>zookeeper-counter-add</code> depends on the <code>zookeeper</code> resource as dependency, and uses it to implement a global atomic counter.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper :zk})]
   (module $)
   (def zookeeper-counter-add (di/wait-for $ zookeeper-counter-add)))</code></pre></div><div><p><code>zookeeper-counter-add</code> takes a path to a counter and a number to be added. If a node corresponding to the given path does not exist, it is assumed to be equal 0, and is therefore created using the given number. The new value, which is the given number, is returned.</p></div><div class="code"><pre><code class="clojure">(zookeeper-counter-add &quot;/rules/foobar&quot; 3) =&gt; 3
  (provided
@@ -226,7 +316,7 @@
                                              :version 9}]
 (zkp/get-clj-data :zk &quot;/rules/foobar&quot;) =streams=&gt; [2 3 4]
 (zkp/to-bytes irrelevant) =&gt; irrelevant
-(zk/set-data :zk &quot;/rules/foobar&quot; irrelevant irrelevant) =throws=&gt; (Exception. &quot;boo&quot;))</code></pre></div><div><span id="fact-declarer"></span><h3>5.2 &nbsp;&nbsp; fact-declarer</h3></div><div><p><code>fact-declarer</code> is used to declare the service that will accept events related to a certain fact. We call it before we start migration based on that fact so that new events related to this fact that come during the migration process are accumulated in the queue. Once the migration is done, <a href='rabbit-microservices.html#assign-service'>functions assigned to it</a> will receive these events as well as new ones, so there will not be any data loss.</p></div><div><p><code>fact-declarer</code> is a generator function that takes the name of the rule and the link number (as a unique identifier)</p></div><div class="code"><pre><code class="clojure">(def decl-my-fact (fact-declarer 'perm.ABC123/my-rule 2))</code></pre></div><div><p>The returned fact declarer is intended to be used in a <a href='zk-plan.html'>zk-plan</a>, as a <a href='zk-plan.html#add-task'>task</a> function. As such, it needs to accept one or more arguments. It ignores all but the first one, which is an injector (<code>$</code>) passed to it directly by <code>zk-plan</code>.</p></div><div><p>The injector must be able to resolve the resource <code>declare-service</code> (e.g., <a href='rabbit-microservices.html#declare-service'>the one implemented for RabbitMQ</a>). We will mock it here.</p></div><div class="code"><pre><code class="clojure">(let [calls (async/chan 10)
+(zk/set-data :zk &quot;/rules/foobar&quot; irrelevant irrelevant) =throws=&gt; (Exception. &quot;boo&quot;))</code></pre></div><div><span id="fact-declarer"></span><h3>6.2 &nbsp;&nbsp; fact-declarer</h3></div><div><p><code>fact-declarer</code> is used to declare the service that will accept events related to a certain fact. We call it before we start migration based on that fact so that new events related to this fact that come during the migration process are accumulated in the queue. Once the migration is done, <a href='rabbit-microservices.html#assign-service'>functions assigned to it</a> will receive these events as well as new ones, so there will not be any data loss.</p></div><div><p><code>fact-declarer</code> is a generator function that takes the name of the rule and the link number (as a unique identifier)</p></div><div class="code"><pre><code class="clojure">(def decl-my-fact (fact-declarer 'perm.ABC123/my-rule 2))</code></pre></div><div><p>The returned fact declarer is intended to be used in a <a href='zk-plan.html'>zk-plan</a>, as a <a href='zk-plan.html#add-task'>task</a> function. As such, it needs to accept one or more arguments. It ignores all but the first one, which is an injector (<code>$</code>) passed to it directly by <code>zk-plan</code>.</p></div><div><p>The injector must be able to resolve the resource <code>declare-service</code> (e.g., <a href='rabbit-microservices.html#declare-service'>the one implemented for RabbitMQ</a>). We will mock it here.</p></div><div class="code"><pre><code class="clojure">(let [calls (async/chan 10)
      $ (di/injector {:declare-service (fn [key reg] (async/&gt;!! calls [:declare-service key reg]))})]
  (decl-my-fact $ :some :args :that :are :ignored) =&gt; nil
  (provided
@@ -234,7 +324,7 @@
  ;; Assert the calls
  (async/alts!! [calls
                 (async/timeout 1000)]) =&gt; [[:declare-service &quot;fact-for-rule/perm.ABC123/my-rule!2&quot; {:kind :fact
-                                                                                        :name &quot;test/follows&quot;}] calls])</code></pre></div><div><span id="initial-migrator"></span><h3>5.3 &nbsp;&nbsp; initial-migrator</h3></div><div><p><code>initial-migrator</code> creates a migration function for link 0 of a rule. Link 0 is special in that it only depends on a fact, creates rule tuples based on fact tuples. Other links also depend on previous rule tuples.</p></div><div><p><code>initial-migrator</code> takes the following arguments:</p><ol><li><code>rule</code>: The name of a rule (as a symbol).</li><li><code>writers</code>: The rule's writer-set</li><li><code>shard</code>: The shard number</li><li><code>shards</code>: The total number of shards being used.It returns a closure (function) that operates from within a <a href='zk-plan.html'>zk-plan</a>.</li></ol></div><div class="code"><pre><code class="clojure">(def my-migrator (initial-migrator 'perm.ABC/my-rule #{:some-writer} 2 6))</code></pre></div><div><p>The migration process requires a <code>database-scanner</code> (e.g., <a href='dynamo.html#database-scanner'>this</a>) to scan given shard of the given table (fact). We mock this function by providing <code>:test/follows</code> facts for Alice, who follows Bob, Charlie and Dave. </p></div><div class="code"><pre><code class="clojure">(defn mock-scanner [name shard shards chan]
+                                                                                        :name &quot;test/follows&quot;}] calls])</code></pre></div><div><span id="initial-migrator"></span><h3>6.3 &nbsp;&nbsp; initial-migrator</h3></div><div><p><code>initial-migrator</code> creates a migration function for link 0 of a rule. Link 0 is special in that it only depends on a fact, creates rule tuples based on fact tuples. Other links also depend on previous rule tuples.</p></div><div><p><code>initial-migrator</code> takes the following arguments:</p><ol><li><code>rule</code>: The name of a rule (as a symbol).</li><li><code>writers</code>: The rule's writer-set</li><li><code>shard</code>: The shard number</li><li><code>shards</code>: The total number of shards being used.It returns a closure (function) that operates from within a <a href='zk-plan.html'>zk-plan</a>.</li></ol></div><div class="code"><pre><code class="clojure">(def my-migrator (initial-migrator 'perm.ABC/my-rule #{:some-writer} 2 6))</code></pre></div><div><p>The migration process requires a <code>database-scanner</code> (e.g., <a href='dynamo.html#database-scanner'>this</a>) to scan given shard of the given table (fact). We mock this function by providing <code>:test/follows</code> facts for Alice, who follows Bob, Charlie and Dave. </p></div><div class="code"><pre><code class="clojure">(defn mock-scanner [name shard shards chan]
   (when-not (= [name shard shards] [&quot;test/follows&quot; 2 6])
     (throw (Exception. (str &quot;Unexpected args in mock-scanner: &quot; [name shard shards]))))
   (doseq [followee [&quot;bob&quot; &quot;charlie&quot; &quot;dave&quot;]]
@@ -270,7 +360,7 @@
                                           :kind :rule
                                           :name &quot;migrator.core-test/timeline!0&quot;
                                           :readers nil
-                                          :writers #{:some-writer}} rule-tuple-chan]</code></pre></div><div><span id="link-migrator"></span><h3>5.4 &nbsp;&nbsp; link-migrator</h3></div><div><p>For links other than 0, migration requires applying a <a href='cloudlog-events.html#matcher'>matcher</a>. A matcher takes one event (a fact event in our case), and matches it against all matching events (rule events in our case). We need to provide a <code>database-chan</code> to allow the matcher to cross reference facts and rules.</p></div><div><p>The <code>link-migrator</code> function takes the following arguments:</p><ol><li><code>rule</code>: The rule to be migrated.</li><li><code>link</code>: The link number within the rule (> 0).</li><li><code>writers</code>: The rule's writer set.</li><li><code>shard</code>: The shard number to be processed by this node.</li><li><code>shards</code>: The overall number of shards.It returns a closure to be processed as a <code>zk-plan</code> task.</li></ol></div><div class="code"><pre><code class="clojure">(def my-link-migrator (link-migrator 'perm.ABC/my-rule 1 #{:my-writers} 3 17))</code></pre></div><div><p>For the migration process we will need a <code>database-scanner</code> that will provide fact events. We will mock one to produce <code>:test/tweeted</code> facts, stating that Bob, Charlie and Dave all tweeted 'hello'.</p></div><div class="code"><pre><code class="clojure">(defn mock-scanner [name shard shards chan]
+                                          :writers #{:some-writer}} rule-tuple-chan]</code></pre></div><div><span id="link-migrator"></span><h3>6.4 &nbsp;&nbsp; link-migrator</h3></div><div><p>For links other than 0, migration requires applying a <a href='cloudlog-events.html#matcher'>matcher</a>. A matcher takes one event (a fact event in our case), and matches it against all matching events (rule events in our case). We need to provide a <code>database-chan</code> to allow the matcher to cross reference facts and rules.</p></div><div><p>The <code>link-migrator</code> function takes the following arguments:</p><ol><li><code>rule</code>: The rule to be migrated.</li><li><code>link</code>: The link number within the rule (> 0).</li><li><code>writers</code>: The rule's writer set.</li><li><code>shard</code>: The shard number to be processed by this node.</li><li><code>shards</code>: The overall number of shards.It returns a closure to be processed as a <code>zk-plan</code> task.</li></ol></div><div class="code"><pre><code class="clojure">(def my-link-migrator (link-migrator 'perm.ABC/my-rule 1 #{:my-writers} 3 17))</code></pre></div><div><p>For the migration process we will need a <code>database-scanner</code> that will provide fact events. We will mock one to produce <code>:test/tweeted</code> facts, stating that Bob, Charlie and Dave all tweeted 'hello'.</p></div><div class="code"><pre><code class="clojure">(defn mock-scanner [name shard shards chan]
   (when-not (= [name shard shards] [&quot;test/tweeted&quot; 3 17])
     (throw (Exception. (str &quot;Unexpected args in mock-scanner: &quot; [name shard shards]))))
   (doseq [user [&quot;bob&quot; &quot;charlie&quot; &quot;dave&quot;]]
@@ -355,7 +445,7 @@
                                           :data [&quot;dave&quot; &quot;hello&quot;]
                                           :change 1
                                           :readers nil
-                                          :writers #{:some-writer}} mock-store-chan]</code></pre></div><div><p>For good citizenship, let's close the mock <code>database-chan</code> and allow the service we started shut down.</p></div><div class="code"><pre><code class="clojure">(async/close! mock-db-chan)</code></pre></div><div><span id="migration-end-notifier"></span><h3>5.5 &nbsp;&nbsp; migration-end-notifier</h3></div><div><p><a href='#rule-migrator'>rule-migrator</a> finishes when a plan is created and is ready to be executed. However, the actual migration operation only starts at that point. We therefore need a way to tell other parts of <em>axiom</em> that the rule has been migrated, once migration is complete. For this purpose, the plan will include a final piece: <code>migration-end-notifier</code>, which will <a href='rabbit-microservices.html#publish'>publish</a> a <code>axiom/rule-ready</code> event holding the rule identifier as its <code>:key</code>.</p></div><div class="code"><pre><code class="clojure">(def my-end-notifier (migration-end-notifier 'perm.ABC123/my-rule #{:some-writer}))</code></pre></div><div><p>The returned closure (<code>my-end-notifier</code>) takes an injector and any number of other parameters. From the injector it takes the <code>publish</code> resource to publish the desired event.</p></div><div class="code"><pre><code class="clojure">(def events (transient []))
+                                          :writers #{:some-writer}} mock-store-chan]</code></pre></div><div><p>For good citizenship, let's close the mock <code>database-chan</code> and allow the service we started shut down.</p></div><div class="code"><pre><code class="clojure">(async/close! mock-db-chan)</code></pre></div><div><span id="migration-end-notifier"></span><h3>6.5 &nbsp;&nbsp; migration-end-notifier</h3></div><div><p><a href='#rule-migrator'>rule-migrator</a> finishes when a plan is created and is ready to be executed. However, the actual migration operation only starts at that point. We therefore need a way to tell other parts of <em>axiom</em> that the rule has been migrated, once migration is complete. For this purpose, the plan will include a final piece: <code>migration-end-notifier</code>, which will <a href='rabbit-microservices.html#publish'>publish</a> a <code>axiom/rule-ready</code> event holding the rule identifier as its <code>:key</code>.</p></div><div class="code"><pre><code class="clojure">(def my-end-notifier (migration-end-notifier 'perm.ABC123/my-rule #{:some-writer}))</code></pre></div><div><p>The returned closure (<code>my-end-notifier</code>) takes an injector and any number of other parameters. From the injector it takes the <code>publish</code> resource to publish the desired event.</p></div><div class="code"><pre><code class="clojure">(def events (transient []))
  (let [$ (di/injector {:publish (fn [ev] (conj! events ev))})]
  (my-end-notifier $ :some :other :params))</code></pre></div><div><p>Once called it should <code>publish</code> an <code>axiom/rule-ready</code> event.</p></div><div class="code"><pre><code class="clojure">(persistent! events) =&gt; [{:kind :fact
                          :name &quot;axiom/rule-ready&quot;
