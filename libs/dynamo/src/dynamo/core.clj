@@ -29,16 +29,19 @@
             (async/close! res-chan)
             true))))
 
-(defn scanner [config table shard shards chan]
-  (let [kw (table-kw table)
-        items (far/scan config kw {:segment shard
-                                   :total-segments shards})]
-    (doseq [item items]
-      (let [body (nippy/thaw (:event item))]
-        (async/>!! chan (merge body {:kind :fact
-                                     :name table
-                                     :key (read-string (:key item))
-                                     :ts (:ts item)}))))))
+(defn scanner [config ensure table shard shards chan]
+  (let [kw (table-kw table)]
+    (ensure kw)
+    (let [items (far/scan config kw {:segment shard
+                                     :total-segments shards})]
+      (doseq [item items]
+        (let [body (nippy/thaw (:event item))]
+          (async/>!! chan (merge body {:kind :fact
+                                       :name table
+                                       :key (read-string (:key item))
+                                       :ts (:ts item)}))))
+      (async/close! chan))
+    nil))
 
 (defn module [$]
   (di/provide database-chan $
@@ -69,13 +72,13 @@
                                        dynamodb-config]
                 (atom (set (dynamodb-get-tables dynamodb-config)))))
   (di/provide database-scanner $
-              (di/with-dependencies $ [dynamodb-config]
-                (partial scanner dynamodb-config)))
+              (di/with-dependencies $ [dynamodb-config
+                                       database-ensure-table]
+                (partial scanner dynamodb-config database-ensure-table)))
 
   (di/provide database-event-storage $
               (di/with-dependencies $ [dynamodb-config
-                                       database-tables
-                                       dynamodb-default-throughput]
+                                       database-ensure-table]
       (fn
         [ev]
         (let [name (:name ev)]
@@ -84,12 +87,7 @@
                 nil
                 :else
                 (let [table-name (table-kw (:name ev))]
-                  (when-not (@database-tables table-name)
-                    (far/ensure-table dynamodb-config table-name [:key :s]
-                                      {:range-keydef [:ts :n]
-                                       :throughput dynamodb-default-throughput
-                                       :block true})
-                    (swap! database-tables #(conj % table-name)))
+                  (database-ensure-table table-name)
                   (let [bin (nippy/freeze (dissoc ev :kind :name :key :ts))]
                     (far/put-item dynamodb-config table-name {:key (pr-str (:key ev))
                                                               :ts (:ts ev)
@@ -107,4 +105,17 @@
                           (database-event-storage ev)
                           (async/close! ack)
                           (recur)))))
-                  chan))))
+                  chan)))
+  (di/provide database-ensure-table $
+              (di/with-dependencies $ [database-tables
+                                       dynamodb-default-throughput
+                                       dynamodb-config]
+                (fn [table]
+                  (when-not (contains? @database-tables table)
+                    (far/ensure-table dynamodb-config table
+                                      [:key :s]
+                                      {:range-keydef [:ts :n]
+                                       :throughput dynamodb-default-throughput
+                                       :block true})
+                    (swap! database-tables #(conj % table)))
+                  nil))))

@@ -108,14 +108,17 @@ and the request channel.  Once called, it will perform the following:
 "`database-event-storage` is a function for storing events in the database."
 
 "It is a DI resource that depends on the following resources:
-1. `dynamodb-config`: The DynamoDB credentials and coordinates,
-2. `dynamodb-default-throughput`: A map containing the default throughput settings for a new table, and
-3. `database-tables`: An atom holding a set of all tables currently known to exist."
-(let [$ (di/injector {:dynamodb-config :config
-                      :dynamodb-default-throughput :default-throughput
-                      :database-tables (atom #{:foo :bar})})]
-  (module $)
-  (def database-event-storage (di/wait-for $ database-event-storage)))
+1. `dynamodb-config`: The DynamoDB credentials and coordinates, and
+2. [database-ensure-table](#database-ensure-table): a function that makes sure the given table exists."
+(fact
+ (def table-ensured (atom nil))
+ (let [$ (di/injector {:dynamodb-config :config
+                       :database-ensure-table (fn [table]
+                                                (reset! table-ensured table))
+                       :database-tables (atom #{})
+                       :dynamodb-default-throughput 0})]
+   (module $)
+   (def database-event-storage (di/wait-for $ database-event-storage))))
 
 "`database-event-storage` takes an event and stores it in DynamoDB."
 (fact
@@ -137,22 +140,9 @@ and the request channel.  Once called, it will perform the following:
                               :ts 1000
                               :event ..bin..}) => irrelevant))
 
-"If the table does not exist, it is created."
+"It ensures the table exists by calling (our mock) `database-ensure-table`."
 (fact
- (def my-event2 (assoc my-event :name "baz"))
- (database-event-storage my-event2) => nil
- (provided
-  (nippy/freeze {:data [1 2 3 4]
-                 :change 1
-                 :writers #{}
-                 :readers #{}}) => ..bin..
-  (far/ensure-table :config :baz [:key :s] ; :key is the partition key
-                    {:range-keydef [:ts :n] ; and :ts is the range key
-                     :throughput :default-throughput
-                     :block true}) => irrelevant
-  (far/put-item :config :baz {:key "1234"
-                              :ts 1000
-                              :event ..bin..}) => irrelevant))
+ @table-ensured => :foo)
 
 "Events with `:name` values that end with \"?\" or \"!\" should not be persisted, and are therefore ignored."
 (fact
@@ -225,36 +215,44 @@ Once the event is safely stored, `ack` will be closed."
 "For the purpose of data migration we need to process all events in a table.
 To do this efficiently, we shard the table."
 
-"`database-scanner` depends on `dynamodb-config`."
-(let [$ (di/injector {:dynamodb-config :some-config
-                      :dynamodb-get-tables (fn [conf] [])})]
-  (module $)
-  (def database-scanner (di/wait-for $ database-scanner)))
+"`database-scanner` depends on `dynamodb-config` for credentials to DynamoDB, and on `database-ensure-table` to ensure the
+table exists before issuing the actual scan request."
+(fact
+ (def table-ensured (atom nil))
+ (let [$ (di/injector {:dynamodb-config :some-config
+                       :database-ensure-table (fn [table]
+                                                (reset! table-ensured table))
+                       :dynamodb-get-tables (fn [conf] []) ;; Irrelevant to this test
+                       })]
+   (module $)
+   (def database-scanner (di/wait-for $ database-scanner))))
 
 "`database-scanner` is given a name of a table, a shard number, a total number of shards and an output channel.
 It then produces all events from that shard into the channel and closes the channel.
 It is blocking, and is therefore assumed to be working from within its own thread."
 (fact
- (database-scanner ..table.. ..shard.. ..shards.. ..chan..) => nil
+ (database-scanner "foo/bar" ..shard.. ..shards.. ..chan..) => nil
  (provided
-  (table-kw ..table..) => ..kw..
-  (far/scan :some-config ..kw.. {:segment ..shard..
-                               :total-segments ..shards..}) => [{:key "1" :ts 1000 :event ..bin1..}
-                                                                {:key "2" :ts 2000 :event ..bin2..}]
+  (far/scan :some-config :foo.bar {:segment ..shard..
+                                   :total-segments ..shards..}) => [{:key "1" :ts 1000 :event ..bin1..}
+                                                                    {:key "2" :ts 2000 :event ..bin2..}]
   (nippy/thaw ..bin1..) => {:data [1 2 3]}
   (async/>!! ..chan.. {:kind :fact
-                       :name ..table..
+                       :name "foo/bar"
                        :key 1
                        :ts 1000
                        :data [1 2 3]}) => irrelevant
   (nippy/thaw ..bin2..) => {:data [2 3 4]}
   (async/>!! ..chan.. {:kind :fact
-                       :name ..table..
+                       :name "foo/bar"
                        :key 2
                        :ts 2000
-                       :data [2 3 4]}) => irrelevant))
+                       :data [2 3 4]}) => irrelevant
+  (async/close! ..chan..) => irrelevant))
 
-"**TODO:** Close the channel."
+"Before issuing the scan, `database-scanner` calls `database-ensure-table` to make sure the table exists."
+(fact
+ @table-ensured => :foo.bar)
 
 [[:chapter {:title "Usage Example"}]]
 "To see that this library can actually connect to DynamoDB we will use the `store-fact` service to create a few events in different
@@ -383,3 +381,41 @@ The latter is intended for testing and is provided by this module to be `far/lis
    (let [tables (di/wait-for $ database-tables)]
      @tables => #{:foo :bar :config})))
 
+[[:section {:title "database-ensure-table"}]]
+"Sometimes, before performing operations such as storing an event or starting a scan we want to ensure that the
+table we have at hand actually exists.
+If it doesn't, or we don't know it exists, we wish to create it.
+We count on DynamoDB's ignoring re-creation of tables that already exist."
+
+"`database-ensure-table` is based on the following:
+1. [database-tables](#database-tables): the set of currently known tables,
+2. `dynamodb-default-throughput`: a map containing the default configuration for a new table, and
+3. `dynamodb-config`: credentials to talk to DynamoDB."
+(fact
+ (let [$ (di/injector {:database-tables (atom #{:foo :bar})
+                       :dynamodb-default-throughput {:default :throughput}
+                       :dynamodb-config :config})]
+   (module $)
+   (def database-ensure-table (di/wait-for $ database-ensure-table))
+   (def database-tables (di/wait-for $ database-tables)))) ;; For inspecting it after calling database-ensure-table
+
+"`database-ensure-table` is a function that takes a name of a table (as a keyword).
+If the table exists in `database-tables`, it does nothing."
+(fact
+ (database-ensure-table :foo) => nil
+ (provided
+  ;; No calls
+  ))
+
+"However, if the table does not exist in `database-tables`, `database-ensure-table` creates a table in DynamoDB."
+(fact
+ (database-ensure-table :other-table) => nil
+ (provided
+  (far/ensure-table :config :other-table [:key :s] ; :key is the partition key
+                    {:range-keydef [:ts :n] ; and :ts is the range key
+                     :throughput {:default :throughput}
+                     :block true}) => irrelevant))
+
+"After ensuring a table exists, the table is added to `database-tables`."
+(fact
+ @database-tables => #{:foo :bar :other-table})
