@@ -14,18 +14,20 @@
 
 
 
-(defn retriever [config req-chan]
+(defn retriever [config ensure-table req-chan]
   (let [request (async/<!! req-chan)]
     (cond (nil? request)
           false
           :else
           (let [[ev res-chan] request
-                items (far/query config (table-kw (:name ev)) {:key [:eq (pr-str (:key  ev))]})]
-            (doseq [item items]
-              (let [event (-> (nippy/thaw (:event item))
-                              (merge {:ts (:ts item)})
-                              (merge ev))]
-                (async/>!! res-chan event)))
+                kw (table-kw (:name ev))]
+            (ensure-table kw)
+            (let [items (far/query config kw {:key [:eq (pr-str (:key  ev))]})]
+              (doseq [item items]
+                (let [event (-> (nippy/thaw (:event item))
+                                (merge {:ts (:ts item)})
+                                (merge ev))]
+                  (async/>!! res-chan event))))
             (async/close! res-chan)
             true))))
 
@@ -39,7 +41,8 @@
           (async/>!! chan (merge body {:kind :fact
                                        :name table
                                        :key (read-string (:key item))
-                                       :ts (:ts item)}))))
+                                       :ts (:ts item)}))
+))
       (async/close! chan))
     nil))
 
@@ -53,8 +56,9 @@
                       (while (database-retriever chan))))
                   chan)))
   (di/provide database-retriever $
-              (di/with-dependencies $ [dynamodb-config]
-                (partial retriever dynamodb-config)))
+              (di/with-dependencies $ [dynamodb-config
+                                       database-ensure-table]
+                (partial retriever dynamodb-config database-ensure-table)))
   (async/go
     (di/with-dependencies $ [declare-service
                              assign-service

@@ -176,7 +176,7 @@
     (di/with-dependencies $ [zk-plan zk-plan-config]
       (let [{:keys [worker]} zk-plan]
         (let [threads (map (fn [_] (Thread. (fn []
-                                                 (loop []
+                                              (loop []
                                                    (try
                                                      (worker (:parent zk-plan-config) {} $)
                                                      (catch Exception e

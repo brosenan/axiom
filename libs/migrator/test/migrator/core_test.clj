@@ -221,7 +221,7 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
 "First, we need to provide configuration to connect to Zookeeper, RabbitMQ and DynamoDB (local)."
 (def config
   {:zookeeper-config {:url "127.0.0.1:2181"}
-   :zk-plan-config {:num-threads 3
+   :zk-plan-config {:num-threads 5
                     :parent "/my-plans"}
    :dynamodb-config {:access-key "FOO"
                      :secret-key "BAR"
@@ -257,6 +257,11 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
      (zk/delete-all zookeeper "/my-plans"))
    (zk/create zookeeper "/my-plans" :persistent? true)))
 
+"Let's let the services some time to register themselves."
+(fact
+ :integ
+ (Thread/sleep 1000))
+
 "The next step would be to generate test data.
 We will start with tweets:"
 (fact
@@ -268,7 +273,7 @@ We will start with tweets:"
            greeted ["world" "clojure" "axiom"]
            user users]
      (publish {:kind :fact
-               :name "test/tweeted"
+               :name "tweetlog/tweeted"
                :key user
                :data [(str greeting " " greeted " from " user)]
                :ts @time
@@ -278,20 +283,21 @@ We will start with tweets:"
      (swap! time inc))
    :not-nil))
 
-"Now let's create a full-factorial following matrix (everyone follows everyone else."
+"Now let's create a full-factorial following matrix (everyone follows everyone else)."
 (fact
  :integ
  (di/with-dependencies!! $ [publish]
    (doseq [u1 users
            u2 users]
-     (publish {:kind :fact
-               :name "test/follows"
-               :key u1
-               :data [u2]
-               :ts @time
-               :change 1
-               :writers #{[:user= u1]}
-               :readers #{}})
+     (when-not (= u1 u2)
+       (publish {:kind :fact
+                 :name "tweetlog/follows"
+                 :key u1
+                 :data [u2]
+                 :ts @time
+                 :change 1
+                 :writers #{[:user= u1]}
+                 :readers #{}}))
      (swap! time inc))
    :not-nil))
 
@@ -333,7 +339,7 @@ The following service function listens to such events and for the rule `followee
  (async/<!! done))
 
 "After the migration, all facts have been processed by the rules.
-This means that Alice's timeline should contain 27 tweets."
+This means that Alice's timeline should contain 18 tweets."
 (fact
  :integ
  (di/with-dependencies!! $ [database-chan]
@@ -346,7 +352,7 @@ This means that Alice's timeline should contain 27 tweets."
          (cond (nil? ev)
                res
                :else
-               (recur (inc res))))))) => 27)
+               (recur (inc res))))))) => 18)
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "zookeeper-counter-add"}]]
@@ -477,30 +483,35 @@ It will evaluate this function on each result comming from the `database-scanner
 "The migrator function should push to `database-event-storage-chan` rule events.
 In our case, these should be one per each fact."
 (fact
- (async/alts!! [rule-tuple-chan
-                (async/timeout 1000)]) => [{:change 1
-                                            :data ["alice" "bob"]
-                                            :key "bob"
-                                            :kind :rule
-                                            :name "migrator.core-test/timeline!0"
-                                            :readers nil
-                                            :writers #{:some-writer}} rule-tuple-chan]
-  (async/alts!! [rule-tuple-chan
-                (async/timeout 1000)]) => [{:change 1
-                                            :data ["alice" "charlie"]
-                                            :key "charlie"
-                                            :kind :rule
-                                            :name "migrator.core-test/timeline!0"
-                                            :readers nil
-                                            :writers #{:some-writer}} rule-tuple-chan]
-    (async/alts!! [rule-tuple-chan
-                (async/timeout 1000)]) => [{:change 1
-                                            :data ["alice" "dave"]
-                                            :key "dave"
-                                            :kind :rule
-                                            :name "migrator.core-test/timeline!0"
-                                            :readers nil
-                                            :writers #{:some-writer}} rule-tuple-chan])
+ (defn read-event []
+   (let [resp (async/alts!! [rule-tuple-chan
+                             (async/timeout 1000)])]
+     (when-not (= (second resp) rule-tuple-chan)
+       (throw (Exception. "Opration timed out")))
+     (async/close! (second (first resp))) ;; ack
+     (first (first resp))))
+ 
+ (read-event) => {:change 1
+                  :data ["alice" "bob"]
+                  :key "bob"
+                  :kind :rule
+                  :name "migrator.core-test/timeline!0"
+                  :readers nil
+                  :writers #{:some-writer}}
+ (read-event) => {:change 1
+                  :data ["alice" "charlie"]
+                  :key "charlie"
+                  :kind :rule
+                  :name "migrator.core-test/timeline!0"
+                  :readers nil
+                  :writers #{:some-writer}}
+ (read-event) => {:change 1
+                  :data ["alice" "dave"]
+                  :key "dave"
+                  :kind :rule
+                  :name "migrator.core-test/timeline!0"
+                  :readers nil
+                  :writers #{:some-writer}})
 
 [[:section {:title "link-migrator"}]]
 "For links other than 0, migration requires applying a [matcher](cloudlog-events.html#matcher).
@@ -578,55 +589,56 @@ based on it."
 for each event it consults the `database-chan` for matching rule tuples, and the resulting events (timeline facts in our case)
 are pushed to the `database-event-storage-chan`."
 (fact
+ (defn read-event []
+   (let [resp (async/alts!! [mock-store-chan
+                             (async/timeout 1000)])]
+     (when-not (= (second resp) mock-store-chan)
+       (throw (Exception. "Operation timed out")))
+     (async/close! (second (first resp))) ;; ack
+     (first (first resp))))
  ;; For Bob
- (async/alts!! [mock-store-chan
-                (async/timeout 1000)]) => [{:kind :fact
-                                            :name "migrator.core-test/timeline"
-                                            :key "alice"
-                                            :data ["bob" "hello"]
-                                            :change 1
-                                            :readers nil
-                                            :writers #{:some-writer}} mock-store-chan]
-  (async/alts!! [mock-store-chan
-                (async/timeout 1000)]) => [{:kind :fact
-                                            :name "migrator.core-test/timeline"
-                                            :key "eve"
-                                            :data ["bob" "hello"]
-                                            :change 1
-                                            :readers nil
-                                            :writers #{:some-writer}} mock-store-chan]
-   (async/alts!! [mock-store-chan
-                (async/timeout 1000)]) => [{:kind :fact
-                                            :name "migrator.core-test/timeline"
-                                            :key "alice"
-                                            :data ["charlie" "hello"]
-                                            :change 1
-                                            :readers nil
-                                            :writers #{:some-writer}} mock-store-chan]
-  (async/alts!! [mock-store-chan
-                (async/timeout 1000)]) => [{:kind :fact
-                                            :name "migrator.core-test/timeline"
-                                            :key "eve"
-                                            :data ["charlie" "hello"]
-                                            :change 1
-                                            :readers nil
-                                            :writers #{:some-writer}} mock-store-chan]
-   (async/alts!! [mock-store-chan
-                (async/timeout 1000)]) => [{:kind :fact
-                                            :name "migrator.core-test/timeline"
-                                            :key "alice"
-                                            :data ["dave" "hello"]
-                                            :change 1
-                                            :readers nil
-                                            :writers #{:some-writer}} mock-store-chan]
-  (async/alts!! [mock-store-chan
-                (async/timeout 1000)]) => [{:kind :fact
-                                            :name "migrator.core-test/timeline"
-                                            :key "eve"
-                                            :data ["dave" "hello"]
-                                            :change 1
-                                            :readers nil
-                                            :writers #{:some-writer}} mock-store-chan])
+ (read-event) => {:kind :fact
+                  :name "migrator.core-test/timeline"
+                  :key "alice"
+                  :data ["bob" "hello"]
+                  :change 1
+                  :readers nil
+                  :writers #{:some-writer}}
+ (read-event) => {:kind :fact
+                  :name "migrator.core-test/timeline"
+                  :key "eve"
+                  :data ["bob" "hello"]
+                  :change 1
+                  :readers nil
+                  :writers #{:some-writer}}
+ (read-event) => {:kind :fact
+                  :name "migrator.core-test/timeline"
+                  :key "alice"
+                  :data ["charlie" "hello"]
+                  :change 1
+                  :readers nil
+                  :writers #{:some-writer}}
+ (read-event) => {:kind :fact
+                  :name "migrator.core-test/timeline"
+                  :key "eve"
+                  :data ["charlie" "hello"]
+                  :change 1
+                  :readers nil
+                  :writers #{:some-writer}}
+ (read-event) => {:kind :fact
+                  :name "migrator.core-test/timeline"
+                  :key "alice"
+                  :data ["dave" "hello"]
+                  :change 1
+                  :readers nil
+                  :writers #{:some-writer}}
+ (read-event) => {:kind :fact
+                  :name "migrator.core-test/timeline"
+                  :key "eve"
+                  :data ["dave" "hello"]
+                  :change 1
+                  :readers nil
+                  :writers #{:some-writer}})
 
 "For good citizenship, let's close the mock `database-chan` and allow the service we started shut down."
 (fact

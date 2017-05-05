@@ -23,14 +23,15 @@
                                database-event-storage-chan]
       (let [rule (perm/eval-symbol rule)
             em (ev/emitter rule writers)
-            inp (async/chan 10)]
-        (database-scanner (-> rule meta :source-fact clg/fact-table) shard shards inp)
+            inp (async/chan)]
+        (async/thread
+          (database-scanner (-> rule meta :source-fact clg/fact-table) shard shards inp))
         (loop []
           (let [ev (async/<! inp)]
             (when-not (nil? ev)
               (let [out (em ev)]
                 (doseq [ev out]
-                  (async/>! database-event-storage-chan ev)))
+                  (async/>! database-event-storage-chan [ev (async/chan)])))
               (recur)))))
       :not-nil)
     nil))
@@ -41,21 +42,20 @@
                                database-scanner]
       (let [rule (perm/eval-symbol rule)
             matcher (ev/matcher rule link database-chan)
-            scan-chan (async/chan 100)]
-        (database-scanner (ev/source-fact-table rule link) shard shards scan-chan)
+            scan-chan (async/chan)]
+        (async/thread
+          (database-scanner (ev/source-fact-table rule link) shard shards scan-chan))
         (loop []
           (let [ev (async/<! scan-chan)
                 out-chan (async/chan)]
-            (println "processing: " ev)
             (when-not (nil? ev)
               (matcher ev out-chan)
               (di/with-dependencies!! $ [database-event-storage-chan]
                 (loop []
                   (let [ev (async/<! out-chan)]
-                    (println "got: " ev)
                     (when-not (nil? ev)
-                      (println "storing: " ev)
-                      (async/>! database-event-storage-chan ev)
+                      (async/>! database-event-storage-chan [ev (async/chan)])
+                      ;; TODO: wait for acks before completing
                       (recur))))
                 :not-nil)
               (recur)))))

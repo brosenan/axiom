@@ -40,10 +40,14 @@ It will get a response channel from the request channel, and then output two eve
 [[:chapter {:title "database-retriever: A Function for Retrieving Events from DynamoDB" :tag "database-retriever"}]]
 "`database-retriever` is a function that retrieves data from DynamoDB.  
 It is a DI-resource that depends on `dynamodb-config` -- a map containing credentials and other details for connecting to DynamoDB 
-(see [faraday's documentation](https://github.com/ptaoussanis/faraday#connecting) for more details)."
+(see [faraday's documentation](https://github.com/ptaoussanis/faraday#connecting) for more details),
+and `database-ensure-table` to ensure the table exists before accessing it."
 (fact
+ (def table-ensured (atom nil))
  (let [$ (di/injector {:dynamodb-config :some-config
-                       :dynamodb-get-tables (fn [conf] [])})]
+                       :dynamodb-get-tables (fn [conf] [])
+                       :database-ensure-table (fn [table]
+                                                (reset! table-ensured table))})]
    (module $)
    (def database-retriever (di/wait-for $ database-retriever))))
 
@@ -71,6 +75,10 @@ and the request channel.  Once called, it will perform the following:
       {:key "123" :ts 1001 :event ..bin2..}]
   (nippy/thaw ..bin1..) => {:data [1 2 3]}
   (nippy/thaw ..bin2..) => {:data [2 3 4]}))
+
+"It also ensured that the table exists by calling (our mock) `database-ensure-table`."
+(fact
+ @table-ensured => :foo.bar)
 
 "The events are reconstructed from the items:
 - The `:kind`, `:name` and `:key` fields are taken from the request.
@@ -277,6 +285,7 @@ We will use [dependency injection](di.html) to initialize the needed services."
                        :amqp-config langohr.core/*default-config*})]
    (module $)
    (rabbit-microservices.core/module $)
+   (di/wait-for $ database-event-storage)
    (def req-chan (di/wait-for $ database-chan))
    (def publish (di/wait-for $ publish))))
 
