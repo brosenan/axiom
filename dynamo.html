@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 04 May 2017</h5>
+              <h5>Date: 05 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -96,8 +96,11 @@
    (async/&gt;!! chan-req [{:some :request} chan-res])
    (async/&lt;!! chan-res) =&gt; {:event 1}
    (async/&lt;!! chan-res) =&gt; {:event 2}
-   (async/&lt;!! chan-res) =&gt; nil))</code></pre></div><div><span id="database-retriever"></span><h2><b>2 &nbsp;&nbsp; database-retriever: A Function for Retrieving Events from DynamoDB</b></h2></div><div><p><code>database-retriever</code> is a function that retrieves data from DynamoDB.<br /> It is a DI-resource that depends on <code>dynamodb-config</code> &ndash; a map containing credentials and other details for connecting to DynamoDB  (see <a href='https://github.com/ptaoussanis/faraday#connecting'>faraday's documentation</a> for more details).</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:dynamodb-config :some-config
-                     :dynamodb-get-tables (fn [conf] [])})]
+   (async/&lt;!! chan-res) =&gt; nil))</code></pre></div><div><span id="database-retriever"></span><h2><b>2 &nbsp;&nbsp; database-retriever: A Function for Retrieving Events from DynamoDB</b></h2></div><div><p><code>database-retriever</code> is a function that retrieves data from DynamoDB.<br /> It is a DI-resource that depends on <code>dynamodb-config</code> &ndash; a map containing credentials and other details for connecting to DynamoDB  (see <a href='https://github.com/ptaoussanis/faraday#connecting'>faraday's documentation</a> for more details), and <code>database-ensure-table</code> to ensure the table exists before accessing it.</p></div><div class="code"><pre><code class="clojure">(def table-ensured (atom nil))
+ (let [$ (di/injector {:dynamodb-config :some-config
+                     :dynamodb-get-tables (fn [conf] [])
+                     :database-ensure-table (fn [table]
+                                              (reset! table-ensured table))})]
  (module $)
  (def database-retriever (di/wait-for $ database-retriever)))</code></pre></div><div><p>To demonstrate how it works, let's create two channels: a request channel and a response channel.</p></div><div class="code"><pre><code class="clojure">(def chan-req (async/chan 1000))
  (def chan-res (async/chan 1000))</code></pre></div><div><p>Now let's put a request in the request channel.  The request consists of a partial event and the response channel.</p></div><div class="code"><pre><code class="clojure">(async/&gt;!! chan-req [{:kind :fact
@@ -109,7 +112,7 @@
 =&gt; [{:key &quot;123&quot; :ts 1000 :event ..bin1..}
     {:key &quot;123&quot; :ts 1001 :event ..bin2..}]
 (nippy/thaw ..bin1..) =&gt; {:data [1 2 3]}
-(nippy/thaw ..bin2..) =&gt; {:data [2 3 4]})</code></pre></div><div><p>The events are reconstructed from the items:</p><ul><li>The <code>:kind</code>, <code>:name</code> and <code>:key</code> fields are taken from the request.</li><li>The <code>:ts</code> field is taken from the item, and</li><li>The rest of the fields are taken from the de-serialized <code>:event</code> field in the item.</li></ul></div><div class="code"><pre><code class="clojure">; First event
+(nippy/thaw ..bin2..) =&gt; {:data [2 3 4]})</code></pre></div><div><p>It also ensured that the table exists by calling (our mock) <code>database-ensure-table</code>.</p></div><div class="code"><pre><code class="clojure">@table-ensured =&gt; :foo.bar</code></pre></div><div><p>The events are reconstructed from the items:</p><ul><li>The <code>:kind</code>, <code>:name</code> and <code>:key</code> fields are taken from the request.</li><li>The <code>:ts</code> field is taken from the item, and</li><li>The rest of the fields are taken from the de-serialized <code>:event</code> field in the item.</li></ul></div><div class="code"><pre><code class="clojure">; First event
  (async/alts!! [chan-res
               (async/timeout 100)]) =&gt; [{:kind :fact
                                          :name &quot;foo/bar&quot;
@@ -211,6 +214,7 @@
                      :amqp-config langohr.core/*default-config*})]
  (module $)
  (rabbit-microservices.core/module $)
+ (di/wait-for $ database-event-storage)
  (def req-chan (di/wait-for $ database-chan))
  (def publish (di/wait-for $ publish)))</code></pre></div><div><p>Now let's create a bunch of events with different <code>:name</code>, <code>:key</code> and <code>:ts</code> values.</p></div><div class="code"><pre><code class="clojure">(def events
   (for [name [&quot;foo/foo&quot; &quot;foo/bar&quot; &quot;bar/baz&quot;]
@@ -276,7 +280,13 @@
 (far/ensure-table :config :other-table [:key :s] ; :key is the partition key
                   {:range-keydef [:ts :n] ; and :ts is the range key
                    :throughput {:default :throughput}
-                   :block true}) =&gt; irrelevant)</code></pre></div><div><p>After ensuring a table exists, the table is added to <code>database-tables</code>.</p></div><div class="code"><pre><code class="clojure">@database-tables =&gt; #{:foo :bar :other-table}</code></pre></div>
+                   :block true}) =&gt; irrelevant)</code></pre></div><div><p>After ensuring a table exists, the table is added to <code>database-tables</code>.</p></div><div class="code"><pre><code class="clojure">@database-tables =&gt; #{:foo :bar :other-table}</code></pre></div><div><p>In case of a failure due to a wrong state, the operation succeeds &ndash;  after all, the table couldn't have been in the wrong state if it hadn't existed...</p></div><div class="code"><pre><code class="clojure">(database-ensure-table :yet-another) =&gt; nil
+ (provided
+(far/ensure-table :config :yet-another [:key :s] ; :key is the partition key
+                  {:range-keydef [:ts :n] ; and :ts is the range key
+                   :throughput {:default :throughput}
+                   :block true})
+=throws=&gt; (com.amazonaws.services.dynamodbv2.model.ResourceInUseException. &quot;bad state...&quot;))</code></pre></div><div><p>The <code>database-tables</code> set is still updated (we know the table exists).</p></div><div class="code"><pre><code class="clojure">@database-tables =&gt; #{:foo :bar :other-table :yet-another}</code></pre></div>
         </div>
       </div>
     </div>

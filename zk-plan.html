@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 04 May 2017</h5>
+              <h5>Date: 05 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -243,10 +243,15 @@
  (provided
 (zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '()
 (execute-function ..zk.. &quot;/foo/task-1234&quot; ..$..) =&gt; 1234.5
-                                      ; It should create a result child node and store the result to it
+;; It should create a result child node and store the result to it
 (zk/create ..zk.. &quot;/foo/task-1234/result&quot; :persistent? true) =&gt; true
 (set-initial-clj-data ..zk.. &quot;/foo/task-1234/result&quot; 1234.5) =&gt; irrelevant
-(zk/delete-all irrelevant irrelevant) =&gt; irrelevant)</code></pre></div><div><span id="set-initial-clj-data"></span><h3>9.3 &nbsp;&nbsp; set-initial-clj-data</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>node:</strong> the node</li><li><strong>data:</strong> the Clojure s-expression to be stored</li></ul><p><strong>Returns:</strong> Nothing in particular</p></div><div><p>It calls zk/set-data to update the data</p></div><div class="code"><pre><code class="clojure">(set-initial-clj-data ..zk.. ..node.. ..data..) =&gt; irrelevant
+(zk/delete-all irrelevant irrelevant) =&gt; irrelevant)</code></pre></div><div><p>Sometimes, due to race conditions, when a worker grabs a task it is already handled by another worker. In such cases the task node may be already gone when we try to list its children. In such a case, <code>perform-task</code> returns without doing anything.</p></div><div class="code"><pre><code class="clojure">(perform-task ..zk.. &quot;/foo/task-1234&quot; ..$..) =&gt; irrelevant
+ (provided
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; false)</code></pre></div><div><p>If <code>execute-function</code> returns <code>:task-does-not-exist</code>, we do not write the result and return.</p></div><div class="code"><pre><code class="clojure">(perform-task ..zk.. &quot;/foo/task-1234&quot; ..$..) =&gt; irrelevant
+ (provided
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '()
+(execute-function ..zk.. &quot;/foo/task-1234&quot; ..$..) =&gt; :task-does-not-exist)</code></pre></div><div><span id="set-initial-clj-data"></span><h3>9.3 &nbsp;&nbsp; set-initial-clj-data</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>node:</strong> the node</li><li><strong>data:</strong> the Clojure s-expression to be stored</li></ul><p><strong>Returns:</strong> Nothing in particular</p></div><div><p>It calls zk/set-data to update the data</p></div><div class="code"><pre><code class="clojure">(set-initial-clj-data ..zk.. ..node.. ..data..) =&gt; irrelevant
     (provided
      (pr-str ..data..) =&gt; ..str..
      (to-bytes ..str..) =&gt; ..bytes..
@@ -273,7 +278,10 @@
 (zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(&quot;arg-00001&quot; &quot;arg-00002&quot; &quot;arg-00000&quot;)
 (get-clj-data ..zk.. &quot;/foo/task-1234/arg-00000&quot;) =&gt; 1
 (get-clj-data ..zk.. &quot;/foo/task-1234/arg-00001&quot;) =&gt; 2
-(get-clj-data ..zk.. &quot;/foo/task-1234/arg-00002&quot;) =&gt; 3)</code></pre></div><div><span id="propagate-result"></span><h3>9.7 &nbsp;&nbsp; propagate-result</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>prov:</strong> path to the <code>prov-&#42;</code> node to propagate</li><li><strong>value:</strong> the value to be propagated</li></ul><p><strong>Returns:</strong> nothing in particular</p></div><div><p>It does the following:</p><ul><li>reads the path of the <code>dep-&#42;</code> node from the <code>prov-&#42;</code> node</li><li>create an <code>arg-&#42;</code> node at the same task and with the same serial number as the <code>dep-&#42;</code> node</li><li>set the value of the <code>arg-&#42;</code> node to be <code>value</code></li><li>remove the <code>dep-&#42;</code> node</li></ul></div><div class="code"><pre><code class="clojure">(propagate-result ..zk.. ..prov.. ..value..) =&gt; irrelevant
+(get-clj-data ..zk.. &quot;/foo/task-1234/arg-00002&quot;) =&gt; 3)</code></pre></div><div><p>If the node is removed before we manage to get the arguments we return <code>:task-does-not-exist</code> without doing anything.</p></div><div class="code"><pre><code class="clojure">(execute-function ..zk.. &quot;/foo/task-1234&quot; ..$..) =&gt; :task-does-not-exist
+ (provided
+(get-clj-data ..zk.. &quot;/foo/task-1234&quot;) =&gt; '(fn [$ &amp; args] args)
+(zk/children ..zk.. &quot;/foo/task-1234&quot;) =&gt; false)</code></pre></div><div><span id="propagate-result"></span><h3>9.7 &nbsp;&nbsp; propagate-result</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>prov:</strong> path to the <code>prov-&#42;</code> node to propagate</li><li><strong>value:</strong> the value to be propagated</li></ul><p><strong>Returns:</strong> nothing in particular</p></div><div><p>It does the following:</p><ul><li>reads the path of the <code>dep-&#42;</code> node from the <code>prov-&#42;</code> node</li><li>create an <code>arg-&#42;</code> node at the same task and with the same serial number as the <code>dep-&#42;</code> node</li><li>set the value of the <code>arg-&#42;</code> node to be <code>value</code></li><li>remove the <code>dep-&#42;</code> node</li></ul></div><div class="code"><pre><code class="clojure">(propagate-result ..zk.. ..prov.. ..value..) =&gt; irrelevant
  (provided
 (get-clj-data ..zk.. ..prov..) =&gt; &quot;/foo/task-1234/dep-01472&quot;
 (zk/create ..zk.. &quot;/foo/task-1234/arg-01472&quot; :persistent? true) =&gt; true

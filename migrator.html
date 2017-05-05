@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 04 May 2017</h5>
+              <h5>Date: 05 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -198,7 +198,7 @@
    [:add-task :plan-node `(migration-end-notifier 'perm.1234ABC/timeline #{:some-writers}) [6 7 8]] ;; =&gt; 9
    [:mark-as-ready :plan-node]]</code></pre></div><div><span id="usage-example"></span><h2><b>5 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>In this example we will migrate the rules provided in our <a href='https://github.com/brosenan/axiom/blob/master/libs/examples/test/examples/tweetlog_test.clj'>tweetlog example</a>.</p></div><div><p>First, we need to provide configuration to connect to Zookeeper, RabbitMQ and DynamoDB (local).</p></div><div class="code"><pre><code class="clojure">(def config
   {:zookeeper-config {:url &quot;127.0.0.1:2181&quot;}
-   :zk-plan-config {:num-threads 3
+   :zk-plan-config {:num-threads 5
                     :parent &quot;/my-plans&quot;}
    :dynamodb-config {:access-key &quot;FOO&quot;
                      :secret-key &quot;BAR&quot;
@@ -224,7 +224,8 @@
  (zk/create zookeeper &quot;/rules&quot; :persistent? true)
  (when (zk/exists zookeeper &quot;/my-plans&quot;)
    (zk/delete-all zookeeper &quot;/my-plans&quot;))
- (zk/create zookeeper &quot;/my-plans&quot; :persistent? true))</code></pre></div><div><p>The next step would be to generate test data. We will start with tweets:</p></div><div class="code"><pre><code class="clojure">:integ
+ (zk/create zookeeper &quot;/my-plans&quot; :persistent? true))</code></pre></div><div><p>Let's let the services some time to register themselves.</p></div><div class="code"><pre><code class="clojure">:integ
+ (Thread/sleep 1000)</code></pre></div><div><p>The next step would be to generate test data. We will start with tweets:</p></div><div class="code"><pre><code class="clojure">:integ
  (def users [&quot;alice&quot; &quot;bob&quot; &quot;charlie&quot;])
  (def time (atom 1000))
  (di/with-dependencies!! $ [publish]
@@ -232,7 +233,7 @@
          greeted [&quot;world&quot; &quot;clojure&quot; &quot;axiom&quot;]
          user users]
    (publish {:kind :fact
-             :name &quot;test/tweeted&quot;
+             :name &quot;tweetlog/tweeted&quot;
              :key user
              :data [(str greeting &quot; &quot; greeted &quot; from &quot; user)]
              :ts @time
@@ -240,18 +241,19 @@
              :writers #{[:user= user]}
              :readers #{}})
    (swap! time inc))
- :not-nil)</code></pre></div><div><p>Now let's create a full-factorial following matrix (everyone follows everyone else.</p></div><div class="code"><pre><code class="clojure">:integ
+ :not-nil)</code></pre></div><div><p>Now let's create a full-factorial following matrix (everyone follows everyone else).</p></div><div class="code"><pre><code class="clojure">:integ
  (di/with-dependencies!! $ [publish]
  (doseq [u1 users
          u2 users]
-   (publish {:kind :fact
-             :name &quot;test/follows&quot;
-             :key u1
-             :data [u2]
-             :ts @time
-             :change 1
-             :writers #{[:user= u1]}
-             :readers #{}})
+   (when-not (= u1 u2)
+     (publish {:kind :fact
+               :name &quot;tweetlog/follows&quot;
+               :key u1
+               :data [u2]
+               :ts @time
+               :change 1
+               :writers #{[:user= u1]}
+               :readers #{}}))
    (swap! time inc))
  :not-nil)</code></pre></div><div><p>Let's give the microservices a few seconds to store all the facts.</p></div><div class="code"><pre><code class="clojure">:integ
  (Thread/sleep 5000)</code></pre></div><div><p>To know when our migration is complete we need to listen to <code>axiom/rule-ready</code> events. The following service function listens to such events and for the rule <code>followee-tweets</code> it closes a channel to indicate it is done.</p></div><div class="code"><pre><code class="clojure">:integ
@@ -262,29 +264,29 @@
             (async/close! done)))
         {:kind :fact
          :name &quot;axiom/rule-ready&quot;})
- :not-nil)</code></pre></div><div><p>To kick the migration, we need to publish an <code>axiom/version</code> event with a version of the example application.</p></div><div class="code"><pre><code class="clojure">(fact
-        :integ
-        (di/with-dependencies!! $ [publish]
-          (publish {:kind :fact
-                    :name &quot;axiom/version&quot;
-                    :key &quot;perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt&quot;
-                    :data []
-                    :ts 1000
-                    :change 1
-                    :writers #{:my-app}
-                    :readers #{}})
-          :not-nil))</code></pre></div><div class="code"><pre><code class="clojure">:integ
+ :not-nil)</code></pre></div><div><p>To kick the migration, we need to publish an <code>axiom/version</code> event with a version of the example application.</p></div><div class="code"><pre><code class="clojure">:integ
  (di/with-dependencies!! $ [publish]
  (publish {:kind :fact
-           :name &quot;axiom/rule&quot;
-           :key 'perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt/followee-tweets
+           :name &quot;axiom/version&quot;
+           :key &quot;perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt&quot;
            :data []
            :ts 1000
            :change 1
            :writers #{:my-app}
            :readers #{}})
- :not-nil)</code></pre></div><div><p>So now we wait for the migration to complete</p></div><div class="code"><pre><code class="clojure">:integ
- (async/&lt;!! done)</code></pre></div><div><span id="under-the-hood"></span><h2><b>6 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="zookeeper-counter-add"></span><h3>6.1 &nbsp;&nbsp; zookeeper-counter-add</h3></div><div><p><code>zookeeper-counter-add</code> depends on the <code>zookeeper</code> resource as dependency, and uses it to implement a global atomic counter.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper :zk})]
+ :not-nil)</code></pre></div><div><p>So now we wait for the migration to complete.</p></div><div class="code"><pre><code class="clojure">:integ
+ (async/&lt;!! done)</code></pre></div><div><p>After the migration, all facts have been processed by the rules. This means that Alice's timeline should contain 18 tweets.</p></div><div class="code"><pre><code class="clojure">:integ
+ (di/with-dependencies!! $ [database-chan]
+ (let [chan-out (async/chan 30)]
+   (async/&gt;!! database-chan [{:kind :fact
+                              :name &quot;perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt/followee-tweets&quot;
+                              :key &quot;alice&quot;} chan-out])
+   (loop [res 0]
+     (let [ev (async/&lt;!! chan-out)]
+       (cond (nil? ev)
+             res
+             :else
+             (recur (inc res))))))) =&gt; 18</code></pre></div><div><span id="under-the-hood"></span><h2><b>6 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="zookeeper-counter-add"></span><h3>6.1 &nbsp;&nbsp; zookeeper-counter-add</h3></div><div><p><code>zookeeper-counter-add</code> depends on the <code>zookeeper</code> resource as dependency, and uses it to implement a global atomic counter.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper :zk})]
   (module $)
   (def zookeeper-counter-add (di/wait-for $ zookeeper-counter-add)))</code></pre></div><div><p><code>zookeeper-counter-add</code> takes a path to a counter and a number to be added. If a node corresponding to the given path does not exist, it is assumed to be equal 0, and is therefore created using the given number. The new value, which is the given number, is returned.</p></div><div class="code"><pre><code class="clojure">(zookeeper-counter-add &quot;/rules/foobar&quot; 3) =&gt; 3
  (provided
@@ -337,30 +339,35 @@
                      :database-event-storage-chan rule-tuple-chan})]
  (my-migrator $ :ignored) =&gt; nil
  (provided
-  (perm/eval-symbol 'perm.ABC/my-rule) =&gt; timeline))</code></pre></div><div><p>The migrator function should push to <code>database-event-storage-chan</code> rule events. In our case, these should be one per each fact.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [rule-tuple-chan
-              (async/timeout 1000)]) =&gt; [{:change 1
-                                          :data [&quot;alice&quot; &quot;bob&quot;]
-                                          :key &quot;bob&quot;
-                                          :kind :rule
-                                          :name &quot;migrator.core-test/timeline!0&quot;
-                                          :readers nil
-                                          :writers #{:some-writer}} rule-tuple-chan]
-(async/alts!! [rule-tuple-chan
-              (async/timeout 1000)]) =&gt; [{:change 1
-                                          :data [&quot;alice&quot; &quot;charlie&quot;]
-                                          :key &quot;charlie&quot;
-                                          :kind :rule
-                                          :name &quot;migrator.core-test/timeline!0&quot;
-                                          :readers nil
-                                          :writers #{:some-writer}} rule-tuple-chan]
-  (async/alts!! [rule-tuple-chan
-              (async/timeout 1000)]) =&gt; [{:change 1
-                                          :data [&quot;alice&quot; &quot;dave&quot;]
-                                          :key &quot;dave&quot;
-                                          :kind :rule
-                                          :name &quot;migrator.core-test/timeline!0&quot;
-                                          :readers nil
-                                          :writers #{:some-writer}} rule-tuple-chan]</code></pre></div><div><span id="link-migrator"></span><h3>6.4 &nbsp;&nbsp; link-migrator</h3></div><div><p>For links other than 0, migration requires applying a <a href='cloudlog-events.html#matcher'>matcher</a>. A matcher takes one event (a fact event in our case), and matches it against all matching events (rule events in our case). We need to provide a <code>database-chan</code> to allow the matcher to cross reference facts and rules.</p></div><div><p>The <code>link-migrator</code> function takes the following arguments:</p><ol><li><code>rule</code>: The rule to be migrated.</li><li><code>link</code>: The link number within the rule (> 0).</li><li><code>writers</code>: The rule's writer set.</li><li><code>shard</code>: The shard number to be processed by this node.</li><li><code>shards</code>: The overall number of shards.It returns a closure to be processed as a <code>zk-plan</code> task.</li></ol></div><div class="code"><pre><code class="clojure">(def my-link-migrator (link-migrator 'perm.ABC/my-rule 1 #{:my-writers} 3 17))</code></pre></div><div><p>For the migration process we will need a <code>database-scanner</code> that will provide fact events. We will mock one to produce <code>:test/tweeted</code> facts, stating that Bob, Charlie and Dave all tweeted 'hello'.</p></div><div class="code"><pre><code class="clojure">(defn mock-scanner [name shard shards chan]
+  (perm/eval-symbol 'perm.ABC/my-rule) =&gt; timeline))</code></pre></div><div><p>The migrator function should push to <code>database-event-storage-chan</code> rule events. In our case, these should be one per each fact.</p></div><div class="code"><pre><code class="clojure">(defn read-event []
+ (let [resp (async/alts!! [rule-tuple-chan
+                           (async/timeout 1000)])]
+   (when-not (= (second resp) rule-tuple-chan)
+     (throw (Exception. &quot;Opration timed out&quot;)))
+   (async/close! (second (first resp))) ;; ack
+   (first (first resp))))
+ 
+ (read-event) =&gt; {:change 1
+                :data [&quot;alice&quot; &quot;bob&quot;]
+                :key &quot;bob&quot;
+                :kind :rule
+                :name &quot;migrator.core-test/timeline!0&quot;
+                :readers nil
+                :writers #{:some-writer}}
+ (read-event) =&gt; {:change 1
+                :data [&quot;alice&quot; &quot;charlie&quot;]
+                :key &quot;charlie&quot;
+                :kind :rule
+                :name &quot;migrator.core-test/timeline!0&quot;
+                :readers nil
+                :writers #{:some-writer}}
+ (read-event) =&gt; {:change 1
+                :data [&quot;alice&quot; &quot;dave&quot;]
+                :key &quot;dave&quot;
+                :kind :rule
+                :name &quot;migrator.core-test/timeline!0&quot;
+                :readers nil
+                :writers #{:some-writer}}</code></pre></div><div><span id="link-migrator"></span><h3>6.4 &nbsp;&nbsp; link-migrator</h3></div><div><p>For links other than 0, migration requires applying a <a href='cloudlog-events.html#matcher'>matcher</a>. A matcher takes one event (a fact event in our case), and matches it against all matching events (rule events in our case). We need to provide a <code>database-chan</code> to allow the matcher to cross reference facts and rules.</p></div><div><p>The <code>link-migrator</code> function takes the following arguments:</p><ol><li><code>rule</code>: The rule to be migrated.</li><li><code>link</code>: The link number within the rule (> 0).</li><li><code>writers</code>: The rule's writer set.</li><li><code>shard</code>: The shard number to be processed by this node.</li><li><code>shards</code>: The overall number of shards.It returns a closure to be processed as a <code>zk-plan</code> task.</li></ol></div><div class="code"><pre><code class="clojure">(def my-link-migrator (link-migrator 'perm.ABC/my-rule 1 #{:my-writers} 3 17))</code></pre></div><div><p>For the migration process we will need a <code>database-scanner</code> that will provide fact events. We will mock one to produce <code>:test/tweeted</code> facts, stating that Bob, Charlie and Dave all tweeted 'hello'.</p></div><div class="code"><pre><code class="clojure">(defn mock-scanner [name shard shards chan]
   (when-not (= [name shard shards] [&quot;test/tweeted&quot; 3 17])
     (throw (Exception. (str &quot;Unexpected args in mock-scanner: &quot; [name shard shards]))))
   (doseq [user [&quot;bob&quot; &quot;charlie&quot; &quot;dave&quot;]]
@@ -397,62 +404,66 @@
                      :database-event-storage-chan mock-store-chan})]
  (my-link-migrator $ :ignored) =&gt; nil
  (provided
-  (perm/eval-symbol 'perm.ABC/my-rule) =&gt; timeline))</code></pre></div><div><p>The migration function reads all fact events from the scanner,  for each event it consults the <code>database-chan</code> for matching rule tuples, and the resulting events (timeline facts in our case) are pushed to the <code>database-event-storage-chan</code>.</p></div><div class="code"><pre><code class="clojure">;; For Bob
- (async/alts!! [mock-store-chan
-              (async/timeout 1000)]) =&gt; [{:kind :fact
-                                          :name &quot;migrator.core-test/timeline&quot;
-                                          :key &quot;alice&quot;
-                                          :data [&quot;bob&quot; &quot;hello&quot;]
-                                          :change 1
-                                          :readers nil
-                                          :writers #{:some-writer}} mock-store-chan]
-(async/alts!! [mock-store-chan
-              (async/timeout 1000)]) =&gt; [{:kind :fact
-                                          :name &quot;migrator.core-test/timeline&quot;
-                                          :key &quot;eve&quot;
-                                          :data [&quot;bob&quot; &quot;hello&quot;]
-                                          :change 1
-                                          :readers nil
-                                          :writers #{:some-writer}} mock-store-chan]
- (async/alts!! [mock-store-chan
-              (async/timeout 1000)]) =&gt; [{:kind :fact
-                                          :name &quot;migrator.core-test/timeline&quot;
-                                          :key &quot;alice&quot;
-                                          :data [&quot;charlie&quot; &quot;hello&quot;]
-                                          :change 1
-                                          :readers nil
-                                          :writers #{:some-writer}} mock-store-chan]
-(async/alts!! [mock-store-chan
-              (async/timeout 1000)]) =&gt; [{:kind :fact
-                                          :name &quot;migrator.core-test/timeline&quot;
-                                          :key &quot;eve&quot;
-                                          :data [&quot;charlie&quot; &quot;hello&quot;]
-                                          :change 1
-                                          :readers nil
-                                          :writers #{:some-writer}} mock-store-chan]
- (async/alts!! [mock-store-chan
-              (async/timeout 1000)]) =&gt; [{:kind :fact
-                                          :name &quot;migrator.core-test/timeline&quot;
-                                          :key &quot;alice&quot;
-                                          :data [&quot;dave&quot; &quot;hello&quot;]
-                                          :change 1
-                                          :readers nil
-                                          :writers #{:some-writer}} mock-store-chan]
-(async/alts!! [mock-store-chan
-              (async/timeout 1000)]) =&gt; [{:kind :fact
-                                          :name &quot;migrator.core-test/timeline&quot;
-                                          :key &quot;eve&quot;
-                                          :data [&quot;dave&quot; &quot;hello&quot;]
-                                          :change 1
-                                          :readers nil
-                                          :writers #{:some-writer}} mock-store-chan]</code></pre></div><div><p>For good citizenship, let's close the mock <code>database-chan</code> and allow the service we started shut down.</p></div><div class="code"><pre><code class="clojure">(async/close! mock-db-chan)</code></pre></div><div><span id="migration-end-notifier"></span><h3>6.5 &nbsp;&nbsp; migration-end-notifier</h3></div><div><p><a href='#rule-migrator'>rule-migrator</a> finishes when a plan is created and is ready to be executed. However, the actual migration operation only starts at that point. We therefore need a way to tell other parts of <em>axiom</em> that the rule has been migrated, once migration is complete. For this purpose, the plan will include a final piece: <code>migration-end-notifier</code>, which will <a href='rabbit-microservices.html#publish'>publish</a> a <code>axiom/rule-ready</code> event holding the rule identifier as its <code>:key</code>.</p></div><div class="code"><pre><code class="clojure">(def my-end-notifier (migration-end-notifier 'perm.ABC123/my-rule #{:some-writer}))</code></pre></div><div><p>The returned closure (<code>my-end-notifier</code>) takes an injector and any number of other parameters. From the injector it takes the <code>publish</code> resource to publish the desired event.</p></div><div class="code"><pre><code class="clojure">(def events (transient []))
+  (perm/eval-symbol 'perm.ABC/my-rule) =&gt; timeline))</code></pre></div><div><p>The migration function reads all fact events from the scanner,  for each event it consults the <code>database-chan</code> for matching rule tuples, and the resulting events (timeline facts in our case) are pushed to the <code>database-event-storage-chan</code>.</p></div><div class="code"><pre><code class="clojure">(defn read-event []
+ (let [resp (async/alts!! [mock-store-chan
+                           (async/timeout 1000)])]
+   (when-not (= (second resp) mock-store-chan)
+     (throw (Exception. &quot;Operation timed out&quot;)))
+   (async/close! (second (first resp))) ;; ack
+   (first (first resp))))
+ ;; For Bob
+ (read-event) =&gt; {:kind :fact
+                :name &quot;migrator.core-test/timeline&quot;
+                :key &quot;alice&quot;
+                :data [&quot;bob&quot; &quot;hello&quot;]
+                :change 1
+                :readers nil
+                :writers #{:some-writer}}
+ (read-event) =&gt; {:kind :fact
+                :name &quot;migrator.core-test/timeline&quot;
+                :key &quot;eve&quot;
+                :data [&quot;bob&quot; &quot;hello&quot;]
+                :change 1
+                :readers nil
+                :writers #{:some-writer}}
+ (read-event) =&gt; {:kind :fact
+                :name &quot;migrator.core-test/timeline&quot;
+                :key &quot;alice&quot;
+                :data [&quot;charlie&quot; &quot;hello&quot;]
+                :change 1
+                :readers nil
+                :writers #{:some-writer}}
+ (read-event) =&gt; {:kind :fact
+                :name &quot;migrator.core-test/timeline&quot;
+                :key &quot;eve&quot;
+                :data [&quot;charlie&quot; &quot;hello&quot;]
+                :change 1
+                :readers nil
+                :writers #{:some-writer}}
+ (read-event) =&gt; {:kind :fact
+                :name &quot;migrator.core-test/timeline&quot;
+                :key &quot;alice&quot;
+                :data [&quot;dave&quot; &quot;hello&quot;]
+                :change 1
+                :readers nil
+                :writers #{:some-writer}}
+ (read-event) =&gt; {:kind :fact
+                :name &quot;migrator.core-test/timeline&quot;
+                :key &quot;eve&quot;
+                :data [&quot;dave&quot; &quot;hello&quot;]
+                :change 1
+                :readers nil
+                :writers #{:some-writer}}</code></pre></div><div><p>For good citizenship, let's close the mock <code>database-chan</code> and allow the service we started shut down.</p></div><div class="code"><pre><code class="clojure">(async/close! mock-db-chan)</code></pre></div><div><span id="migration-end-notifier"></span><h3>6.5 &nbsp;&nbsp; migration-end-notifier</h3></div><div><p><a href='#rule-migrator'>rule-migrator</a> finishes when a plan is created and is ready to be executed. However, the actual migration operation only starts at that point. We therefore need a way to tell other parts of <em>axiom</em> that the rule has been migrated, once migration is complete. For this purpose, the plan will include a final piece: <code>migration-end-notifier</code>, which will <a href='rabbit-microservices.html#publish'>publish</a> a <code>axiom/rule-ready</code> event holding the rule identifier as its <code>:key</code>.</p></div><div class="code"><pre><code class="clojure">(def my-end-notifier (migration-end-notifier 'perm.ABC123/my-rule #{:some-writer}))</code></pre></div><div><p>The returned closure (<code>my-end-notifier</code>) takes an injector and any number of other parameters. From the injector it takes the <code>publish</code> resource to publish the desired event.</p></div><div class="code"><pre><code class="clojure">(def events (transient []))
  (let [$ (di/injector {:publish (fn [ev] (conj! events ev))})]
- (my-end-notifier $ :some :other :params))</code></pre></div><div><p>Once called it should <code>publish</code> an <code>axiom/rule-ready</code> event.</p></div><div class="code"><pre><code class="clojure">(persistent! events) =&gt; [{:kind :fact
-                         :name &quot;axiom/rule-ready&quot;
-                         :key 'perm.ABC123/my-rule
-                         :data []
-                         :change 1
-                         :writers #{:some-writer}}]</code></pre></div>
+ (my-end-notifier $ :some :other :params))</code></pre></div><div><p>Once called it should <code>publish</code> an <code>axiom/rule-ready</code> event (we ignore the <code>:ts</code> field which changes with time).</p></div><div class="code"><pre><code class="clojure">(-&gt; events
+   persistent!
+   first
+   (dissoc :ts)) =&gt; {:kind :fact
+                     :name &quot;axiom/rule-ready&quot;
+                     :key 'perm.ABC123/my-rule
+                     :data []
+                     :change 1
+                     :writers #{:some-writer}}</code></pre></div>
         </div>
       </div>
     </div>
