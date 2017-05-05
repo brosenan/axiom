@@ -419,3 +419,19 @@ If the table exists in `database-tables`, it does nothing."
 "After ensuring a table exists, the table is added to `database-tables`."
 (fact
  @database-tables => #{:foo :bar :other-table})
+
+
+"In case of a failure due to a wrong state, the operation succeeds -- 
+after all, the table couldn't have been in the wrong state if it hadn't existed..."
+(fact
+ (database-ensure-table :yet-another) => nil
+ (provided
+  (far/ensure-table :config :yet-another [:key :s] ; :key is the partition key
+                    {:range-keydef [:ts :n] ; and :ts is the range key
+                     :throughput {:default :throughput}
+                     :block true})
+  =throws=> (com.amazonaws.services.dynamodbv2.model.ResourceInUseException. "bad state...")))
+
+"The `database-tables` set is still updated (we know the table exists)."
+(fact
+ @database-tables => #{:foo :bar :other-table :yet-another})

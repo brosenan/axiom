@@ -314,25 +314,12 @@ The following service function listens to such events and for the rule `followee
    :not-nil))
 
 "To kick the migration, we need to publish an `axiom/version` event with a version of the example application."
-(comment (fact
-          :integ
-          (di/with-dependencies!! $ [publish]
-            (publish {:kind :fact
-                      :name "axiom/version"
-                      :key "perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt"
-                      :data []
-                      :ts 1000
-                      :change 1
-                      :writers #{:my-app}
-                      :readers #{}})
-            :not-nil)))
-
 (fact
  :integ
  (di/with-dependencies!! $ [publish]
    (publish {:kind :fact
-             :name "axiom/rule"
-             :key 'perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt/followee-tweets
+             :name "axiom/version"
+             :key "perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt"
              :data []
              :ts 1000
              :change 1
@@ -340,10 +327,27 @@ The following service function listens to such events and for the rule `followee
              :readers #{}})
    :not-nil))
 
-"So now we wait for the migration to complete"
+"So now we wait for the migration to complete."
 (fact
  :integ
  (async/<!! done))
+
+"After the migration, all facts have been processed by the rules.
+This means that Alice's timeline should contain 27 tweets."
+(fact
+ :integ
+ (di/with-dependencies!! $ [database-chan]
+   (let [chan-out (async/chan 30)]
+     (async/>!! database-chan [{:kind :fact
+                                :name "perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt/followee-tweets"
+                                :key "alice"} chan-out])
+     (loop [res 0]
+       (let [ev (async/<!! chan-out)]
+         (cond (nil? ev)
+               res
+               :else
+               (recur (inc res))))))) => 27)
+
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "zookeeper-counter-add"}]]
 "`zookeeper-counter-add` depends on the `zookeeper` resource as dependency, and uses it to implement a global atomic counter."
@@ -646,11 +650,14 @@ From the injector it takes the `publish` resource to publish the desired event."
  (let [$ (di/injector {:publish (fn [ev] (conj! events ev))})]
    (my-end-notifier $ :some :other :params)))
 
-"Once called it should `publish` an `axiom/rule-ready` event."
+"Once called it should `publish` an `axiom/rule-ready` event (we ignore the `:ts` field which changes with time)."
 (fact
- (persistent! events) => [{:kind :fact
-                           :name "axiom/rule-ready"
-                           :key 'perm.ABC123/my-rule
-                           :data []
-                           :change 1
-                           :writers #{:some-writer}}])
+ (-> events
+     persistent!
+     first
+     (dissoc :ts)) => {:kind :fact
+                       :name "axiom/rule-ready"
+                       :key 'perm.ABC123/my-rule
+                       :data []
+                       :change 1
+                       :writers #{:some-writer}})

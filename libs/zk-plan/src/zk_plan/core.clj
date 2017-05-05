@@ -41,20 +41,20 @@
     (loop [tasks tasks]
             (if (empty? tasks)
               nil
-              ; else
+              ;; else
               (let [task (first tasks)
                     task-props (zk/children zk task)]
                 (if (= task-props nil)
                   (do (zk/delete zk task)
                       (recur (rest tasks)))
-                                        ; else
+                  ;; else
                   (if (and task-props
                            (not (some #(or (re-matches #"dep-\d+" %)
                                            (= "owner" %)) task-props))
                            (contains? (set task-props) "ready")
                            (take-ownership zk task))
                     task
-                                        ; else
+                    ;; else
                     (recur (rest tasks)))))))))
 
 
@@ -66,13 +66,17 @@
   (let [func (get-clj-data zk node)
         _ (println "executing function: " func)
         func' (eval func)
-        vals (->> (zk/children zk node)
-                  (filter #(re-matches #"arg-\d+" %))
-                  sort
-                  (map #(str node "/" %))
-                  (map #(get-clj-data zk %)))]
-    (let [res (apply func' $ vals)]
-      res)))
+        children (zk/children zk node)]
+    (cond children
+      (let [vals (->> children
+                      (filter #(re-matches #"arg-\d+" %))
+                      sort
+                      (map #(str node "/" %))
+                      (map #(get-clj-data zk %)))
+            res (apply func' $ vals)]
+        res)
+      :else
+      :task-does-not-exist)))
 
 (defn propagate-result [zk prov value]
   (let [dep (get-clj-data zk prov)
@@ -84,27 +88,45 @@
 (defn prov? [key]
   (re-matches #"prov-\d+" key))
 
+(defmacro retry [times & exprs]
+  (cond (> times 1)
+        `(try
+           ~@exprs
+           (catch Throwable ~'$e
+             (retry ~(dec times)
+                    ~@exprs)))
+        :else
+        `(do
+           ~@exprs)))
+
 (defn perform-task [zk task $]
-  (let [children   (zk/children zk task)
-        result-node (str task "/result")
-        res (if (contains? (set children) "result")
-              (get-clj-data zk result-node)
-              ; else
-              (execute-function zk task $))]
-    (when-not (contains? (set children) "result")
-      (zk/create zk result-node :persistent? true)
-      (set-initial-clj-data zk result-node res))
-    (doseq [prov (filter prov? children)]
-      (propagate-result zk (str task "/" prov) res)))
-  (zk/delete-all zk task))
+  (let [children (zk/children zk task)]
+    (when children
+      (let [result-node (str task "/result")
+            res (if (contains? (set children) "result")
+                  (get-clj-data zk result-node)
+                  ;; else
+                  (execute-function zk task $))]
+        (when-not (= res :task-does-not-exist)
+          (when-not (contains? (set children) "result")
+            (zk/create zk result-node :persistent? true)
+            (set-initial-clj-data zk result-node res))
+          (doseq [prov (filter prov? children)]
+            (propagate-result zk (str task "/" prov) res))
+          (retry 3 (zk/delete-all zk task)))))))
 
 (defn get-task-from-any-plan [zk parent]
   (let [plans (zk/children zk parent)]
     (when plans
-      (let [plans (map (partial str parent "/") plans)
-            ready-plans (filter (fn [plan] (zk/exists zk (str plan "/ready"))) plans)
-            tasks (map (partial get-task zk) ready-plans)]
-        (some identity tasks)))))
+      (loop [plans (map (partial str parent "/") plans)]
+        (when-not (empty? plans)
+          (let [plan (first plans)]
+            (let [task (and (zk/exists zk (str plan "/ready"))
+                            (get-task zk plan))]
+              (cond task
+                    task
+                    :else
+                    (recur (rest plans))))))))))
 
 (defn calc-sleep-time [attrs count]
   (let [max (:max attrs 10000)]
@@ -127,7 +149,7 @@
           (finally
             (when (zk/exists zk task)
               (zk/delete zk (str task "/owner")))))
-        ; else
+        ;; else
         (do
           (Thread/sleep (calc-sleep-time attrs count))
           (recur (inc count)))))))

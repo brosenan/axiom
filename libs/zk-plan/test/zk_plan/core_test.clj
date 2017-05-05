@@ -374,10 +374,25 @@ We call execute-function to get the result, and store it as the 'result' child."
  (provided
   (zk/children ..zk.. "/foo/task-1234") => '()
   (execute-function ..zk.. "/foo/task-1234" ..$..) => 1234.5
-                                        ; It should create a result child node and store the result to it
+  ;; It should create a result child node and store the result to it
   (zk/create ..zk.. "/foo/task-1234/result" :persistent? true) => true
   (set-initial-clj-data ..zk.. "/foo/task-1234/result" 1234.5) => irrelevant
   (zk/delete-all irrelevant irrelevant) => irrelevant))
+
+"Sometimes, due to race conditions, when a worker grabs a task it is already handled by another worker.
+In such cases the task node may be already gone when we try to list its children.
+In such a case, `perform-task` returns without doing anything."
+(fact
+ (perform-task ..zk.. "/foo/task-1234" ..$..) => irrelevant
+ (provided
+  (zk/children ..zk.. "/foo/task-1234") => false))
+
+"If `execute-function` returns `:task-does-not-exist`, we do not write the result and return."
+(fact
+ (perform-task ..zk.. "/foo/task-1234" ..$..) => irrelevant
+ (provided
+  (zk/children ..zk.. "/foo/task-1234") => '()
+  (execute-function ..zk.. "/foo/task-1234" ..$..) => :task-does-not-exist))
 
 [[:section {:title "set-initial-clj-data"}]]
 "
@@ -468,6 +483,13 @@ If no parameters exist in the task it executes the function without parameters."
   (get-clj-data ..zk.. "/foo/task-1234/arg-00000") => 1
   (get-clj-data ..zk.. "/foo/task-1234/arg-00001") => 2
   (get-clj-data ..zk.. "/foo/task-1234/arg-00002") => 3))
+
+"If the node is removed before we manage to get the arguments we return `:task-does-not-exist` without doing anything."
+(fact
+ (execute-function ..zk.. "/foo/task-1234" ..$..) => :task-does-not-exist
+ (provided
+  (get-clj-data ..zk.. "/foo/task-1234") => '(fn [$ & args] args)
+  (zk/children ..zk.. "/foo/task-1234") => false))
 
 [[:section {:title "propagate-result"}]]
 "

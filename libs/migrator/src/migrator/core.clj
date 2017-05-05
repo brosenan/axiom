@@ -46,12 +46,15 @@
         (loop []
           (let [ev (async/<! scan-chan)
                 out-chan (async/chan)]
+            (println "processing: " ev)
             (when-not (nil? ev)
               (matcher ev out-chan)
               (di/with-dependencies!! $ [database-event-storage-chan]
                 (loop []
                   (let [ev (async/<! out-chan)]
+                    (println "got: " ev)
                     (when-not (nil? ev)
+                      (println "storing: " ev)
                       (async/>! database-event-storage-chan ev)
                       (recur))))
                 :not-nil)
@@ -67,6 +70,7 @@
                 :name "axiom/rule-ready"
                 :key rule
                 :data []
+                :ts (.getTime (java.util.Date.))
                 :change 1
                 :writers writers})
       :not-nil)))

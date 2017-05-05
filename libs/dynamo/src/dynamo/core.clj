@@ -112,10 +112,14 @@
                                        dynamodb-config]
                 (fn [table]
                   (when-not (contains? @database-tables table)
-                    (far/ensure-table dynamodb-config table
-                                      [:key :s]
-                                      {:range-keydef [:ts :n]
-                                       :throughput dynamodb-default-throughput
-                                       :block true})
+                    (try
+                      (far/ensure-table dynamodb-config table
+                                        [:key :s]
+                                        {:range-keydef [:ts :n]
+                                         :throughput dynamodb-default-throughput
+                                         :block true})
+                      (catch com.amazonaws.services.dynamodbv2.model.ResourceInUseException e
+                        ;; do nothing
+                        ))
                     (swap! database-tables #(conj % table)))
                   nil))))
