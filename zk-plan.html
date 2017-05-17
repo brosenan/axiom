@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 05 May 2017</h5>
+              <h5>Date: 17 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -86,7 +86,8 @@
           </div>
           <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>zk-plan</code> is a tool for orchestrating execution of parallel jobs. It is based on the notion of a <em>plan</em>, which is dependecy graph of Clojure functions to be executed. After <a href='#create-plan'>creating a plan</a>, <a href='#add-task'>populating it</a> and <a href='#mark-as-ready'>marking it ready for execution</a>, a cluster of <em>workers</em> start taking tasks from it. A worker will only take a task for which all dependencies are met. If a task fails it is automatically retried by another worker. Eventually, <a href='#plan-completed'>plan-completed?</a> will indicated if all tasks in a given plan have been successfully completed.</p></div><div><span id="module"></span><h2><b>2 &nbsp;&nbsp; module</b></h2></div><div><p>The content of this library is provided as a <a href='di.html'>dependency injection</a> module. The <code>zk-plan</code> resource containing the external API of this library depends on the <code>zookeeper</code> resource which is a Zookeeper connection object. <code>zookeeper</code> itself is provided by this module, but it depends on <code>zookeeper-config</code>, containing the coordinates of the Zookeeper server.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper :zk})] ;; :zk is a mock zookeeper connection object
  (module $)
- (def zk-plan (di/wait-for $ zk-plan)))</code></pre></div><div><p>The <code>zk-plan</code> resource is a map containing function comprising the external API of this library, already addressing a given connection.</p></div><div class="code"><pre><code class="clojure">(def create-plan (:create-plan zk-plan))
+ (di/startup $)
+ (def zk-plan (di/do-with! $ [zk-plan] zk-plan)))</code></pre></div><div><p>The <code>zk-plan</code> resource is a map containing function comprising the external API of this library, already addressing a given connection.</p></div><div class="code"><pre><code class="clojure">(def create-plan (:create-plan zk-plan))
  create-plan =&gt; fn?
  (def add-task (:add-task zk-plan))
  add-task =&gt; fn?
@@ -174,20 +175,21 @@
                      :zk-plan-config {:num-threads N
                                       :parent &quot;/stress&quot;}})]
  (module $)
- (let [zk (di/wait-for $ zookeeper)
-       zk-plan (di/wait-for $ zk-plan)
-       {:keys [plan-completed?]} zk-plan
-       parent &quot;/stress&quot;]
-   (zk/delete-all zk &quot;/stress&quot;)
-   (zk/create zk parent :persistent? true)
-   (let [plan (build-stress-plan zk-plan parent)]
-     (loop []
-       (when-not (plan-completed? plan)
-         (Thread/sleep 100)
-         (recur)))
-     (doseq [m (range M)]
-       (when-not (contains? @workers-completed m)
-         (println &quot;Task &quot; m &quot; was not completed&quot;))))))</code></pre></div><div><span id="under-the-hood"></span><h2><b>9 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="get-task"></span><h3>9.1 &nbsp;&nbsp; get-task</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>plan:</strong> the path to the plan</li></ul><p><strong>Returns:</strong> path to the task</p></div><div><p>It returns nil if the plan is empty</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. ..plan..) =&gt; nil
+ (di/startup $)
+ (di/do-with! $ [zookeeper
+                 zk-plan]
+              (let [{:keys [plan-completed?]} zk-plan
+                    parent &quot;/stress&quot;]
+                (zk/delete-all zookeeper &quot;/stress&quot;)
+                (zk/create zookeeper parent :persistent? true)
+                (let [plan (build-stress-plan zk-plan parent)]
+                  (loop []
+                    (when-not (plan-completed? plan)
+                      (Thread/sleep 100)
+                      (recur)))
+                  (doseq [m (range M)]
+                    (when-not (contains? @workers-completed m)
+                      (println &quot;Task &quot; m &quot; was not completed&quot;)))))))</code></pre></div><div><span id="under-the-hood"></span><h2><b>9 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="get-task"></span><h3>9.1 &nbsp;&nbsp; get-task</h3></div><div><p><strong>Parameters:</strong></p><ul><li><strong>zk:</strong> the Zookeeper connection object</li><li><strong>plan:</strong> the path to the plan</li></ul><p><strong>Returns:</strong> path to the task</p></div><div><p>It returns nil if the plan is empty</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. ..plan..) =&gt; nil
  (provided
 (zk/children ..zk.. ..plan..) =&gt; nil)</code></pre></div><div><p>It returns a task if it does not have <code>dep-&#42;</code> or owner as children</p></div><div class="code"><pre><code class="clojure">(get-task ..zk.. &quot;/foo&quot;) =&gt; &quot;/foo/task-1234&quot;
  (provided

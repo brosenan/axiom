@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 05 May 2017</h5>
+              <h5>Date: 17 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -86,11 +86,12 @@
           </div>
           <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>migrator</code> is a microservice that listens to events describing new rules being published, and initiates data migration using <a href='zk-plan.html'>zk-plan</a>.</p></div><div><p>Consider for example the <code>timeline</code> clause originally introduced in our <a href='cloudlog.html#joins'>cloudlog documentation</a>.</p></div><div class="code"><pre><code class="clojure">(clg/defrule timeline [user author tweet]
   [:test/follows user author] (clg/by-anyone)
-  [:test/tweeted author tweet] (clg/by-anyone))</code></pre></div><div><p>If we introduce this rule when <code>:test/follows</code> and <code>:test/tweeted</code> facts already exist, a migration process is necessary to do the following:</p><ol><li>Create timeline entries for all the tweets that already have followers.</li><li>Create intermediate data so that new followers will receive existing tweets in their timelines.</li><li>Create intermediate data so that new tweets will be added to the timelines of existing followers.</li></ol></div><div><p>To allow this to happen, we need to go through all the <code>:test/follows</code> facts first and create intermediate rule tuples based on them. Then we need to go through all the <code>:test/tweeted</code> facts and match them against the tuples we generated in the previous step to know to which timelines each tweet needs to go.</p></div><div><p>Going through all the existing facts with a certain name can be a lengthy process. To speed things up we do the following:</p><ul><li>We use <a href='zk-plan.html'>zk-plan</a> to distribute this work across multiple workers.</li><li>We <a href='dynamo.html#database-scanner'>scan the facts</a> in the database in shards, to allow different computer nodes to process different pieces of data in parallel.</li></ul></div><div><span id="extract-version-rules"></span><h2><b>2 &nbsp;&nbsp; extract-version-rules</b></h2></div><div><p><code>extract-version-rules</code> is a service function which registers to <code>:axiom/version</code> events. As such it depends on the <code>serve</code> function we will mock in order to get hold of the function itself and the registration it is making.</p></div><div class="code"><pre><code class="clojure">(let [reg (async/chan)
+  [:test/tweeted author tweet] (clg/by-anyone))</code></pre></div><div><p>If we introduce this rule when <code>:test/follows</code> and <code>:test/tweeted</code> facts already exist, a migration process is necessary to do the following:</p><ol><li>Create timeline entries for all the tweets that already have followers.</li><li>Create intermediate data so that new followers will receive existing tweets in their timelines.</li><li>Create intermediate data so that new tweets will be added to the timelines of existing followers.</li></ol></div><div><p>To allow this to happen, we need to go through all the <code>:test/follows</code> facts first and create intermediate rule tuples based on them. Then we need to go through all the <code>:test/tweeted</code> facts and match them against the tuples we generated in the previous step to know to which timelines each tweet needs to go.</p></div><div><p>Going through all the existing facts with a certain name can be a lengthy process. To speed things up we do the following:</p><ul><li>We use <a href='zk-plan.html'>zk-plan</a> to distribute this work across multiple workers.</li><li>We <a href='dynamo.html#database-scanner'>scan the facts</a> in the database in shards, to allow different computer nodes to process different pieces of data in parallel.</li></ul></div><div><span id="extract-version-rules"></span><h2><b>2 &nbsp;&nbsp; extract-version-rules</b></h2></div><div><p><code>extract-version-rules</code> is a service function which registers to <code>:axiom/version</code> events. As such it depends on the <code>serve</code> function we will mock in order to get hold of the function itself and the registration it is making.</p></div><div class="code"><pre><code class="clojure">(let [reg (transient [])
      $ (di/injector {:serve (fn [f r]
-                              (async/&gt;!! reg [f r]))})]
+                              (conj! reg [f r]))})]
  (module $)
- (let [[f r] (async/&lt;!! reg)]
+ (di/startup $)
+ (let [[[f r]] (persistent! reg)]
    r =&gt; {:kind :fact
          :name &quot;axiom/version&quot;}
    (def extract-version-rules f)))</code></pre></div><div><p><code>:axiom/version</code> events report on addition or removal of <code>permacode</code> module versions. <code>extract-version-rules</code> extracts all the rule functions from such a version and publishes corresponding <code>:axiom/rule</code> events.</p></div><div><p>It publishes only rule functions, identified by having a <code>:source-fact</code> meta field.</p></div><div class="code"><pre><code class="clojure">(extract-version-rules {:key &quot;perm.1234ABC&quot;} ..pub..) =&gt; nil
@@ -106,7 +107,7 @@
           :name &quot;axiom/rule&quot;
           :key 'perm.1234ABC/bar
           :data []}) =&gt; irrelevant)</code></pre></div><div><span id="rule-tracker"></span><h2><b>3 &nbsp;&nbsp; rule-tracker</b></h2></div><div><p><code>rule-tracker</code> registers to <code>:axiom/rule</code> and tracks the quantity of each rule by summing the <code>:change</code> <a href='cloudlog-events.html#introduction'>field of the event</a>.</p></div><div><p>It depends on the resources <a href='#zookeeper-counter-add'>zookeeper-counter-add</a> <code>declare-service</code> and <code>assign-service</code>, which we will mock.</p></div><div class="code"><pre><code class="clojure">(def mock-counters (transient {&quot;/rules/perm.1234ABC.foo&quot; 2}))
- (def calls (async/chan))
+ (def calls (async/chan 10))
  (let [$ (di/injector {:zookeeper-counter-add (fn [path change]
                                               (let [old (mock-counters path 0)
                                                     new (+ old change)]
@@ -115,6 +116,7 @@
                      :declare-service (fn [key reg] (async/&gt;!! calls [:declare-service key reg]))
                      :assign-service (fn [key func] (async/&gt;!! calls [:assign-service key func]))})]
  (module $)
+ (di/startup $)
  (let [[call chan] (async/alts!! [calls
                                   (async/timeout 1000)])]
    chan =&gt; calls
@@ -170,6 +172,7 @@
                      :migration-config {:number-of-shards 3
                                         :plan-prefix &quot;/my-plans&quot;}})]
  (module $)
+ (di/startup $)
  (async/alts!! [calls-chan
                 (async/timeout 1000)]) =&gt; [[:declare-service &quot;migrator.core/rule-migrator&quot; {:kind :fact
                                                                                             :name &quot;axiom/rule-exists&quot;}] calls-chan]
@@ -217,8 +220,9 @@
  (module $)
  (rms/module $)
  (zkp/module $)
- (dyn/module $)</code></pre></div><div><p>Let's create the root elements we need in Zookeeper</p></div><div class="code"><pre><code class="clojure">:integ
- (di/with-dependencies!! $ [zookeeper]
+ (dyn/module $)
+ (di/startup $)</code></pre></div><div><p>Let's create the root elements we need in Zookeeper</p></div><div class="code"><pre><code class="clojure">:integ
+ (di/do-with! $ [zookeeper]
  (when (zk/exists zookeeper &quot;/rules&quot;)
    (zk/delete-all zookeeper &quot;/rules&quot;))
  (zk/create zookeeper &quot;/rules&quot; :persistent? true)
@@ -228,7 +232,7 @@
  (Thread/sleep 1000)</code></pre></div><div><p>The next step would be to generate test data. We will start with tweets:</p></div><div class="code"><pre><code class="clojure">:integ
  (def users [&quot;alice&quot; &quot;bob&quot; &quot;charlie&quot;])
  (def time (atom 1000))
- (di/with-dependencies!! $ [publish]
+ (di/do-with! $ [publish]
  (doseq [greeting [&quot;hello&quot; &quot;hi&quot; &quot;howdy&quot;]
          greeted [&quot;world&quot; &quot;clojure&quot; &quot;axiom&quot;]
          user users]
@@ -242,7 +246,7 @@
              :readers #{}})
    (swap! time inc))
  :not-nil)</code></pre></div><div><p>Now let's create a full-factorial following matrix (everyone follows everyone else).</p></div><div class="code"><pre><code class="clojure">:integ
- (di/with-dependencies!! $ [publish]
+ (di/do-with! $ [publish]
  (doseq [u1 users
          u2 users]
    (when-not (= u1 u2)
@@ -258,14 +262,14 @@
  :not-nil)</code></pre></div><div><p>Let's give the microservices a few seconds to store all the facts.</p></div><div class="code"><pre><code class="clojure">:integ
  (Thread/sleep 5000)</code></pre></div><div><p>To know when our migration is complete we need to listen to <code>axiom/rule-ready</code> events. The following service function listens to such events and for the rule <code>followee-tweets</code> it closes a channel to indicate it is done.</p></div><div class="code"><pre><code class="clojure">:integ
  (def done (async/chan))
- (di/with-dependencies!! $ [serve]
+ (di/do-with! $ [serve]
  (serve (fn [ev]
           (when (= (name (:key ev)) &quot;followee-tweets&quot;)
             (async/close! done)))
         {:kind :fact
          :name &quot;axiom/rule-ready&quot;})
  :not-nil)</code></pre></div><div><p>To kick the migration, we need to publish an <code>axiom/version</code> event with a version of the example application.</p></div><div class="code"><pre><code class="clojure">:integ
- (di/with-dependencies!! $ [publish]
+ (di/do-with! $ [publish]
  (publish {:kind :fact
            :name &quot;axiom/version&quot;
            :key &quot;perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt&quot;
@@ -276,7 +280,7 @@
            :readers #{}})
  :not-nil)</code></pre></div><div><p>So now we wait for the migration to complete.</p></div><div class="code"><pre><code class="clojure">:integ
  (async/&lt;!! done)</code></pre></div><div><p>After the migration, all facts have been processed by the rules. This means that Alice's timeline should contain 18 tweets.</p></div><div class="code"><pre><code class="clojure">:integ
- (di/with-dependencies!! $ [database-chan]
+ (di/do-with! $ [database-chan]
  (let [chan-out (async/chan 30)]
    (async/&gt;!! database-chan [{:kind :fact
                               :name &quot;perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt/followee-tweets&quot;
@@ -288,7 +292,8 @@
              :else
              (recur (inc res))))))) =&gt; 18</code></pre></div><div><span id="under-the-hood"></span><h2><b>6 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="zookeeper-counter-add"></span><h3>6.1 &nbsp;&nbsp; zookeeper-counter-add</h3></div><div><p><code>zookeeper-counter-add</code> depends on the <code>zookeeper</code> resource as dependency, and uses it to implement a global atomic counter.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper :zk})]
   (module $)
-  (def zookeeper-counter-add (di/wait-for $ zookeeper-counter-add)))</code></pre></div><div><p><code>zookeeper-counter-add</code> takes a path to a counter and a number to be added. If a node corresponding to the given path does not exist, it is assumed to be equal 0, and is therefore created using the given number. The new value, which is the given number, is returned.</p></div><div class="code"><pre><code class="clojure">(zookeeper-counter-add &quot;/rules/foobar&quot; 3) =&gt; 3
+  (di/startup $)
+  (def zookeeper-counter-add (di/do-with! $ [zookeeper-counter-add] zookeeper-counter-add)))</code></pre></div><div><p><code>zookeeper-counter-add</code> takes a path to a counter and a number to be added. If a node corresponding to the given path does not exist, it is assumed to be equal 0, and is therefore created using the given number. The new value, which is the given number, is returned.</p></div><div class="code"><pre><code class="clojure">(zookeeper-counter-add &quot;/rules/foobar&quot; 3) =&gt; 3
  (provided
 (zk/exists :zk &quot;/rules/foobar&quot;) =&gt; nil
 (zk/create :zk &quot;/rules/foobar&quot; :persistent? true) =&gt; &quot;/rules/foobar&quot;
@@ -384,14 +389,14 @@
        ;; The query is for rule tuples of link 0
        (when-not (= (:name query) &quot;migrator.core-test/timeline!0&quot;)
          (throw (Exception. (str &quot;Wrong fact in query: &quot; (:name query)))))
-       (async/&gt;! out-chan {:change 1
+       (async/&gt;!! out-chan {:change 1
                            :data [&quot;alice&quot; (:key query)]
                            :key (:key query)
                            :kind :rule
                            :name &quot;migrator.core-test/timeline!0&quot;
                            :readers nil
                            :writers #{:some-writer}})
-       (async/&gt;! out-chan {:change 1
+       (async/&gt;!! out-chan {:change 1
                            :data [&quot;eve&quot; (:key query)]
                            :key (:key query)
                            :kind :rule

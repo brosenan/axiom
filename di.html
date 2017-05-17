@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 05 May 2017</h5>
+              <h5>Date: 17 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li><li><a class="chapter" data-scroll="" href="#wait-for"><h4>5 &nbsp; wait-for</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies-0"><h4>6 &nbsp; with-dependencies!!</h4></a></li><li><a class="chapter" data-scroll="" href="#best-practices"><h4>7 &nbsp; Best Practices</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#do-with"><h4>4 &nbsp; do-with</h4></a></li><li><a class="chapter" data-scroll="" href="#startup"><h4>5 &nbsp; startup</h4></a></li><li><a class="chapter" data-scroll="" href="#shutdown"><h4>6 &nbsp; shutdown</h4></a></li><li><a class="chapter" data-scroll="" href="#do-with-0"><h4>7 &nbsp; do-with!</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>8 &nbsp; Under the Hood</h4></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,117 +80,115 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies"><h4>4 &nbsp; with-dependencies</h4></a></li><li><a class="chapter" data-scroll="" href="#wait-for"><h4>5 &nbsp; wait-for</h4></a></li><li><a class="chapter" data-scroll="" href="#with-dependencies-0"><h4>6 &nbsp; with-dependencies!!</h4></a></li><li><a class="chapter" data-scroll="" href="#best-practices"><h4>7 &nbsp; Best Practices</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#intoduction"><h4>1 &nbsp; Intoduction</h4></a></li><li><a class="chapter" data-scroll="" href="#injector"><h4>2 &nbsp; injector</h4></a></li><li><a class="chapter" data-scroll="" href="#provide"><h4>3 &nbsp; provide</h4></a></li><li><a class="chapter" data-scroll="" href="#do-with"><h4>4 &nbsp; do-with</h4></a></li><li><a class="chapter" data-scroll="" href="#startup"><h4>5 &nbsp; startup</h4></a></li><li><a class="chapter" data-scroll="" href="#shutdown"><h4>6 &nbsp; shutdown</h4></a></li><li><a class="chapter" data-scroll="" href="#do-with-0"><h4>7 &nbsp; do-with!</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>8 &nbsp; Under the Hood</h4></a></li>
                 </ul>
               </nav>
           </div>
-          <div><span id="intoduction"></span><h2><b>1 &nbsp;&nbsp; Intoduction</b></h2></div><div><p><a href='https://en.wikipedia.org/wiki/Dependency_injection'>Dependency Injection</a> (DI) is a practice by which code assets receive their dependencies from their surroundings at runtime, as opposed to the practice in which they are compiled against these dependencies. This allows different modules to be decoupled from one another, making software more modular and easier to modify and test.</p></div><div><p>This module provides DI to Clojure projects. It defines two macros: <code>provide</code> and <code>with-dependencies</code>. <code>provide</code> defines the algorithm for providing a <em>resource</em>. <code>with-dependencies</code> calculates an expression based on one or more resources known as its <em>dependencies</em>. The evaluation of the expression inside <code>with-dependencies</code> is delayed until all resources are available.</p></div><div><p><code>provide</code> and <code>with-dependencies</code> can be used in concert.</p></div><div><span id="injector"></span><h2><b>2 &nbsp;&nbsp; injector</b></h2></div><div><p><code>injector</code> constructs an empty injector, which should be passed to <code>provide</code> and <code>with-dependencies</code>.</p></div><div class="code"><pre><code class="clojure">(let [inj (injector)]
- @(inj 0) =&gt; {} ; Map of fulfilled resources
- (inj 1) =&gt; irrelevant ; channel on which newly fulfilled resources are published
- (inj 2) =&gt; irrelevant)</code></pre></div><div><p><code>injector</code> takes an optional argument with default values for resources.</p></div><div class="code"><pre><code class="clojure">(let [inj (injector {:foo 1
-                    :bar 2})]
- (:foo @(inj 0)) =&gt; 1
- (:bar @(inj 0)) =&gt; 2)</code></pre></div><div><span id="provide"></span><h2><b>3 &nbsp;&nbsp; provide</b></h2></div><div><p>The <code>provide</code> macro defines an algorithm for fulfilling a resource. It is called eagerly as a side-effect of loading its containing module.</p></div><div class="code"><pre><code class="clojure">(def inj (injector))
- (provide foo inj
-        1 ; There can be
-        2 ; any number of
-        3 ; expressions here, but
-        123)</code></pre></div><div><p>The <code>provide</code> block evaluates the expressions in a <code>do</code> block, and the returned value is placed in the injector as the value of the provided resource.</p></div><div class="code"><pre><code class="clojure">(:foo @(first inj)) =&gt; 123</code></pre></div><div><p>Fulfilled resources are published using the <code>pub</code> object that is the third element in the injector tuple. To wait for them clients can subscribe to the topic they are interested in.</p></div><div class="code"><pre><code class="clojure">(def bar-chan (async/chan))
- (async/sub (inj 2) :bar bar-chan)</code></pre></div><div><p>Now, a provider of <code>bar</code> will cause <code>bar-chan</code> to contain a key/value pair.</p></div><div class="code"><pre><code class="clojure">(provide bar inj
-        &quot;This is bar&quot;)
- (async/alts!! [bar-chan
-              (async/timeout 1000)]) =&gt; [[:bar &quot;This is bar&quot;]
-                                         bar-chan]</code></pre></div><div><p><code>provide</code> executes within the context of a <code>go</code> block. Its underlying expressions can use macros such as <code>&gt;!</code> and <code>&lt;!</code>.</p></div><div class="code"><pre><code class="clojure">(def baz-chan (async/chan))
- (def wait-chan (async/chan))
- (provide baz inj
-        (async/&lt;! baz-chan))
- (:baz @(first inj)) =&gt; nil ; not yet...
- ; let's subscribe to the value
- (async/sub (inj 2) :baz wait-chan)
- (async/&gt;!! baz-chan 4)
- (async/alts!! [wait-chan
-              (async/timeout 1000)]) =&gt; [[:baz 4] wait-chan]</code></pre></div><div><span id="with-dependencies"></span><h2><b>4 &nbsp;&nbsp; with-dependencies</b></h2></div><div><p>When we wish to evaluate something that depends on external resources, <code>with-dependencies</code> is the way to go. It can only be used from within a surrounding <code>go</code> block. It needs this <code>go</code> block to suspend execution until all requirements are fulfilled.</p></div><div><p>Consider the following example. We create an injector and define resources: <code>foo</code> and <code>bar</code>, which are provided first. Then we have a <code>go</code> block in which we wait for both <code>foo</code> and <code>bar</code>, and push their sum into a channel. Finally, we wait (blocking wait) to get this value from the channel (or time-out if we didn't get it within one second). We expect that the value we get from the channel be the sum of <code>foo</code> and <code>bar</code>.</p></div><div class="code"><pre><code class="clojure">(let [inj (injector)
-     chan (async/chan)]
- (provide foo inj
+          <div><span id="intoduction"></span><h2><b>1 &nbsp;&nbsp; Intoduction</b></h2></div><div><p><a href='https://en.wikipedia.org/wiki/Dependency_injection'>Dependency Injection</a> (DI) is a practice by which code assets receive their dependencies from their surroundings at runtime, as opposed to the practice in which they are compiled against these dependencies. This allows different modules to be decoupled from one another, making software more modular and easier to modify and test.</p></div><div><p>The basic building block in DI is a <em>resource</em>. In our implementation, a resource can be any Clojure value. Such a value could be a function that does something, a configuration value such as a number or a string, an object representing a connection to an external server or anything else.</p></div><div><p>Resources are defined by <em>modules</em>, which are Clojure functions (typically named <code>module</code>), that contribute rules that provide and use resources.</p></div><div><p>The state of the injection is maintained by an <em>injector</em>. An empty injector is created using the <a href='#injector'>injector</a> function. <code>module</code> functions take an injector and <a href='#provide'>provide</a> resources to it. Modules can also define initialization operations that do not result in a resource, using the <code>do-with</code> macro.</p></div><div><p>The initializations defined by modules do not take effect until the <a href='#startup'>startup</a> function is called. This function executes all initialization operations in order. Once <code>startup</code> has completed, all initialization operations have been performed.</p></div><div><p>Modules can also associate resources with shutdown operations. The <a href='#shutdown'>shutdown</a> function performs a shutdown sequence, executed in reverse order relative to the strtup sequence  to make sure no dependencies are dropped before they are shut down properly.</p></div><div><span id="injector"></span><h2><b>2 &nbsp;&nbsp; injector</b></h2></div><div><p><code>injector</code> creates an empty injector. By convention, injectors are bound to the variable <code>$</code>. The injector is an atom holding a map. It has the following fields:</p><ol><li><code>:resources</code>: A map containing the currently initialized resources.</li><li><code>:rule</code>: An atom holding a sequence of rules contributed by modules.</li><li><code>:shutdown</code>: An atom holding a sequence of shutdown operations to be executed.</li></ol></div><div class="code"><pre><code class="clojure">(let [$ (injector)]
+ @$ =&gt; map?
+ (:resources @$) =&gt; map?
+ (:rules @$) =&gt; []
+ (:shutdown @$) =&gt; [])</code></pre></div><div><p>An optional argument provides a map with initial resource values.</p></div><div class="code"><pre><code class="clojure">(let [$ (injector {:foo 1
+                  :bar 2})
+     res (:resources @$)]
+ (:foo res) =&gt; 1
+ (:bar res) =&gt; 2)</code></pre></div><div><span id="provide"></span><h2><b>3 &nbsp;&nbsp; provide</b></h2></div><div><p>The <code>provide</code> macro provides a rule for providing a resource that may or may not depend on other resources.</p></div><div><p>It takes an injector, the name of the new resource, a list of dependencies and code that evaluates the resource. It places a function in the <code>:rules</code> list in the injector, that when called with the resource map as its parameter,  returns the value of the new resource. The function is given two meta fields: <code>:resource</code>, containing the name of the target resource, and <code>:deps</code>, containing the dependencies. Both <code>:resource</code> and <code>:deps</code> hold resource names as keywords.</p></div><div class="code"><pre><code class="clojure">(let [$ (injector)]
+ (provide $ baz [foo bar]
+          (+ foo bar))
+ (count (:rules @$)) =&gt; 1
+ (let [func ((:rules @$) 0)]
+   (func {:foo 1
+          :bar 2}) =&gt; 3
+   (-&gt; func meta :resource) =&gt; :baz
+   (-&gt; func meta :deps) =&gt; [:foo :bar]))</code></pre></div><div><span id="do-with"></span><h2><b>4 &nbsp;&nbsp; do-with</b></h2></div><div><p>Modules can also define actions with side effects that do not result in a new resource. <code>do-with</code> is a macro similar to <a href='#provide'>provide</a>, that adds a rule to the injector, but it is not given a resource name, and therefore does not set the <code>:resource</code> meta field in the function.</p></div><div class="code"><pre><code class="clojure">(let [res (atom nil)
+     $ (injector)]
+ (do-with $ [foo bar]
+          (reset! res (+ foo bar)))
+ (count (:rules @$)) =&gt; 1
+ (let [func ((:rules @$) 0)]
+   (-&gt; func meta :deps) =&gt; [:foo :bar]
+   (func {:foo 1
+          :bar 2})
+   @res =&gt; 3))</code></pre></div><div><span id="startup"></span><h2><b>5 &nbsp;&nbsp; startup</b></h2></div><div><p>After all modules contributed rules to the injector, the <code>startup</code> function runs a startup sequence based on these rules.</p></div><div><p>For resources without dependencies, action is performed in arbitrary order.</p></div><div class="code"><pre><code class="clojure">(let [res (transient #{})
+     $ (injector)]
+ (provide $ foo []
+          (conj! res :foo)
           1)
- (provide bar inj
+ (provide $ bar []
+          (conj! res :bar)
           2)
- (async/go
-   (async/&gt;! chan (with-dependencies inj [foo bar]
-                    (+ foo bar))))
- (async/alts!! [chan
-                (async/timeout 1000)]) =&gt; [3 chan])</code></pre></div><div><p>We expect it to work regardless of the order, that is, we expect <code>with-dependencies</code> to block execution until <code>foo</code> and <code>bar</code> are provided. In the following example we place the <code>go</code> block before providing <code>foo</code> and <code>bar</code>, and add a 1 ms delay in the providing of <code>foo</code>.</p></div><div class="code"><pre><code class="clojure">(let [inj (injector)
-     chan (async/chan)]
- (async/go
-   (async/&gt;! chan (with-dependencies inj [foo bar]
-                    (+ foo bar))))
- (provide foo inj
-          (async/&lt;! (async/timeout 1))
+ (startup $)
+ (persistent! res) =&gt; #{:foo :bar})</code></pre></div><div><p>When depndencies exist, functions are applied according to dependency order.</p></div><div class="code"><pre><code class="clojure">(let [res (atom nil)
+     $ (injector)]
+ (do-with $ [foo bar]
+          (reset! res (str &quot;foo is &quot; foo &quot; and bar is &quot; bar)))
+ (provide $ bar [foo]
+          (inc foo))
+ (provide $ foo []
           1)
- (provide bar inj
-          2)
- (async/alts!! [chan
-                (async/timeout 1000)]) =&gt; [3 chan])</code></pre></div><div><p>Since the expressions in a <code>provide</code> block are evaluated inside a <code>go</code> block, we can combine <code>provide</code> and <code>with-dependencies</code> to get resources that depend on other resources.</p></div><div class="code"><pre><code class="clojure">(let [inj (injector)
-     chan (async/chan)]
- (async/go
-   (async/&gt;! chan (with-dependencies inj [bar]
-                    bar)))
- (provide foo inj
-          (async/&lt;! (async/timeout 1))
-          1)
- (provide bar inj
-          (with-dependencies inj [foo]
-            (inc foo)))
- (async/alts!! [chan
-                (async/timeout 1000)]) =&gt; [2 chan])</code></pre></div><div><span id="wait-for"></span><h2><b>5 &nbsp;&nbsp; wait-for</b></h2></div><div><p>Sometimes, especially during tests, we wish to get a resource outside a <code>go</code> block. In such cases we wish to block the current thread. Please note that this should be avoided in <code>provide</code> blocks, as it may lead to deadlocks. In other contexts blocking a thread is unadvised due to performance impact. However, for testing this may be extremely useful.</p></div><div><p>Consider our previous example, with resources <code>foo</code> and <code>bar</code>, where <code>bar</code> depends on <code>foo</code>.</p></div><div class="code"><pre><code class="clojure">(def inj (injector))
- (def chan (async/chan))
- (provide foo inj
-        (async/&lt;! (async/timeout 1))
-        1)
- (provide bar inj
-        (with-dependencies inj [foo]
-          (inc foo)))</code></pre></div><div><p>In the previous example we needed to create a <code>go</code> block to capture <code>bar</code>'s value from within a <code>with-dependencies</code> block. For this to be visible from the outside we used a channel. However, it can be much simpler to just assert on the value of <code>bar</code> using a blocking call. <code>wait-for</code> gives us just that.</p></div><div class="code"><pre><code class="clojure">(wait-for inj bar) =&gt; 2</code></pre></div><div><span id="with-dependencies-0"></span><h2><b>6 &nbsp;&nbsp; with-dependencies!!</b></h2></div><div><p>Sometimes it using a <code>go</code> block is inapplicable in places where dependencies are needed. One example is if we implement a callback function that depends on dependencies, and the callback is expected to return after having calculated what it needs to. For such cases, <code>with-dependencies!!</code> acts similarly to <code>with-dependencies</code>, only that it delays the current thread until the value is calculated, and thus it does not have to be called from within a <code>go</code> block.</p></div><div class="code"><pre><code class="clojure">(def inj (injector))
- (provide foo inj
-        (async/&lt;! (async/timeout 1))
-        1)
- (with-dependencies!! inj [foo]
- (+ foo 2)) =&gt; 3</code></pre></div><div><span id="best-practices"></span><h2><b>7 &nbsp;&nbsp; Best Practices</b></h2></div><div><p>In our opinion, the best way to write modules that use the <code>di</code> library for dependency injection is to wrap all the code that interacts with the injector (i.e., all code that provides and/or depends on resources) in a single function, which we encourage you to call <code>module</code>. This function will take one argument &ndash; the injector, which will be provided externally.</p></div><div><p>For example, imagine we have a module that depends on one resource: <code>some-number</code> (a number), and provides two resources:</p><ol><li><code>plus-some-number</code> &ndash; a function that adds <code>some-number</code> to a given number, and</li><li><code>times-some-number</code> &ndash; a function that multiplies <code>some-number</code> by a given number.We will wrap both providers in a <code>module</code> function which will take the injector as argument.As convention (borrowed from <a href='https://jquery.com'>jQuery</a> plugins), we will call the injector argument <code>$</code>.</li></ol></div><div class="code"><pre><code class="clojure">(defn module [$]
-  (provide plus-some-number $
-           (with-dependencies $ [some-number]
-             (fn [x] (+ x some-number))))
-  (provide times-some-number $
-           (with-dependencies $ [some-number]
-             (fn [x] (* x some-number)))))</code></pre></div><div><p>Now we can test our module. We can call <code>module</code> with different injectors, initialized with different <code>some-number</code> values,  to see that our module behaves as it should in different cases.</p></div><div class="code"><pre><code class="clojure">;; test with 2
- (let [$ (injector {:some-number 2})]
- (module $)
- (let [plus (wait-for $ plus-some-number)
-       times (wait-for $ times-some-number)]
-   (plus 1) =&gt; 3
-   (times 1) =&gt; 2))
- ;; test with 3
- (let [$ (injector {:some-number 3})]
- (module $)
- (let [plus (wait-for $ plus-some-number)
-       times (wait-for $ times-some-number)]
-   (plus 1) =&gt; 4
-   (times 1) =&gt; 3))</code></pre></div><div><p>Now imagine another module that complements our own. Let's imagine a module <code>module2</code>, which provides <code>some-number</code> as 2, and then provides the resource <code>six</code> based on our functions.</p></div><div class="code"><pre><code class="clojure">(defn module2 [$]
-  (provide some-number $
-           2)
-  (provide six $
-           (with-dependencies $ [plus-some-number
-                                 times-some-number
-                                 some-number]
-             (plus-some-number (times-some-number some-number)))))</code></pre></div><div><p>(generally there is only need for placing one <code>module</code> function in a namespace, so the function can always be called <code>module</code>. Here we needed a different function to demonstrate how different modules can work together)</p></div><div><p>We can test <code>module2</code> by injecting mock functions:</p></div><div class="code"><pre><code class="clojure">(let [$ (injector {:plus-some-number (fn [x] [:plus x])
-                  :times-some-number (fn [x] [:times x])})]
- (module2 $)
- (wait-for $ some-number) =&gt; 2
- (wait-for $ six) =&gt; [:plus [:times 2]])</code></pre></div><div><p>In production, these two modules need to actually meet each other and cooperate. We use a single injector and git it to both of them.</p></div><div class="code"><pre><code class="clojure">(let [$ (injector)]
- (module $)
- (module2 $)
- (wait-for $ six) =&gt; 6)</code></pre></div><div><p>The order in which we inject the different modules does not matter.</p></div><div class="code"><pre><code class="clojure">(let [$ (injector)]
- (module2 $) 
- (module $)
- (wait-for $ six) =&gt; 6)</code></pre></div>
+ (startup $)
+ @res =&gt; &quot;foo is 1 and bar is 2&quot;)</code></pre></div><div><p>A function is only executed if all its dependencies are present.</p></div><div class="code"><pre><code class="clojure">(let [$ (injector)]
+ (provide $ foo [resource-that-does-not-exist]
+          (throw (Exception. &quot;This code should not run&quot;)))
+ (startup $) =&gt; nil)</code></pre></div><div><p>The resource values provided by rules are updated in the injector's <code>:resources</code> map.</p></div><div class="code"><pre><code class="clojure">(let [$ (injector)]
+ (provide $ foo []
+          7)
+ (startup $)
+ (-&gt; @$ :resources :foo) =&gt; 7)</code></pre></div><div><p>If a resource was defined during the initialization of the injector, the operation is skipped.</p></div><div class="code"><pre><code class="clojure">(let [$ (injector {:to-skip 8})]
+ (provide $ to-skip []
+          (throw (Exception. &quot;This should not be called&quot;)))
+ (startup $)
+ (-&gt; @$ :resources :to-skip) =&gt; 8)</code></pre></div><div><span id="shutdown"></span><h2><b>6 &nbsp;&nbsp; shutdown</b></h2></div><div><p>When <a href='#provide'>provide</a>ing a resource, it is possible to also provide a <code>:shutdown</code> function. This is done by returning an object containing only these two fields:</p><ol><li><code>:resource</code>: The resource value, and</li><li><code>:shutdown</code>: A function which, when called, cleans up the resource.</li></ol></div><div class="code"><pre><code class="clojure">(let [$ (injector)
+     func (fn [])]
+ (provide $ foo []
+          {:resource 2
+           :shutdown (fn [])})
+ (provide $ bar []
+          {:resource 3
+           :shutdown func
+           :something-else 7})
+ (startup $)
+ (-&gt; @$ :resources :foo) =&gt; 2
+ (-&gt; @$ :resources :bar) =&gt; {:resource 3
+                             :shutdown func
+                             :something-else 7})</code></pre></div><div><p>The <code>:shutdown</code> functions are accumulated in reverse order in the injector's <code>:shutdown</code> sequence.</p></div><div class="code"><pre><code class="clojure">(let [$ (injector)]
+ (provide $ foo []
+          {:resource 1
+           :shutdown :some-func1})
+ (provide $ bar [foo]
+          {:resource 2
+           :shutdown :some-func2})
+ (provide $ baz [bar]
+          {:resource 3
+           :shutdown :some-func3})
+ (startup $)
+ (:shutdown @$) =&gt; [:some-func3 :some-func2 :some-func1])</code></pre></div><div><p>The <code>shutdown</code> function executes the injector's shutdown sequence.</p></div><div class="code"><pre><code class="clojure">(let [res (transient [])
+     $ (injector)]
+ (provide $ foo []
+          {:resource 1
+           :shutdown (fn [] (conj! res :foo))})
+ (provide $ bar [foo]
+          {:resource 2
+           :shutdown (fn [] (conj! res :bar))})
+ (provide $ baz [bar]
+          {:resource 3
+           :shutdown (fn [] (conj! res :baz))})
+ (startup $)
+ (shutdown $)
+ (persistent! res) =&gt; [:baz :bar :foo])</code></pre></div><div><span id="do-with-0"></span><h2><b>7 &nbsp;&nbsp; do-with!</b></h2></div><div><p>The <code>do-with!</code> macro has similar semantics to <a href='#do-with'>do-with</a>, but instead of providing a rule to the injector prior to <code>startup</code>, <code>do-with!</code> perform the enclosed operation (and returns its value) assuming <code>startup</code> has already been called.</p></div><div class="code"><pre><code class="clojure">(let [$ (injector)]
+ (provide $ foo [] 1)
+ (startup $)
+ (do-with! $ [foo]
+           (inc foo)) =&gt; 2)</code></pre></div><div><p>If one or more required resources is not available, an exception is thrown.</p></div><div class="code"><pre><code class="clojure">(let [$ (injector)]
+ (provide $ foo [] 1)
+ (startup $)
+ (do-with! $ [bar]
+           (inc bar)) =&gt; (throws &quot;Resource(s) #{:bar} are not available, but #{:foo} are&quot;))</code></pre></div><div><span id="under-the-hood"></span><h2><b>8 &nbsp;&nbsp; Under the Hood</b></h2></div><div><p><code>rule-edges</code> converts a function representing a rule to a collection of edges in a dependency graph. Each edge is represented by a <code>&#91;src dest&#93;</code> tuple.  The nodes in that graph are either resources (keywords) or functions representing actions to be performed.</p></div><div><p>A single rule provides <code>n</code> or <code>n+1</code> edges, where <code>n</code> is the number of dependencies in the rule. For each dependency <code>d</code> we get a rule <code>&#91;d func&#93;</code>, where <code>func</code> is the rule's function.</p></div><div class="code"><pre><code class="clojure">(let [func (with-meta
+            (fn [res])
+            {:deps [:foo :bar]})]
+ (rule-edges func) =&gt; [[:foo func] [:bar func]])</code></pre></div><div><p>In addition, if <code>func</code> has a <code>:resource</code> meta field with value <code>r</code>, a <code>&#91;func r&#93;</code> edge is added.</p></div><div class="code"><pre><code class="clojure">(let [func (with-meta (fn [res]) {:resource :baz
+                                 :deps [:foo :bar]})]
+ (rule-edges func) =&gt; [[func :baz] [:foo func] [:bar func]])</code></pre></div>
         </div>
       </div>
     </div>
