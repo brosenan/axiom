@@ -49,8 +49,8 @@ where `:a` is connected to both `:b` and `:c`, and `:b` is connected to `:c`."
 [[:section {:title "Under the Hood"}]]
 "Internally, `toposort` takes the following arguments:
 1. `graph`: the graph to be sorted
-2. `inv`: its (inverse)[#invert]
-3. `sources`: a set of its (sources)[#sources]"
+2. `inv`: its [inverse](#invert)
+3. `sources`: a set of its [sources](#sources)"
 
 "When `sources` is empty, it returns an empty sequence."
 (fact

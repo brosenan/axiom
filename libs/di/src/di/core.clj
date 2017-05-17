@@ -3,7 +3,17 @@
 
 (defn injector
   ([fulfilled]
-   (let [chan (async/chan)]
+   (let [fulfilled (merge fulfilled {:time (fn [] (.getTime (java.util.Date.)))
+                                     :format-time str
+                                     :println println
+                                     :log (fn [level msg]
+                                            )
+                                     :err (fn [msg])
+                                     :warn (fn [msg])
+                                     :info (fn [msg])
+                                     :debug (fn [msg])
+                                     :trace (fn [msg])})
+         chan (async/chan)]
      [(atom fulfilled)
       chan
       (async/pub chan first)]))
@@ -50,5 +60,5 @@
 (defmacro with-dependencies!! [inj deps & exprs]
   `(let [~'$chan (async/chan)]
      (async/go
-       (async/>!! ~'$chan (with-dependencies ~inj ~deps ~@exprs)))
-     (async/<!! ~'$chan)))
+       (async/>!! ~'$chan [(with-dependencies ~inj ~deps ~@exprs)]))
+     (first (async/<!! ~'$chan))))

@@ -20,16 +20,53 @@ The evaluation of the expression inside `with-dependencies` is delayed until all
 "`injector` constructs an empty injector, which should be passed to `provide` and `with-dependencies`."
 (fact
  (let [inj (injector)]
-   @(inj 0) => {} ; Map of fulfilled resources
+   @(inj 0) => map? ; Map of fulfilled resources
    (inj 1) => irrelevant ; channel on which newly fulfilled resources are published
    (inj 2) => irrelevant)) ; publication for unfulfilled resources
 
-"`injector` takes an optional argument with default values for resources."
+"`injector` takes an optional argument with resources values."
 (fact
  (let [inj (injector {:foo 1
                       :bar 2})]
    (:foo @(inj 0)) => 1
    (:bar @(inj 0)) => 2))
+
+[[:section {:title "Default Injector"}]]
+"When creating an injector, it comes loaded with certain resources, which can be overridden by the resource value map."
+
+"The function `time` returns the current time in milliseconds."
+(fact
+ (let [$ (injector {})]
+   (with-dependencies!! $ [time]
+     (let [t1 (time)]
+       (async/<! (async/timeout 2))
+       (let [t2 (time)]
+         (> (- t2 t1) 0) => true
+         (<= (- t2 t1) 4) => true)))))
+
+"The function `format-time` formats a given timestamp in a human-readable form."
+(fact
+ (let [$ (injector {})]
+   (with-dependencies!! $ [format-time]
+     (format-time 0) => "0"))) ;; TODO: Make this real human-readable
+
+"The function `println` prints a given string (as a line) to the standard output (`*out*`)."
+(fact
+ (let [$ (injector {})]
+   (with-dependencies!! $ [println]
+     (println "foo bar") => nil)))
+"TODO: Create a real test here."
+
+"For logging, the default injector provides the functions `log`, `err`, `warn`, `info`, `debug` and `trace`.
+The default implementation uses `println`."
+(comment (fact
+          (let [last-print (atom nil)
+                $ (injector {:time (fn [] 1000)
+                             :format-time str
+                             :println (fn [str] (reset! last-print str))})]
+            (with-dependencies!! $ [log]
+              (log "FF" "foo bar")
+              @last-print => "1000 [FF] foo bar"))))
 
 [[:chapter {:title "provide"}]]
 "The `provide` macro defines an algorithm for fulfilling a resource.
