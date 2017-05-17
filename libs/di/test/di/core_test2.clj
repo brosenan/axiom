@@ -40,7 +40,7 @@ It has the following fields:
    @$ => map?
    (:resources @$) => map?
    (:rules @$) => []
-   (:shutdown @$) => []))
+   (:shut-down @$) => []))
 
 "An optional argument provides a map with initial resource values."
 (fact
@@ -123,7 +123,84 @@ a resource name, and therefore does not set the `:resource` meta field in the fu
             (throw (Exception. "This code should not run")))
    (startup $) => nil))
 
+"The resource values provided by rules are updated in the injector's `:resources` map."
+(fact
+          (let [$ (injector)]
+            (provide $ foo []
+                     7)
+            (startup $)
+            (-> @$ :resources :foo) => 7))
+
 [[:chapter {:title "shut-down"}]]
+"When [provide](#provide)ing a resource, it is possible to also provide a `:shut-down` function.
+This is done by returning an object containing only these two fields:
+1. `:resource`: The resource value, and
+2. `:shut-down`: A function which, when called, cleans up the resource."
+(fact
+ (let [$ (injector)
+       func (fn [])]
+   (provide $ foo []
+            {:resource 2
+             :shut-down (fn [])})
+   (provide $ bar []
+            {:resource 3
+             :shut-down func
+             :something-else 7})
+   (startup $)
+   (-> @$ :resources :foo) => 2
+   (-> @$ :resources :bar) => {:resource 3
+                               :shut-down func
+                               :something-else 7}))
+
+"The `:shut-down` functions are accumulated in reverse order in the injector's `:shut-down` sequence."
+(fact
+ (let [$ (injector)]
+   (provide $ foo []
+            {:resource 1
+             :shut-down :some-func1})
+   (provide $ bar [foo]
+            {:resource 2
+             :shut-down :some-func2})
+   (provide $ baz [bar]
+            {:resource 3
+             :shut-down :some-func3})
+   (startup $)
+   (:shut-down @$) => [:some-func3 :some-func2 :some-func1]))
+
+"The `shut-down` function executes the injector's shut-down sequence."
+(fact
+ (let [res (transient [])
+       $ (injector)]
+   (provide $ foo []
+            {:resource 1
+             :shut-down (fn [] (conj! res :foo))})
+   (provide $ bar [foo]
+            {:resource 2
+             :shut-down (fn [] (conj! res :bar))})
+   (provide $ baz [bar]
+            {:resource 3
+             :shut-down (fn [] (conj! res :baz))})
+   (startup $)
+   (shut-down $)
+   (persistent! res) => [:baz :bar :foo]))
+
+[[:chapter {:title "do-with!"}]]
+"The `do-with!` macro has similar semantics to [do-with](#do-with), but instead of providing a rule to the injector prior to `startup`,
+`do-with!` perform the enclosed operation (and returns its value) assuming `startup` has already been called."
+(fact
+ (let [$ (injector)]
+   (provide $ foo [] 1)
+   (startup $)
+   (do-with! $ [foo]
+             (inc foo)) => 2))
+
+"If one or more required resources is not available, an exception is thrown."
+(fact
+ (let [$ (injector)]
+   (provide $ foo [] 1)
+   (startup $)
+   (do-with! $ [bar]
+             (inc bar)) => (throws "Resource(s) #{:bar} are not available, but #{:foo} are")))
 
 [[:chapter {:title "Under the Hood"}]]
 "`rule-edges` converts a function representing a rule to a collection of edges in a dependency graph.
