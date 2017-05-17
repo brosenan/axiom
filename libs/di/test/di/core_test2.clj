@@ -54,16 +54,92 @@ It has the following fields:
 "The `provide` macro provides a rule for providing a resource that may or may not depend on other resources."
 
 "It takes an injector, the name of the new resource, a list of dependencies and code that evaluates the resource.
-It places a tuple in the `:rules` list in the injector, containing the name of the resource, the names of the dependencies and a function
-from the dependencies to the resource."
+It places a function in the `:rules` list in the injector, that when called with the resource map as its parameter, 
+returns the value of the new resource.
+The function is given two meta fields: `:resource`, containing the name of the target resource, and
+`:deps`, containing the dependencies.
+Both `:resource` and `:deps` hold resource names as keywords."
 (fact
  (let [$ (injector)]
    (provide $ baz [foo bar]
             (+ foo bar))
    (count (:rules @$)) => 1
-   (let [tuple ((:rules @$) 0)]
-     (count tuple) => 3
-     (tuple 0) => :baz
-     (tuple 1) => [:foo :bar]
-     (let [func (tuple 2)]
-       (func 1 2) => 3))))
+   (let [func ((:rules @$) 0)]
+     (func {:foo 1
+            :bar 2}) => 3
+     (-> func meta :resource) => :baz
+     (-> func meta :deps) => [:foo :bar])))
+
+
+[[:chapter {:title "do-with"}]]
+"Modules can also define actions with side effects that do not result in a new resource.
+`do-with` is a macro similar to [provide](#provide), that adds a rule to the injector, but it is not given
+a resource name, and therefore does not set the `:resource` meta field in the function."
+(fact
+ (let [res (atom nil)
+       $ (injector)]
+   (do-with $ [foo bar]
+            (reset! res (+ foo bar)))
+   (count (:rules @$)) => 1
+   (let [func ((:rules @$) 0)]
+     (-> func meta :deps) => [:foo :bar]
+     (func {:foo 1
+            :bar 2})
+     @res => 3)))
+
+[[:chapter {:title "startup"}]]
+"After all modules contributed rules to the injector, the `startup` function runs a startup sequence based on these rules."
+
+"For resources without dependencies, action is performed in arbitrary order."
+(fact
+ (let [res (transient #{})
+       $ (injector)]
+   (provide $ foo []
+            (conj! res :foo)
+            1)
+   (provide $ bar []
+            (conj! res :bar)
+            2)
+   (startup $)
+   (persistent! res) => #{:foo :bar}))
+
+"When depndencies exist, functions are applied according to dependency order."
+(fact
+ (let [res (atom nil)
+       $ (injector)]
+   (do-with $ [foo bar]
+            (reset! res (str "foo is " foo " and bar is " bar)))
+   (provide $ bar [foo]
+            (inc foo))
+   (provide $ foo []
+            1)
+   (startup $)
+   @res => "foo is 1 and bar is 2"))
+
+"A function is only executed if all its dependencies are present."
+(fact
+ (let [$ (injector)]
+   (provide $ foo [resource-that-does-not-exist]
+            (throw (Exception. "This code should not run")))
+   (startup $) => nil))
+
+[[:chapter {:title "shut-down"}]]
+
+[[:chapter {:title "Under the Hood"}]]
+"`rule-edges` converts a function representing a rule to a collection of edges in a dependency graph.
+Each edge is represented by a `[src dest]` tuple. 
+The nodes in that graph are either resources (keywords) or functions representing actions to be performed."
+
+"A single rule provides `n` or `n+1` edges, where `n` is the number of dependencies in the rule.
+For each dependency `d` we get a rule `[d func]`, where `func` is the rule's function."
+(fact
+ (let [func (with-meta
+              (fn [res])
+              {:deps [:foo :bar]})]
+   (rule-edges func) => [[:foo func] [:bar func]]))
+
+"In addition, if `func` has a `:resource` meta field with value `r`, a `[func r]` edge is added."
+(fact
+ (let [func (with-meta (fn [res]) {:resource :baz
+                                   :deps [:foo :bar]})]
+   (rule-edges func) => [[func :baz] [:foo func] [:bar func]]))
