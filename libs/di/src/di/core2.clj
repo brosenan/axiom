@@ -8,7 +8,7 @@
    (atom
     {:resources initial
      :rules []
-     :shut-down []}))
+     :shutdown []}))
   ([]
    (injector {})))
 
@@ -42,34 +42,36 @@
   (let [edges (mapcat rule-edges (:rules @$))
         g (apply graph/digraph edges)
         ordered (alg/topsort g)
-        funcs (filter fn? ordered)]
+        funcs (filter fn? ordered)
+        keys-to-skip (set (keys (:resources @$)))]
     (loop [funcs funcs
            resources (:resources @$)
-           shut-down-seq []]
+           shutdown-seq []]
       (cond (empty? funcs)
             (swap! $ #(-> %
                           (assoc :resources resources)
-                          (assoc :shut-down shut-down-seq)))
+                          (assoc :shutdown shutdown-seq)))
             :else
             (let [func (first funcs)
                   res (-> func meta :resource)
                   deps (-> func meta :deps)]
-              (cond (every? (partial contains? resources) deps)
+              (cond (and (every? (partial contains? resources) deps)
+                         (not (contains? keys-to-skip res)))
                     (let [val (func resources)
-                          [val shut-down-seq] (cond (and (map? val)
+                          [val shutdown-seq] (cond (and (map? val)
                                                          (:resource val)
-                                                         (:shut-down val)
+                                                         (:shutdown val)
                                                          (= (count val) 2))
-                                                    [(:resource val) (cons (:shut-down val) shut-down-seq)]
+                                                    [(:resource val) (cons (:shutdown val) shutdown-seq)]
                                                     :else
-                                                    [val shut-down-seq])]
-                      (recur (rest funcs) (assoc resources res val) shut-down-seq))
+                                                    [val shutdown-seq])]
+                      (recur (rest funcs) (assoc resources res val) shutdown-seq))
                     :else
-                    (recur (rest funcs) resources shut-down-seq)))))
+                    (recur (rest funcs) resources shutdown-seq)))))
     nil))
 
-(defn shut-down [$]
-  (doseq [func (:shut-down @$)]
+(defn shutdown [$]
+  (doseq [func (:shutdown @$)]
     (func)))
 
 (defmacro do-with! [$ deps & exprs]

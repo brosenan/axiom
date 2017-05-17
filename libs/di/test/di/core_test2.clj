@@ -23,8 +23,8 @@ Modules can also define initialization operations that do not result in a resour
 This function executes all initialization operations in order.
 Once `startup` has completed, all initialization operations have been performed."
 
-"Modules can also associate resources with shut-down operations.
-The [shut-down](#shut-down) function performs a shut-down sequence, executed in reverse order relative to the strtup sequence 
+"Modules can also associate resources with shutdown operations.
+The [shutdown](#shutdown) function performs a shutdown sequence, executed in reverse order relative to the strtup sequence 
 to make sure no dependencies are dropped before they are shut down properly."
 
 [[:chapter {:title "injector"}]]
@@ -40,7 +40,7 @@ It has the following fields:
    @$ => map?
    (:resources @$) => map?
    (:rules @$) => []
-   (:shut-down @$) => []))
+   (:shutdown @$) => []))
 
 "An optional argument provides a map with initial resource values."
 (fact
@@ -125,63 +125,71 @@ a resource name, and therefore does not set the `:resource` meta field in the fu
 
 "The resource values provided by rules are updated in the injector's `:resources` map."
 (fact
-          (let [$ (injector)]
-            (provide $ foo []
-                     7)
-            (startup $)
-            (-> @$ :resources :foo) => 7))
+ (let [$ (injector)]
+   (provide $ foo []
+            7)
+   (startup $)
+   (-> @$ :resources :foo) => 7))
 
-[[:chapter {:title "shut-down"}]]
-"When [provide](#provide)ing a resource, it is possible to also provide a `:shut-down` function.
+"If a resource was defined during the initialization of the injector, the operation is skipped."
+(fact
+ (let [$ (injector {:to-skip 8})]
+   (provide $ to-skip []
+            (throw (Exception. "This should not be called")))
+   (startup $)
+   (-> @$ :resources :to-skip) => 8))
+
+[[:chapter {:title "shutdown"}]]
+"When [provide](#provide)ing a resource, it is possible to also provide a `:shutdown` function.
 This is done by returning an object containing only these two fields:
 1. `:resource`: The resource value, and
-2. `:shut-down`: A function which, when called, cleans up the resource."
+2. `:shutdown`: A function which, when called, cleans up the resource."
 (fact
  (let [$ (injector)
        func (fn [])]
    (provide $ foo []
             {:resource 2
-             :shut-down (fn [])})
+             :shutdown (fn [])})
    (provide $ bar []
             {:resource 3
-             :shut-down func
+             :shutdown func
              :something-else 7})
    (startup $)
    (-> @$ :resources :foo) => 2
    (-> @$ :resources :bar) => {:resource 3
-                               :shut-down func
+                               :shutdown func
                                :something-else 7}))
 
-"The `:shut-down` functions are accumulated in reverse order in the injector's `:shut-down` sequence."
+"The `:shutdown` functions are accumulated in reverse order in the injector's `:shutdown` sequence."
 (fact
  (let [$ (injector)]
    (provide $ foo []
             {:resource 1
-             :shut-down :some-func1})
+             :shutdown :some-func1})
    (provide $ bar [foo]
             {:resource 2
-             :shut-down :some-func2})
+             :shutdown :some-func2})
    (provide $ baz [bar]
             {:resource 3
-             :shut-down :some-func3})
+             :shutdown :some-func3})
    (startup $)
-   (:shut-down @$) => [:some-func3 :some-func2 :some-func1]))
+   (:shutdown @$) => [:some-func3 :some-func2 :some-func1]))
 
-"The `shut-down` function executes the injector's shut-down sequence."
+"The `shutdown` function executes the injector's shutdown sequence."
 (fact
  (let [res (transient [])
        $ (injector)]
    (provide $ foo []
             {:resource 1
-             :shut-down (fn [] (conj! res :foo))})
+             :shutdown (fn [] (conj! res :foo))})
    (provide $ bar [foo]
             {:resource 2
-             :shut-down (fn [] (conj! res :bar))})
+             :shutdown (fn [] (conj! res :bar))})
    (provide $ baz [bar]
             {:resource 3
-             :shut-down (fn [] (conj! res :baz))})
+             :shutdown (fn [] (conj! res :baz))})
    (startup $)
-   (shut-down $)
+   (shutdown $)
    (persistent! res) => [:baz :bar :foo]))
 
 [[:chapter {:title "do-with!"}]]

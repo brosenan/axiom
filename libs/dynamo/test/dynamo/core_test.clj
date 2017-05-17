@@ -4,7 +4,7 @@
             [clojure.core.async :as async]
             [taoensso.faraday :as far]
             [taoensso.nippy :as nippy]
-            [di.core :as di]
+            [di.core2 :as di]
             [langohr.core]
             [rabbit-microservices.core]))
 
@@ -30,7 +30,8 @@ It will get a response channel from the request channel, and then output two eve
                                                (async/close! resp-chan)))
                        :num-database-retriever-threads 1})]
    (module $)
-   (let [chan-req (di/wait-for $ database-chan)
+   (di/startup $)
+   (let [chan-req (di/do-with! $ [database-chan] database-chan)
          chan-res (async/chan 10)]
      (async/>!! chan-req [{:some :request} chan-res])
      (async/<!! chan-res) => {:event 1}
@@ -49,7 +50,8 @@ and `database-ensure-table` to ensure the table exists before accessing it."
                        :database-ensure-table (fn [table]
                                                 (reset! table-ensured table))})]
    (module $)
-   (def database-retriever (di/wait-for $ database-retriever))))
+   (di/startup $)
+   (def database-retriever (di/do-with! $ [database-retriever] database-retriever))))
 
 "To demonstrate how it works, let's create two channels: a request channel and a response channel."
 (fact
@@ -126,7 +128,8 @@ and the request channel.  Once called, it will perform the following:
                        :database-tables (atom #{})
                        :dynamodb-default-throughput 0})]
    (module $)
-   (def database-event-storage (di/wait-for $ database-event-storage))))
+   (di/startup $)
+   (def database-event-storage (di/do-with! $ [database-event-storage] database-event-storage))))
 
 "`database-event-storage` takes an event and stores it in DynamoDB."
 (fact
@@ -173,15 +176,14 @@ It depends on the following resources:
 "The service is merely a serving of `database-event-storage`, registered to all fact events.
 We will demonstrate it by mocking the `serve` function to push its parameters to a channel."
 (fact
- (let [calls (async/chan)
-       $ (di/injector {:declare-service (fn [key reg] (async/>!! calls [:declare-service key reg]))
-                       :assign-service (fn [key func] (async/>!! calls [:assign-service key func]))
+ (let [calls (transient [])
+       $ (di/injector {:declare-service (fn [key reg] (conj! calls [:declare-service key reg]))
+                       :assign-service (fn [key func] (conj! calls [:assign-service key func]))
                        :database-event-storage :the-storage-func})]
    (module $)
-   (async/alts!! [calls
-                  (async/timeout 1000)]) => [[:declare-service "database-event-storage" {:kind :fact}] calls]
-   (async/alts!! [calls
-                  (async/timeout 1000)]) => [[:assign-service "database-event-storage" :the-storage-func] calls]))
+   (di/startup $)
+   (persistent! calls) => [[:declare-service "database-event-storage" {:kind :fact}]
+                           [:assign-service "database-event-storage" :the-storage-func]]))
 
 [[:chapter {:title "database-event-storage-chan: A Channel for Storing Events in the Database" :tag "database-event-storage-chan"}]]
 "While [store-fact](#store-fact#) allows us to store system-wide fact events to the database,
@@ -201,7 +203,8 @@ to a sequence stored in an atom."
                                                  (swap! db #(conj % ev)))
                        :dynamodb-event-storage-num-threads 2})]
    (module $)
-   (def database-event-storage-chan (di/wait-for $ database-event-storage-chan))))
+   (di/startup $)
+   (def database-event-storage-chan (di/do-with! $ [database-event-storage-chan] database-event-storage-chan))))
 
 "We operate the channel by sending it pairs: `[ev ack]`, where `ev` is the event we wish to store,
 and `ack` is a fresh channel we use to get acknowledgement through.
@@ -233,7 +236,8 @@ table exists before issuing the actual scan request."
                        :dynamodb-get-tables (fn [conf] []) ;; Irrelevant to this test
                        })]
    (module $)
-   (def database-scanner (di/wait-for $ database-scanner))))
+   (di/startup $)
+   (def database-scanner (di/do-with! $ [database-scanner] database-scanner))))
 
 "`database-scanner` is given a name of a table, a shard number, a total number of shards and an output channel.
 It then produces all events from that shard into the channel and closes the channel.
@@ -285,9 +289,10 @@ We will use [dependency injection](di.html) to initialize the needed services."
                        :amqp-config langohr.core/*default-config*})]
    (module $)
    (rabbit-microservices.core/module $)
-   (di/wait-for $ database-event-storage)
-   (def req-chan (di/wait-for $ database-chan))
-   (def publish (di/wait-for $ publish))))
+   (di/startup $)
+   (di/do-with! $ [database-chan publish]
+                (def req-chan database-chan)
+                (def publish publish))))
 
 "Now let's create a bunch of events with different `:name`, `:key` and `:ts` values."
 (def events
@@ -387,8 +392,9 @@ The latter is intended for testing and is provided by this module to be `far/lis
                        :dynamodb-get-tables (fn [config]
                                               [config :foo :bar])})]
    (module $)
-   (let [tables (di/wait-for $ database-tables)]
-     @tables => #{:foo :bar :config})))
+   (di/startup $)
+   (di/do-with! $ [database-tables]
+                @database-tables) => #{:foo :bar :config}))
 
 [[:section {:title "database-ensure-table"}]]
 "Sometimes, before performing operations such as storing an event or starting a scan we want to ensure that the
@@ -405,8 +411,9 @@ We count on DynamoDB's ignoring re-creation of tables that already exist."
                        :dynamodb-default-throughput {:default :throughput}
                        :dynamodb-config :config})]
    (module $)
-   (def database-ensure-table (di/wait-for $ database-ensure-table))
-   (def database-tables (di/wait-for $ database-tables)))) ;; For inspecting it after calling database-ensure-table
+   (di/startup $)
+   (def database-ensure-table (di/do-with! $ [database-ensure-table] database-ensure-table))
+   (def database-tables (di/do-with! $ [database-tables] database-tables)))) ;; For inspecting it after calling database-ensure-table
 
 "`database-ensure-table` is a function that takes a name of a table (as a keyword).
 If the table exists in `database-tables`, it does nothing."
