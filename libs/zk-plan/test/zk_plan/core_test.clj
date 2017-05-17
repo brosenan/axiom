@@ -2,7 +2,7 @@
   (:use midje.sweet)
   (:use [zk-plan.core])
   (:use [zookeeper :as zk])
-  (:require [di.core :as di]))
+  (:require [di.core2 :as di]))
 
 [[:chapter {:title "Introduction"}]]
 "`zk-plan` is a tool for orchestrating execution of parallel jobs.
@@ -21,7 +21,8 @@ which is a Zookeeper connection object.
 (fact
  (let [$ (di/injector {:zookeeper :zk})] ;; :zk is a mock zookeeper connection object
    (module $)
-   (def zk-plan (di/wait-for $ zk-plan))))
+   (di/startup $)
+   (def zk-plan (di/do-with! $ [zk-plan] zk-plan))))
 
 "The `zk-plan` resource is a map containing function comprising the external API of this library, already addressing a given connection."
 (fact
@@ -233,20 +234,21 @@ The other `M-K` tasks are built with `K` arguments each, which are randomly sele
                        :zk-plan-config {:num-threads N
                                         :parent "/stress"}})]
    (module $)
-   (let [zk (di/wait-for $ zookeeper)
-         zk-plan (di/wait-for $ zk-plan)
-         {:keys [plan-completed?]} zk-plan
-         parent "/stress"]
-     (zk/delete-all zk "/stress")
-     (zk/create zk parent :persistent? true)
-     (let [plan (build-stress-plan zk-plan parent)]
-       (loop []
-         (when-not (plan-completed? plan)
-           (Thread/sleep 100)
-           (recur)))
-       (doseq [m (range M)]
-         (when-not (contains? @workers-completed m)
-           (println "Task " m " was not completed")))))))
+   (di/startup $)
+   (di/do-with! $ [zookeeper
+                   zk-plan]
+                (let [{:keys [plan-completed?]} zk-plan
+                      parent "/stress"]
+                  (zk/delete-all zookeeper "/stress")
+                  (zk/create zookeeper parent :persistent? true)
+                  (let [plan (build-stress-plan zk-plan parent)]
+                    (loop []
+                      (when-not (plan-completed? plan)
+                        (Thread/sleep 100)
+                        (recur)))
+                    (doseq [m (range M)]
+                      (when-not (contains? @workers-completed m)
+                        (println "Task " m " was not completed"))))))))
          
 
 [[:chapter {:title "Under the Hood"}]]

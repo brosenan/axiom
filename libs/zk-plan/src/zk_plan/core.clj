@@ -1,7 +1,7 @@
 (ns zk-plan.core
   (:use [zookeeper :as zk])
   (:require [clojure.string :as str]
-            [di.core :as di]
+            [di.core2 :as di]
             [clojure.core.async :as async]))
 
 (defn ^:private create-plan [zk parent]
@@ -160,28 +160,25 @@
              (zk/children zk plan))))
 
 (defn module [$]
-  (di/provide zookeeper $
-              (di/with-dependencies $ [zookeeper-config]
-                (zk/connect (:url zookeeper-config))))
+  (di/provide $ zookeeper [zookeeper-config]
+              (zk/connect (:url zookeeper-config)))
 
-  (di/provide zk-plan $
-              (di/with-dependencies $ [zookeeper]
-                {:create-plan (partial create-plan zookeeper)
-                 :add-task (partial add-task zookeeper)
-                 :mark-as-ready (partial mark-as-ready-internal zookeeper)
-                 :worker (partial worker zookeeper)
-                 :plan-completed? (partial plan-completed? zookeeper)}))
+  (di/provide $ zk-plan [zookeeper]
+              {:create-plan (partial create-plan zookeeper)
+               :add-task (partial add-task zookeeper)
+               :mark-as-ready (partial mark-as-ready-internal zookeeper)
+               :worker (partial worker zookeeper)
+               :plan-completed? (partial plan-completed? zookeeper)})
 
-  (async/go
-    (di/with-dependencies $ [zk-plan zk-plan-config]
-      (let [{:keys [worker]} zk-plan]
-        (let [threads (map (fn [_] (Thread. (fn []
-                                              (loop []
-                                                   (try
-                                                     (worker (:parent zk-plan-config) {} $)
-                                                     (catch Exception e
-                                                       (.printStackTrace e)))
-                                                   (recur))))) (range (:num-threads zk-plan-config)))]
-             (doseq [thread threads]
-               (.start thread))
-             threads)))))
+  (di/do-with $ [zk-plan zk-plan-config]
+              (let [{:keys [worker]} zk-plan]
+                (let [threads (map (fn [_] (Thread. (fn []
+                                                      (loop []
+                                                        (try
+                                                          (worker (:parent zk-plan-config) {} $)
+                                                          (catch Exception e
+                                                            (.printStackTrace e)))
+                                                        (recur))))) (range (:num-threads zk-plan-config)))]
+                  (doseq [thread threads]
+                    (.start thread))
+                  threads))))
