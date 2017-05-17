@@ -8,7 +8,7 @@
             [langohr.consumers :as lc]
             [langohr.basic     :as lb]
             [langohr.exchange  :as le]
-            [di.core :as di]
+            [di.core2 :as di]
             [clojure.core.async :as async]))
 
 [[:chapter {:title "Introduction"}]]
@@ -35,7 +35,8 @@ It is provided a partial event, and calls the given function on any event that m
        $ (di/injector {:declare-service (fn [key reg] (conj! calls [:declare-service key reg]))
                        :assign-service (fn [key func] (conj! calls [:assign-service key func]))})]
    (module $)
-   (let [serve (di/wait-for $ serve)]
+   (di/startup $)
+   (di/do-with! $ [serve]
      (serve my-service {:partial :event}) => nil
      (persistent! calls) => [[:declare-service "rabbit-microservices.core-test/my-service" {:partial :event}]
                              [:assign-service "rabbit-microservices.core-test/my-service" my-service]])))
@@ -46,7 +47,8 @@ It is provided a partial event, and calls the given function on any event that m
 (fact
  (let [$ (di/injector {:amqp-service {:chan :some-chan}})]
    (module $)
-   (def declare-service (di/wait-for $ declare-service))))
+   (di/startup $)
+   (def declare-service (di/do-with! $ [declare-service] declare-service))))
 
 "`declare-service` declares a queue and binds it to the `facts` exchange to receive events matching the given partial event."
 (fact
@@ -60,9 +62,10 @@ It is provided a partial event, and calls the given function on any event that m
 [[:chapter {:title "assign-service: Register an Event Handler" :tag "assign-service"}]]
 "`assign-service` depends on an `amqp-service`."
 (fact
- (let [inj (di/injector {:amqp-service {:chan :some-chan}})]
-   (module inj)
-   (def assign-service (di/wait-for inj assign-service))))
+ (let [$ (di/injector {:amqp-service {:chan :some-chan}})]
+   (module $)
+   (di/startup $)
+   (def assign-service (di/do-with! $ [assign-service] assign-service))))
 
 
 "`assign-service` takes a key that was previously [declared](#declare-service) and a service function,
@@ -84,9 +87,10 @@ The third of which is expected to be bound to an explicit `ack` function."
 "`publish` is a service that allows its users to publish events from outside the context of a service.
 It depends on `amqp-service`."
 (fact
- (let [inj (di/injector {:amqp-service {:chan :some-chan}})]
-   (module inj)
-   (def publish (di/wait-for inj publish))))
+ (let [$ (di/injector {:amqp-service {:chan :some-chan}})]
+   (module $)
+   (di/startup $)
+   (def publish (di/do-with! $ [publish] publish))))
 
 (fact
  (publish ..ev..) => nil
@@ -107,61 +111,60 @@ It depends on `amqp-service`."
  :integ ; Integration test.  Does not run during continouts integration
  (def foo-sum (atom 0))
  (def ev-count (atom {}))
- (def inj (di/injector))
- (module inj)
- (async/go
-   (di/with-dependencies inj [serve]
-     (println "Registering services")
-     (serve (fn ;; sum-foo
-              [ev pub]
-              (swap! foo-sum (partial + (:data ev)))
-              (pub {:kind :fact
-                    :name "foo-sum"
-                    :key 0
-                    :data @foo-sum}))
-            {:kind :fact
-             :name "foo"})
+ (def $ (di/injector))
+ (module $)
+ (di/do-with $ [serve]
+   (println "Registering services")
+   (serve (fn ;; sum-foo
+            [ev pub]
+            (swap! foo-sum (partial + (:data ev)))
+            (pub {:kind :fact
+                  :name "foo-sum"
+                  :key 0
+                  :data @foo-sum}))
+          {:kind :fact
+           :name "foo"})
 
-     (serve (fn  ;; count-ev
-              [ev pub]
-              (let [key (:name ev)]
-                (swap! ev-count (fn [m]
-                                  (let [old (or (m key) 0)
-                                        new (inc old)]
-                                    (assoc m key new))))
-                (pub {:kind :fact
-                      :name "count"
-                      :key key
-                      :data (@ev-count key)})))
-            {:kind :fact})
-
-     (serve (fn ;; foo-from-count
-              [ev pub]
+   (serve (fn  ;; count-ev
+            [ev pub]
+            (let [key (:name ev)]
+              (swap! ev-count (fn [m]
+                                (let [old (or (m key) 0)
+                                      new (inc old)]
+                                  (assoc m key new))))
               (pub {:kind :fact
-                    :name "foo"
-                    :key (:key ev)
-                    :data (:data ev)}))
-            {:kind :fact
-             :name "count"}))))
+                    :name "count"
+                    :key key
+                    :data (@ev-count key)})))
+          {:kind :fact})
+
+   (serve (fn ;; foo-from-count
+            [ev pub]
+            (pub {:kind :fact
+                  :name "foo"
+                  :key (:key ev)
+                  :data (:data ev)}))
+          {:kind :fact
+           :name "count"})))
 
 "For the `serve` resource to initialize, we need to provide an `amqp-config` resource with values needed for the underlying `langohr` library
 to find the AMQP broker.
 We will use the default values."
 (fact
  :integ
- (di/provide amqp-config inj
-             rmq/*default-config*))
+ (di/provide $ amqp-config []
+             rmq/*default-config*)
+ (di/startup $))
 
 "Now our service is ready to roll.  
 All we need is to get the fire started is a little match -- a single event."
 (fact :integ ; Integration test.  Does not run during continouts integration
-      (async/go
-        (di/with-dependencies inj [publish]
-          (println "Kicking the first event")
-          (publish {:kind :fact
-                    :name "foo"
-                    :key 0
-                    :data 1})))
+      (di/do-with! $ [publish]
+                   (println "Kicking the first event")
+                   (publish {:kind :fact
+                             :name "foo"
+                             :key 0
+                             :data 1}))
       (println "waiting for the sum to reach ten-milion")
       (while (< @foo-sum 10000000)
         (Thread/sleep 100))
