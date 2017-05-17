@@ -2,7 +2,7 @@
   (:require [midje.sweet :refer :all]
             [migrator.core :refer :all]
             [permacode.core :as perm]
-            [di.core :as di]
+            [di.core2 :as di]
             [clojure.core.async :as async]
             [zk-plan.core :as zkp]
             [zookeeper :as zk]
@@ -39,11 +39,12 @@ To speed things up we do the following:
 "`extract-version-rules` is a service function which registers to `:axiom/version` events.
 As such it depends on the `serve` function we will mock in order to get hold of the function itself and the registration it is making."
 (fact
- (let [reg (async/chan)
+ (let [reg (transient [])
        $ (di/injector {:serve (fn [f r]
-                                (async/>!! reg [f r]))})]
+                                (conj! reg [f r]))})]
    (module $)
-   (let [[f r] (async/<!! reg)]
+   (di/startup $)
+   (let [[[f r]] (persistent! reg)]
      r => {:kind :fact
            :name "axiom/version"}
      (def extract-version-rules f))))
@@ -74,7 +75,7 @@ corresponding `:axiom/rule` events."
 "It depends on the resources [zookeeper-counter-add](#zookeeper-counter-add) `declare-service` and `assign-service`, which we will mock."
 (fact
  (def mock-counters (transient {"/rules/perm.1234ABC.foo" 2}))
- (def calls (async/chan))
+ (def calls (async/chan 10))
  (let [$ (di/injector {:zookeeper-counter-add (fn [path change]
                                                 (let [old (mock-counters path 0)
                                                       new (+ old change)]
@@ -83,6 +84,7 @@ corresponding `:axiom/rule` events."
                        :declare-service (fn [key reg] (async/>!! calls [:declare-service key reg]))
                        :assign-service (fn [key func] (async/>!! calls [:assign-service key func]))})]
    (module $)
+   (di/startup $)
    (let [[call chan] (async/alts!! [calls
                                     (async/timeout 1000)])]
      chan => calls
@@ -180,6 +182,7 @@ We also provides it a `migration-config` resource containing the `:number-of-sha
                        :migration-config {:number-of-shards 3
                                           :plan-prefix "/my-plans"}})]
    (module $)
+   (di/startup $)
    (async/alts!! [calls-chan
                   (async/timeout 1000)]) => [[:declare-service "migrator.core/rule-migrator" {:kind :fact
                                                                                               :name "axiom/rule-exists"}] calls-chan]
@@ -244,12 +247,13 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
  (module $)
  (rms/module $)
  (zkp/module $)
- (dyn/module $))
+ (dyn/module $)
+ (di/startup $))
 
 "Let's create the root elements we need in Zookeeper"
 (fact
  :integ
- (di/with-dependencies!! $ [zookeeper]
+ (di/do-with! $ [zookeeper]
    (when (zk/exists zookeeper "/rules")
      (zk/delete-all zookeeper "/rules"))
    (zk/create zookeeper "/rules" :persistent? true)
@@ -268,7 +272,7 @@ We will start with tweets:"
  :integ
  (def users ["alice" "bob" "charlie"])
  (def time (atom 1000))
- (di/with-dependencies!! $ [publish]
+ (di/do-with! $ [publish]
    (doseq [greeting ["hello" "hi" "howdy"]
            greeted ["world" "clojure" "axiom"]
            user users]
@@ -286,7 +290,7 @@ We will start with tweets:"
 "Now let's create a full-factorial following matrix (everyone follows everyone else)."
 (fact
  :integ
- (di/with-dependencies!! $ [publish]
+ (di/do-with! $ [publish]
    (doseq [u1 users
            u2 users]
      (when-not (= u1 u2)
@@ -311,7 +315,7 @@ The following service function listens to such events and for the rule `followee
 (fact
  :integ
  (def done (async/chan))
- (di/with-dependencies!! $ [serve]
+ (di/do-with! $ [serve]
    (serve (fn [ev]
             (when (= (name (:key ev)) "followee-tweets")
               (async/close! done)))
@@ -322,7 +326,7 @@ The following service function listens to such events and for the rule `followee
 "To kick the migration, we need to publish an `axiom/version` event with a version of the example application."
 (fact
  :integ
- (di/with-dependencies!! $ [publish]
+ (di/do-with! $ [publish]
    (publish {:kind :fact
              :name "axiom/version"
              :key "perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt"
@@ -342,7 +346,7 @@ The following service function listens to such events and for the rule `followee
 This means that Alice's timeline should contain 18 tweets."
 (fact
  :integ
- (di/with-dependencies!! $ [database-chan]
+ (di/do-with! $ [database-chan]
    (let [chan-out (async/chan 30)]
      (async/>!! database-chan [{:kind :fact
                                 :name "perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt/followee-tweets"
@@ -359,7 +363,8 @@ This means that Alice's timeline should contain 18 tweets."
 "`zookeeper-counter-add` depends on the `zookeeper` resource as dependency, and uses it to implement a global atomic counter."
 (let [$ (di/injector {:zookeeper :zk})]
   (module $)
-  (def zookeeper-counter-add (di/wait-for $ zookeeper-counter-add)))
+  (di/startup $)
+  (def zookeeper-counter-add (di/do-with! $ [zookeeper-counter-add] zookeeper-counter-add)))
 
 "`zookeeper-counter-add` takes a path to a counter and a number to be added.
 If a node corresponding to the given path does not exist, it is assumed to be equal 0, and is therefore created using the given number.
@@ -553,14 +558,14 @@ These events are similar to the ones we got from the [initial-migrator](#initial
          ;; The query is for rule tuples of link 0
          (when-not (= (:name query) "migrator.core-test/timeline!0")
            (throw (Exception. (str "Wrong fact in query: " (:name query)))))
-         (async/>! out-chan {:change 1
+         (async/>!! out-chan {:change 1
                              :data ["alice" (:key query)]
                              :key (:key query)
                              :kind :rule
                              :name "migrator.core-test/timeline!0"
                              :readers nil
                              :writers #{:some-writer}})
-         (async/>! out-chan {:change 1
+         (async/>!! out-chan {:change 1
                              :data ["eve" (:key query)]
                              :key (:key query)
                              :kind :rule
