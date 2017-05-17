@@ -4,7 +4,7 @@
             [clojure.core.async :as async]
             [taoensso.faraday :as far]
             [taoensso.nippy :as nippy]
-            [di.core2 :as di]
+            [di.core :as di]
             [langohr.core]
             [rabbit-microservices.core]))
 

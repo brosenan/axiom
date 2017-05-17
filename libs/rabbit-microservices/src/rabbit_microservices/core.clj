@@ -6,7 +6,7 @@
             [langohr.basic     :as lb]
             [langohr.exchange  :as le]
             [taoensso.nippy :as nippy]
-            [di.core2 :as di]))
+            [di.core :as di]))
 
 
 (def facts-exch "facts")

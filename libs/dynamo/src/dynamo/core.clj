@@ -4,7 +4,7 @@
             [taoensso.nippy :as nippy]
             [clojure.core.async :as async]
             [clojure.set :as set]
-            [di.core2 :as di]))
+            [di.core :as di]))
 
 (defn table-kw [name]
   (-> name

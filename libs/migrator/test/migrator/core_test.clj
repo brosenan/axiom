@@ -2,7 +2,7 @@
   (:require [midje.sweet :refer :all]
             [migrator.core :refer :all]
             [permacode.core :as perm]
-            [di.core2 :as di]
+            [di.core :as di]
             [clojure.core.async :as async]
             [zk-plan.core :as zkp]
             [zookeeper :as zk]

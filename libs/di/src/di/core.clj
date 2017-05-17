@@ -1,64 +1,85 @@
 (ns di.core
-  (:require [clojure.core.async :as async]))
+  (:require [loom.graph :as graph]
+            [loom.alg :as alg]
+            [clojure.set :as set]))
 
 (defn injector
-  ([fulfilled]
-   (let [fulfilled (merge fulfilled {:time (fn [] (.getTime (java.util.Date.)))
-                                     :format-time str
-                                     :println println
-                                     :log (fn [level msg]
-                                            )
-                                     :err (fn [msg])
-                                     :warn (fn [msg])
-                                     :info (fn [msg])
-                                     :debug (fn [msg])
-                                     :trace (fn [msg])})
-         chan (async/chan)]
-     [(atom fulfilled)
-      chan
-      (async/pub chan first)]))
+  ([initial]
+   (atom
+    {:resources initial
+     :rules []
+     :shutdown []}))
   ([]
    (injector {})))
 
 
-(defmacro provide [resource inj & exprs]
-  (let [resource (keyword resource)]
-    `(async/go
-       (when-not (contains? @(first ~inj) ~resource)
-         (let [~'$value (do ~@exprs)]
-           (when-not (nil? (System/getenv "AXIOM_DI_DEBUG"))
-             (println "Providing " ~resource))
-           (swap! (first ~inj) #(assoc % ~resource ~'$value))
-           (async/>!! (second ~inj) [~resource ~'$value]))))))
+(defmacro provide [$ resource deps & exprs]
+  `(swap! ~$ (fn [~'$inj] (update-in ~'$inj [:rules] (fn [~'$rules]
+                                                       (conj ~'$rules
+                                                              (with-meta
+                                                                (fn [{:keys ~deps}] ~@exprs)
+                                                                {:resource ~(keyword resource)
+                                                                 :deps ~(vec (map keyword deps))})))))))
 
-(defmacro with-dependencies [inj deps & exprs]
-  (let [keys (map keyword deps)]
-    `(loop []
-       (let [~'$fulfilled @(first ~inj)
-             ~'$missing (first (filter #(not (contains? ~'$fulfilled %)) '~keys))]
-         (cond (nil? ~'$missing)
-               (let [{:keys ~deps} ~'$fulfilled]
-                 ~@exprs)
-               :else
-               (let [~'$chan (async/chan)]
-                 (when-not (nil? (System/getenv "AXIOM_DI_DEBUG"))
-                   (println "Resource " ~'$missing " is missing.  Waiting..."))
-                 (async/sub (~inj 2) ~'$missing ~'$chan)
-                 (async/alts! [~'$chan
-                               (async/timeout 100)])
-                 (recur)))))))
+(defmacro do-with [$ deps & exprs]
+  `(swap! ~$ (fn [~'$inj] (update-in ~'$inj [:rules] (fn [~'$rules]
+                                                       (conj ~'$rules
+                                                             (with-meta
+                                                               (fn [{:keys ~deps}] ~@exprs)
+                                                               {:deps ~(vec (map keyword deps))})))))))
 
+(defn rule-edges [func]
+  (let [deps (-> func meta :deps)
+        deps-edges (for [dep deps]
+                     [dep func])
+        resource (-> func meta :resource)]
+    (cond resource
+          (conj deps-edges [func (keyword resource)])
+          :else
+          deps-edges)))
 
-(defmacro wait-for [inj key]
-  `(let [~'$chan (async/chan)]
-     (async/go
-       (async/>! ~'$chan
-                 (with-dependencies ~inj [~key]
-                   ~key)))
-     (async/<!! ~'$chan)))
+(defn startup [$]
+  (let [edges (mapcat rule-edges (:rules @$))
+        g (apply graph/digraph edges)
+        ordered (alg/topsort g)
+        funcs (filter fn? ordered)
+        keys-to-skip (set (keys (:resources @$)))]
+    (loop [funcs funcs
+           resources (:resources @$)
+           shutdown-seq []]
+      (cond (empty? funcs)
+            (swap! $ #(-> %
+                          (assoc :resources resources)
+                          (assoc :shutdown shutdown-seq)))
+            :else
+            (let [func (first funcs)
+                  res (-> func meta :resource)
+                  deps (-> func meta :deps)]
+              (cond (and (every? (partial contains? resources) deps)
+                         (not (contains? keys-to-skip res)))
+                    (let [val (func resources)
+                          [val shutdown-seq] (cond (and (map? val)
+                                                         (:resource val)
+                                                         (:shutdown val)
+                                                         (= (count val) 2))
+                                                    [(:resource val) (cons (:shutdown val) shutdown-seq)]
+                                                    :else
+                                                    [val shutdown-seq])]
+                      (recur (rest funcs) (assoc resources res val) shutdown-seq))
+                    :else
+                    (recur (rest funcs) resources shutdown-seq)))))
+    nil))
 
-(defmacro with-dependencies!! [inj deps & exprs]
-  `(let [~'$chan (async/chan)]
-     (async/go
-       (async/>!! ~'$chan [(with-dependencies ~inj ~deps ~@exprs)]))
-     (first (async/<!! ~'$chan))))
+(defn shutdown [$]
+  (doseq [func (:shutdown @$)]
+    (func)))
+
+(defmacro do-with! [$ deps & exprs]
+  `(let [~'$existing (set (keys (:resources @~$)))
+         ~'$missing (set/difference ~(set (map keyword deps))
+                                    ~'$existing)]
+     (cond (empty? ~'$missing)
+           (let [{:keys ~deps} (:resources @~$)]
+             ~@exprs)
+           :else
+           (throw (Exception. (str "Resource(s) " ~'$missing " are not available, but " ~'$existing " are"))))))

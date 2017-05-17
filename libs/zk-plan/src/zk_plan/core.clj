@@ -1,7 +1,7 @@
 (ns zk-plan.core
   (:use [zookeeper :as zk])
   (:require [clojure.string :as str]
-            [di.core2 :as di]
+            [di.core :as di]
             [clojure.core.async :as async]))
 
 (defn ^:private create-plan [zk parent]

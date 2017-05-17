@@ -1,6 +1,6 @@
 (ns migrator.core
   (:require [permacode.core :as perm]
-            [di.core2 :as di]
+            [di.core :as di]
             [clojure.core.async :as async]
             [zookeeper :as zk]
             [zk-plan.core :as zkp]

@@ -8,7 +8,7 @@
             [langohr.consumers :as lc]
             [langohr.basic     :as lb]
             [langohr.exchange  :as le]
-            [di.core2 :as di]
+            [di.core :as di]
             [clojure.core.async :as async]))
 
 [[:chapter {:title "Introduction"}]]

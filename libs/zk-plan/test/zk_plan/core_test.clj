@@ -2,7 +2,7 @@
   (:use midje.sweet)
   (:use [zk-plan.core])
   (:use [zookeeper :as zk])
-  (:require [di.core2 :as di]))
+  (:require [di.core :as di]))
 
 [[:chapter {:title "Introduction"}]]
 "`zk-plan` is a tool for orchestrating execution of parallel jobs.

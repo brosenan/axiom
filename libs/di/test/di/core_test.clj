@@ -1,285 +1,230 @@
 (ns di.core-test
   (:require [midje.sweet :refer :all]
-            [di.core :refer :all]
-            [clojure.core.async :as async]))
+            [di.core :refer :all]))
 
 [[:chapter {:title "Intoduction"}]]
 "[Dependency Injection](https://en.wikipedia.org/wiki/Dependency_injection) (DI) is a practice by which code assets receive their dependencies
 from their surroundings at runtime, as opposed to the practice in which they are compiled against these dependencies.
 This allows different modules to be decoupled from one another, making software more modular and easier to modify and test."
 
-"This module provides DI to Clojure projects.
-It defines two macros: `provide` and `with-dependencies`.
-`provide` defines the algorithm for providing a *resource*.
-`with-dependencies` calculates an expression based on one or more resources known as its *dependencies*.
-The evaluation of the expression inside `with-dependencies` is delayed until all resources are available."
+"The basic building block in DI is a *resource*.
+In our implementation, a resource can be any Clojure value.
+Such a value could be a function that does something, a configuration value such as a number or a string,
+an object representing a connection to an external server or anything else."
 
-"`provide` and `with-dependencies` can be used in concert."
+"Resources are defined by *modules*, which are Clojure functions (typically named `module`), that contribute rules that provide and use resources."
+
+"The state of the injection is maintained by an *injector*.
+An empty injector is created using the [injector](#injector) function.
+`module` functions take an injector and [provide](#provide) resources to it.
+Modules can also define initialization operations that do not result in a resource, using the `do-with` macro."
+
+"The initializations defined by modules do not take effect until the [startup](#startup) function is called.
+This function executes all initialization operations in order.
+Once `startup` has completed, all initialization operations have been performed."
+
+"Modules can also associate resources with shutdown operations.
+The [shutdown](#shutdown) function performs a shutdown sequence, executed in reverse order relative to the strtup sequence 
+to make sure no dependencies are dropped before they are shut down properly."
 
 [[:chapter {:title "injector"}]]
-"`injector` constructs an empty injector, which should be passed to `provide` and `with-dependencies`."
+"`injector` creates an empty injector.
+By convention, injectors are bound to the variable `$`.
+The injector is an atom holding a map.
+It has the following fields:
+1. `:resources`: A map containing the currently initialized resources.
+1. `:rule`: An atom holding a sequence of rules contributed by modules.
+2. `:shutdown`: An atom holding a sequence of shutdown operations to be executed."
 (fact
- (let [inj (injector)]
-   @(inj 0) => map? ; Map of fulfilled resources
-   (inj 1) => irrelevant ; channel on which newly fulfilled resources are published
-   (inj 2) => irrelevant)) ; publication for unfulfilled resources
+ (let [$ (injector)]
+   @$ => map?
+   (:resources @$) => map?
+   (:rules @$) => []
+   (:shutdown @$) => []))
 
-"`injector` takes an optional argument with resources values."
+"An optional argument provides a map with initial resource values."
 (fact
- (let [inj (injector {:foo 1
-                      :bar 2})]
-   (:foo @(inj 0)) => 1
-   (:bar @(inj 0)) => 2))
-
-[[:section {:title "Default Injector"}]]
-"When creating an injector, it comes loaded with certain resources, which can be overridden by the resource value map."
-
-"The function `time` returns the current time in milliseconds."
-(comment (fact
-          (let [$ (injector {})]
-            (with-dependencies!! $ [time]
-              (let [t1 (time)]
-                (async/<! (async/timeout 2))
-                (let [t2 (time)]
-                  (> (- t2 t1) 0) => true
-                  (<= (- t2 t1) 4) => true))))))
-
-"The function `format-time` formats a given timestamp in a human-readable form."
-(fact
- (let [$ (injector {})]
-   (with-dependencies!! $ [format-time]
-     (format-time 0) => "0"))) ;; TODO: Make this real human-readable
-
-"The function `println` prints a given string (as a line) to the standard output (`*out*`)."
-(fact
- (let [$ (injector {})]
-   (with-dependencies!! $ [println]
-     (println "foo bar") => nil)))
-"TODO: Create a real test here."
-
-"For logging, the default injector provides the functions `log`, `err`, `warn`, `info`, `debug` and `trace`.
-The default implementation uses `println`."
-(comment (fact
-          (let [last-print (atom nil)
-                $ (injector {:time (fn [] 1000)
-                             :format-time str
-                             :println (fn [str] (reset! last-print str))})]
-            (with-dependencies!! $ [log]
-              (log "FF" "foo bar")
-              @last-print => "1000 [FF] foo bar"))))
+ (let [$ (injector {:foo 1
+                    :bar 2})
+       res (:resources @$)]
+   (:foo res) => 1
+   (:bar res) => 2))
 
 [[:chapter {:title "provide"}]]
-"The `provide` macro defines an algorithm for fulfilling a resource.
-It is called eagerly as a side-effect of loading its containing module."
-(fact
- (def inj (injector))
- (provide foo inj
-          1 ; There can be
-          2 ; any number of
-          3 ; expressions here, but
-          123)) ; the last expression's value is returned.
+"The `provide` macro provides a rule for providing a resource that may or may not depend on other resources."
 
-"The `provide` block evaluates the expressions in a `do` block, and the returned value is placed in the injector as the
-value of the provided resource."
-(fact
- (:foo @(first inj)) => 123)
-
-"Fulfilled resources are published using the `pub` object that is the third element in the injector tuple.
-To wait for them clients can subscribe to the topic they are interested in."
-(fact
- (def bar-chan (async/chan))
- (async/sub (inj 2) :bar bar-chan))
-
-"Now, a provider of `bar` will cause `bar-chan` to contain a key/value pair."
-(fact
- (provide bar inj
-          "This is bar")
- (async/alts!! [bar-chan
-                (async/timeout 1000)]) => [[:bar "This is bar"]
-                                           bar-chan])
-
-"`provide` executes within the context of a `go` block.
-Its underlying expressions can use macros such as `>!` and `<!`."
-(fact
- (def baz-chan (async/chan))
- (def wait-chan (async/chan))
- (provide baz inj
-          (async/<! baz-chan))
- (:baz @(first inj)) => nil ; not yet...
- ; let's subscribe to the value
- (async/sub (inj 2) :baz wait-chan)
- (async/>!! baz-chan 4)
- (async/alts!! [wait-chan
-                (async/timeout 1000)]) => [[:baz 4] wait-chan])
-
-[[:chapter {:title "with-dependencies"}]]
-"When we wish to evaluate something that depends on external resources, `with-dependencies` is the way to go.
-It can only be used from within a surrounding `go` block.
-It needs this `go` block to suspend execution until all requirements are fulfilled."
-
-"Consider the following example.
-We create an injector and define resources: `foo` and `bar`, which are provided first.
-Then we have a `go` block in which we wait for both `foo` and `bar`, and push their sum into a channel.
-Finally, we wait (blocking wait) to get this value from the channel (or time-out if we didn't get it within one second).
-We expect that the value we get from the channel be the sum of `foo` and `bar`."
-(fact
- (let [inj (injector)
-       chan (async/chan)]
-   (provide foo inj
-            1)
-   (provide bar inj
-            2)
-   (async/go
-     (async/>! chan (with-dependencies inj [foo bar]
-                      (+ foo bar))))
-   (async/alts!! [chan
-                  (async/timeout 1000)]) => [3 chan]))
-
-"We expect it to work regardless of the order, that is,
-we expect `with-dependencies` to block execution until `foo` and `bar` are provided.
-In the following example we place the `go` block before providing `foo` and `bar`,
-and add a 1 ms delay in the providing of `foo`."
-(fact
- (let [inj (injector)
-       chan (async/chan)]
-   (async/go
-     (async/>! chan (with-dependencies inj [foo bar]
-                      (+ foo bar))))
-   (provide foo inj
-            (async/<! (async/timeout 1))
-            1)
-   (provide bar inj
-            2)
-   (async/alts!! [chan
-                  (async/timeout 1000)]) => [3 chan]))
-
-"Since the expressions in a `provide` block are evaluated inside a `go` block, we can combine `provide` and `with-dependencies` to get
-resources that depend on other resources."
-(fact
- (let [inj (injector)
-       chan (async/chan)]
-   (async/go
-     (async/>! chan (with-dependencies inj [bar]
-                      bar)))
-   (provide foo inj
-            (async/<! (async/timeout 1))
-            1)
-   (provide bar inj
-            (with-dependencies inj [foo]
-              (inc foo)))
-   (async/alts!! [chan
-                  (async/timeout 1000)]) => [2 chan]))
-
-[[:chapter {:title "wait-for"}]]
-"Sometimes, especially during tests, we wish to get a resource outside a `go` block.
-In such cases we wish to block the current thread.
-Please note that this should be avoided in `provide` blocks, as it may lead to deadlocks.
-In other contexts blocking a thread is unadvised due to performance impact.
-However, for testing this may be extremely useful."
-
-"Consider our previous example, with resources `foo` and `bar`, where `bar` depends on `foo`."
-(fact
- (def inj (injector))
- (def chan (async/chan))
- (provide foo inj
-          (async/<! (async/timeout 1))
-          1)
- (provide bar inj
-          (with-dependencies inj [foo]
-            (inc foo))))
-"In the previous example we needed to create a `go` block to capture `bar`'s value from within a `with-dependencies` block.
-For this to be visible from the outside we used a channel.
-However, it can be much simpler to just assert on the value of `bar` using a blocking call.
-`wait-for` gives us just that."
-(fact
- (wait-for inj bar) => 2)
-
-[[:chapter {:title "with-dependencies!!"}]]
-"Sometimes it using a `go` block is inapplicable in places where dependencies are needed.
-One example is if we implement a callback function that depends on dependencies, and the callback
-is expected to return after having calculated what it needs to.
-For such cases, `with-dependencies!!` acts similarly to `with-dependencies`, only that
-it delays the current thread until the value is calculated, and thus it does not have to be called from within a `go` block."
-(fact
- (def inj (injector))
- (provide foo inj
-          (async/<! (async/timeout 1))
-          1)
- (with-dependencies!! inj [foo]
-   (+ foo 2)) => 3)
-
-[[:chapter {:title "Best Practices"}]]
-"In our opinion, the best way to write modules that use the `di` library for dependency injection is to
-wrap all the code that interacts with the injector (i.e., all code that provides and/or depends on resources) in a single function,
-which we encourage you to call `module`.
-This function will take one argument -- the injector, which will be provided externally."
-
-"For example, imagine we have a module that depends on one resource: `some-number` (a number), and provides two resources:
-1. `plus-some-number` -- a function that adds `some-number` to a given number, and
-2. `times-some-number` -- a function that multiplies `some-number` by a given number.
-We will wrap both providers in a `module` function which will take the injector as argument.
-As convention (borrowed from [jQuery](https://jquery.com) plugins), we will call the injector argument `$`."
-(defn module [$]
-  (provide plus-some-number $
-           (with-dependencies $ [some-number]
-             (fn [x] (+ x some-number))))
-  (provide times-some-number $
-           (with-dependencies $ [some-number]
-             (fn [x] (* x some-number)))))
-
-"Now we can test our module.
-We can call `module` with different injectors, initialized with different `some-number` values, 
-to see that our module behaves as it should in different cases."
-(fact
- ;; test with 2
- (let [$ (injector {:some-number 2})]
-   (module $)
-   (let [plus (wait-for $ plus-some-number)
-         times (wait-for $ times-some-number)]
-     (plus 1) => 3
-     (times 1) => 2))
- ;; test with 3
- (let [$ (injector {:some-number 3})]
-   (module $)
-   (let [plus (wait-for $ plus-some-number)
-         times (wait-for $ times-some-number)]
-     (plus 1) => 4
-     (times 1) => 3)))
-
-"Now imagine another module that complements our own.
-Let's imagine a module `module2`, which provides `some-number` as 2, and then provides the resource `six` based on
-our functions."
-(defn module2 [$]
-  (provide some-number $
-           2)
-  (provide six $
-           (with-dependencies $ [plus-some-number
-                                 times-some-number
-                                 some-number]
-             (plus-some-number (times-some-number some-number)))))
-
-"(generally there is only need for placing one `module` function in a namespace, so the function can always be called `module`.
-Here we needed a different function to demonstrate how different modules can work together)"
-
-"We can test `module2` by injecting mock functions:"
-(fact
- (let [$ (injector {:plus-some-number (fn [x] [:plus x])
-                    :times-some-number (fn [x] [:times x])})]
-   (module2 $)
-   (wait-for $ some-number) => 2
-   (wait-for $ six) => [:plus [:times 2]]))
-
-"In production, these two modules need to actually meet each other and cooperate.
-We use a single injector and git it to both of them."
+"It takes an injector, the name of the new resource, a list of dependencies and code that evaluates the resource.
+It places a function in the `:rules` list in the injector, that when called with the resource map as its parameter, 
+returns the value of the new resource.
+The function is given two meta fields: `:resource`, containing the name of the target resource, and
+`:deps`, containing the dependencies.
+Both `:resource` and `:deps` hold resource names as keywords."
 (fact
  (let [$ (injector)]
-   (module $)
-   (module2 $)
-   (wait-for $ six) => 6))
+   (provide $ baz [foo bar]
+            (+ foo bar))
+   (count (:rules @$)) => 1
+   (let [func ((:rules @$) 0)]
+     (func {:foo 1
+            :bar 2}) => 3
+     (-> func meta :resource) => :baz
+     (-> func meta :deps) => [:foo :bar])))
 
-"The order in which we inject the different modules does not matter."
+
+[[:chapter {:title "do-with"}]]
+"Modules can also define actions with side effects that do not result in a new resource.
+`do-with` is a macro similar to [provide](#provide), that adds a rule to the injector, but it is not given
+a resource name, and therefore does not set the `:resource` meta field in the function."
+(fact
+ (let [res (atom nil)
+       $ (injector)]
+   (do-with $ [foo bar]
+            (reset! res (+ foo bar)))
+   (count (:rules @$)) => 1
+   (let [func ((:rules @$) 0)]
+     (-> func meta :deps) => [:foo :bar]
+     (func {:foo 1
+            :bar 2})
+     @res => 3)))
+
+[[:chapter {:title "startup"}]]
+"After all modules contributed rules to the injector, the `startup` function runs a startup sequence based on these rules."
+
+"For resources without dependencies, action is performed in arbitrary order."
+(fact
+ (let [res (transient #{})
+       $ (injector)]
+   (provide $ foo []
+            (conj! res :foo)
+            1)
+   (provide $ bar []
+            (conj! res :bar)
+            2)
+   (startup $)
+   (persistent! res) => #{:foo :bar}))
+
+"When depndencies exist, functions are applied according to dependency order."
+(fact
+ (let [res (atom nil)
+       $ (injector)]
+   (do-with $ [foo bar]
+            (reset! res (str "foo is " foo " and bar is " bar)))
+   (provide $ bar [foo]
+            (inc foo))
+   (provide $ foo []
+            1)
+   (startup $)
+   @res => "foo is 1 and bar is 2"))
+
+"A function is only executed if all its dependencies are present."
 (fact
  (let [$ (injector)]
-   (module2 $) 
-   (module $)
-   (wait-for $ six) => 6))
+   (provide $ foo [resource-that-does-not-exist]
+            (throw (Exception. "This code should not run")))
+   (startup $) => nil))
+
+"The resource values provided by rules are updated in the injector's `:resources` map."
+(fact
+ (let [$ (injector)]
+   (provide $ foo []
+            7)
+   (startup $)
+   (-> @$ :resources :foo) => 7))
+
+"If a resource was defined during the initialization of the injector, the operation is skipped."
+(fact
+ (let [$ (injector {:to-skip 8})]
+   (provide $ to-skip []
+            (throw (Exception. "This should not be called")))
+   (startup $)
+   (-> @$ :resources :to-skip) => 8))
+
+[[:chapter {:title "shutdown"}]]
+"When [provide](#provide)ing a resource, it is possible to also provide a `:shutdown` function.
+This is done by returning an object containing only these two fields:
+1. `:resource`: The resource value, and
+2. `:shutdown`: A function which, when called, cleans up the resource."
+(fact
+ (let [$ (injector)
+       func (fn [])]
+   (provide $ foo []
+            {:resource 2
+             :shutdown (fn [])})
+   (provide $ bar []
+            {:resource 3
+             :shutdown func
+             :something-else 7})
+   (startup $)
+   (-> @$ :resources :foo) => 2
+   (-> @$ :resources :bar) => {:resource 3
+                               :shutdown func
+                               :something-else 7}))
+
+"The `:shutdown` functions are accumulated in reverse order in the injector's `:shutdown` sequence."
+(fact
+ (let [$ (injector)]
+   (provide $ foo []
+            {:resource 1
+             :shutdown :some-func1})
+   (provide $ bar [foo]
+            {:resource 2
+             :shutdown :some-func2})
+   (provide $ baz [bar]
+            {:resource 3
+             :shutdown :some-func3})
+   (startup $)
+   (:shutdown @$) => [:some-func3 :some-func2 :some-func1]))
+
+"The `shutdown` function executes the injector's shutdown sequence."
+(fact
+ (let [res (transient [])
+       $ (injector)]
+   (provide $ foo []
+            {:resource 1
+             :shutdown (fn [] (conj! res :foo))})
+   (provide $ bar [foo]
+            {:resource 2
+             :shutdown (fn [] (conj! res :bar))})
+   (provide $ baz [bar]
+            {:resource 3
+             :shutdown (fn [] (conj! res :baz))})
+   (startup $)
+   (shutdown $)
+   (persistent! res) => [:baz :bar :foo]))
+
+[[:chapter {:title "do-with!"}]]
+"The `do-with!` macro has similar semantics to [do-with](#do-with), but instead of providing a rule to the injector prior to `startup`,
+`do-with!` perform the enclosed operation (and returns its value) assuming `startup` has already been called."
+(fact
+ (let [$ (injector)]
+   (provide $ foo [] 1)
+   (startup $)
+   (do-with! $ [foo]
+             (inc foo)) => 2))
+
+"If one or more required resources is not available, an exception is thrown."
+(fact
+ (let [$ (injector)]
+   (provide $ foo [] 1)
+   (startup $)
+   (do-with! $ [bar]
+             (inc bar)) => (throws "Resource(s) #{:bar} are not available, but #{:foo} are")))
+
+[[:chapter {:title "Under the Hood"}]]
+"`rule-edges` converts a function representing a rule to a collection of edges in a dependency graph.
+Each edge is represented by a `[src dest]` tuple. 
+The nodes in that graph are either resources (keywords) or functions representing actions to be performed."
+
+"A single rule provides `n` or `n+1` edges, where `n` is the number of dependencies in the rule.
+For each dependency `d` we get a rule `[d func]`, where `func` is the rule's function."
+(fact
+ (let [func (with-meta
+              (fn [res])
+              {:deps [:foo :bar]})]
+   (rule-edges func) => [[:foo func] [:bar func]]))
+
+"In addition, if `func` has a `:resource` meta field with value `r`, a `[func r]` edge is added."
+(fact
+ (let [func (with-meta (fn [res]) {:resource :baz
+                                   :deps [:foo :bar]})]
+   (rule-edges func) => [[func :baz] [:foo func] [:bar func]]))
