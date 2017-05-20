@@ -39,7 +39,7 @@ It has the following fields:
  (let [$ (injector)]
    @$ => map?
    (:resources @$) => map?
-   (:rules @$) => []
+   (:rules @$) => sequential?
    (:shutdown @$) => []))
 
 "An optional argument provides a map with initial resource values."
@@ -63,8 +63,7 @@ Both `:resource` and `:deps` hold resource names as keywords."
  (let [$ (injector)]
    (provide $ baz [foo bar]
             (+ foo bar))
-   (count (:rules @$)) => 1
-   (let [func ((:rules @$) 0)]
+   (let [func (last (:rules @$))]
      (func {:foo 1
             :bar 2}) => 3
      (-> func meta :resource) => :baz
@@ -80,8 +79,7 @@ a resource name, and therefore does not set the `:resource` meta field in the fu
        $ (injector)]
    (do-with $ [foo bar]
             (reset! res (+ foo bar)))
-   (count (:rules @$)) => 1
-   (let [func ((:rules @$) 0)]
+   (let [func (last (:rules @$))]
      (-> func meta :deps) => [:foo :bar]
      (func {:foo 1
             :bar 2})
@@ -208,7 +206,83 @@ This is done by returning an object containing only these two fields:
    (provide $ foo [] 1)
    (startup $)
    (do-with! $ [bar]
-             (inc bar)) => (throws "Resource(s) #{:bar} are not available, but #{:foo} are")))
+             (inc bar)) => (throws #"Resource\(s\) \#\{:bar\} are not available, but \#.*:foo.* are")))
+
+[[:chapter {:title "Default Rules"}]]
+"An empty injector comes with some rules pre-loaded.
+These rules are intended to provide a set of basic capabilities to be used in modules."
+
+[[:section {:title "time"}]]
+"`time` is a function that returns the current time in milliseconds."
+(fact
+ (let [$ (injector)]
+   (startup $)
+   (do-with! $ [time]
+             (let [t1 (time)]
+               t1 => number?
+               (Thread/sleep 1)
+               (let [t2 (time)]
+                 (> t2 t1) => true)))))
+
+[[:section {:title "println"}]]
+"`println` prints a line of text to the stndard output."
+(fact
+ (let [$ (injector)]
+   (startup $)
+   (do-with! $ [println]
+             (with-out-str (println "foobar")) => "foobar\n")))
+
+[[:section {:title "format-time"}]]
+"`format-time` is a function that formats a timestamp (as given by `time`) in human-readable form."
+(fact
+ (let [$ (injector)]
+   (startup $)
+   (do-with! $ [format-time]
+             ;; The format is sentitive to timezone, so we match against a regex
+             (format-time 1495299001266) => #"May 2. 2017 ..:50:01:266 ...")))
+
+[[:section {:title "logging"}]]
+"`log` is a function that logs an event.
+An event is given as a map of properties.
+It expects a `:format` field specifying the format of the logging event.
+The `:format` field is a tuple consisting of a string (input to `format`),
+and a vector of field names where the values to the format should come from.
+`log` uses [time](#time), [format-time](#format-time) and [println](#println) to print the formatted event
+along with a timestamp."
+(fact
+ (let [$ (injector {:time (constantly 1234)
+                    :format-time str})]
+   (startup $)
+   (do-with! $ [log]
+             (with-out-str (log {:format ["[%s] [%d]" [:foo :bar]]
+                                 :foo "hello"
+                                 :bar 3})) => "1234 [hello] [3]\n")))
+
+"A default format refers to the properties `:severity`, `:source` and `:desc`."
+(fact
+ (let [$ (injector {:time (constantly 1234)
+                    :format-time str})]
+   (startup $)
+   (do-with! $ [log]
+             (with-out-str (log {:severity "II"
+                                 :source "my-service"
+                                 :desc "Service is shutting down"})) => "1234 [II] [my-service] Service is shutting down\n")))
+
+"The convenience functions `err`, `warn` and `info` call [log](#log) with a corresponding `:severity` value."
+(fact
+ (let [$ (injector {:time (constantly 1234)
+                    :format-time str})]
+   (startup $)
+   (do-with! $ [err warn info]
+             (with-out-str (err {:source "my-service"
+                                 :desc "Something went wrong"}))
+             => "1234 [EE] [my-service] Something went wrong\n"
+             (with-out-str (warn {:source "my-service"
+                                  :desc "Something probably went wrong"}))
+             => "1234 [WW] [my-service] Something probably went wrong\n"
+             (with-out-str (info {:source "my-service"
+                                  :desc "Something is going on"}))
+             => "1234 [II] [my-service] Something is going on\n")))
 
 [[:chapter {:title "Under the Hood"}]]
 "`rule-edges` converts a function representing a rule to a collection of edges in a dependency graph.

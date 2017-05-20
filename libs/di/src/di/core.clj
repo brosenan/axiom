@@ -3,11 +3,46 @@
             [loom.alg :as alg]
             [clojure.set :as set]))
 
+(defn log-with-sev [res sev]
+  (fn [event]
+    (let [{:keys [log]} res]
+      (log (assoc event :severity sev)))))
+
+(def default-rules
+  [(with-meta (fn [res]
+                (fn [] (.getTime (java.util.Date.))))
+     {:resource :time
+      :deps []})
+   (with-meta (fn [res] println)
+     {:resource :println
+      :deps []})
+   (with-meta (fn [res]
+                (fn [time]
+                  (let [fmt (java.text.SimpleDateFormat. "MMM dd YYYY HH:mm:ss:SSS zzz")]
+                    (.format fmt time))))
+     {:resource :format-time
+      :deps []})
+   (with-meta (fn [res] (fn [event]
+                          (let [{:keys [time format-time println]} res
+                                [fmt args] (:format event ["[%s] [%s] %s" [:severity :source :desc]])]
+                            (println (format-time (time)) (apply format fmt (map event args))))))
+     {:resource :log
+      :deps [:time :format-time :println]})
+   (with-meta (fn [res] (log-with-sev res "EE"))
+     {:resource :err
+      :deps [:log]})
+   (with-meta (fn [res] (log-with-sev res "WW"))
+     {:resource :warn
+      :deps [:log]})
+   (with-meta (fn [res] (log-with-sev res "II"))
+     {:resource :info
+      :deps [:log]})])
+
 (defn injector
   ([initial]
    (atom
     {:resources initial
-     :rules []
+     :rules default-rules
      :shutdown []}))
   ([]
    (injector {})))
