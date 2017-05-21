@@ -85,6 +85,6 @@
                      :title "di.core"
                      :subtitle "Dependency Injection"}
                     "s3"
-                    {:input "libs/di/test/s3/core_test.clj"
+                    {:input "libs/s3/test/s3/core_test.clj"
                      :title "s3.core"
                      :subtitle "An Amazon AWS-S3-based Hasher"}}})
