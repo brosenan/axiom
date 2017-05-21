@@ -284,6 +284,17 @@ along with a timestamp."
                                   :desc "Something is going on"}))
              => "1234 [II] [my-service] Something is going on\n")))
 
+[[:section {:title "sh"}]]
+"The `sh` function executes a command given as its arguments, and returns an `:exit` code as an integer,
+and the content of the standard `:out` and `:err` as strings."
+(fact
+ (let [$ (injector)]
+   (startup $)
+   (do-with! $ [sh]
+             (sh "echo" "foo") => {:exit 0
+                                   :out "foo\n"
+                                   :err ""})))
+
 [[:chapter {:title "Under the Hood"}]]
 "`rule-edges` converts a function representing a rule to a collection of edges in a dependency graph.
 Each edge is represented by a `[src dest]` tuple. 

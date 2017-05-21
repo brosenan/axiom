@@ -36,6 +36,9 @@
       :deps [:log]})
    (with-meta (fn [res] (log-with-sev res "II"))
      {:resource :info
+      :deps [:log]})
+   (with-meta (fn [res] clojure.java.shell/sh)
+     {:resource :sh
       :deps [:log]})])
 
 (defn injector
