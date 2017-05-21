@@ -8,7 +8,7 @@
   <!-- Enable responsiveness on mobile devices-->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
   <link rel="shortcut icon" href="favicon.ico">
-  <title>axiom//cloudlog.graph - Graph Utilities</title>
+  <title>axiom//s3.core - An Amazon AWS-S3-based Hasher</title>
   <script src="js/highlight.min.js"></script>
   <script src="js/gumshoe.min.js"></script>
   <script src="js/smooth-scroll.min.js"></script>
@@ -37,7 +37,7 @@
     <span>&nbsp;</span>
     <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
     <span>&nbsp;</span>
-    <a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item active" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="di.html">di.core</a><a class="sidebar-nav-item" href="docs.html"></a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="migrator.html">migrator.core</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="s3.html">s3.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
+    <a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="di.html">di.core</a><a class="sidebar-nav-item" href="docs.html"></a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="migrator.html">migrator.core</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item active" href="s3.html">s3.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
     <span class="sidebar-nav-item">&nbsp;</span>
     <span class="sidebar-nav-item">&nbsp;</span>
   </nav>
@@ -51,8 +51,8 @@
         <div class="container">
 	  <a href="index.html"><img src="img/axiom-logo.png"></a>
           <h3 class="masthead-title">
-            <span>axiom//cloudlog.graph</span>
-            <small>Graph Utilities</small>
+            <span>axiom//s3.core</span>
+            <small>An Amazon AWS-S3-based Hasher</small>
           </h3>
         </div>
       </div>
@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">TOP</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#merge-graph"><h4>2 &nbsp; merge-graph: Merging Two Graphs</h4></a></li><li><a class="chapter" data-scroll="" href="#invert"><h4>3 &nbsp; invert: Invert the Edges of a DGraph</h4></a></li><li><a class="chapter" data-scroll="" href="#souces"><h4>4 &nbsp; souces</h4></a></li><li><a class="chapter" data-scroll="" href="#toposort"><h4>5 &nbsp; toposort: Topological Sort</h4></a><a class="section" data-scroll="" href="#under-the-hood"><h5><i>5.1 &nbsp; Under the Hood</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#storage"><h4>2 &nbsp; storage</h4></a></li><li><a class="chapter" data-scroll="" href="#hasher"><h4>3 &nbsp; hasher</h4></a></li><li><a class="chapter" data-scroll="" href="#usage-example"><h4>4 &nbsp; Usage Example</h4></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,12 +80,53 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#merge-graph"><h4>2 &nbsp; merge-graph: Merging Two Graphs</h4></a></li><li><a class="chapter" data-scroll="" href="#invert"><h4>3 &nbsp; invert: Invert the Edges of a DGraph</h4></a></li><li><a class="chapter" data-scroll="" href="#souces"><h4>4 &nbsp; souces</h4></a></li><li><a class="chapter" data-scroll="" href="#toposort"><h4>5 &nbsp; toposort: Topological Sort</h4></a><a class="section" data-scroll="" href="#under-the-hood"><h5><i>5.1 &nbsp; Under the Hood</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#storage"><h4>2 &nbsp; storage</h4></a></li><li><a class="chapter" data-scroll="" href="#hasher"><h4>3 &nbsp; hasher</h4></a></li><li><a class="chapter" data-scroll="" href="#usage-example"><h4>4 &nbsp; Usage Example</h4></a></li>
                 </ul>
               </nav>
           </div>
-          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p>This is a small graph library intended to provide topological sort.</p></div><div><p>In this library, graphs are represented as maps from edges to sets of target edges. For example, the map <code>{:a #{:b :c} :b #{c:}}</code> represents a graph with three nodes: <code>:a</code>, <code>:b</code> and <code>:c</code>, where <code>:a</code> is connected to both <code>:b</code> and <code>:c</code>, and <code>:b</code> is connected to <code>:c</code>.</p></div><div><span id="merge-graph"></span><h2><b>2 &nbsp;&nbsp; merge-graph: Merging Two Graphs</b></h2></div><div><p><code>merge-graph</code> merges two graphs by adding the edges of the one to the other</p></div><div class="code"><pre><code class="clojure">(merge-graph {} {:a #{:b}}) =&gt; {:a #{:b}}</code></pre></div><div><p>Disjoint graphs are merged by simply merging the maps.</p></div><div class="code"><pre><code class="clojure">(merge-graph {:a #{:b}} {:c #{:d}}) =&gt; {:a #{:b} :c #{:d}}</code></pre></div><div><p>When the two graphs share nodes, their destination sets are merged.</p></div><div class="code"><pre><code class="clojure">(merge-graph {:a #{:b :c}} {:a #{:c :d}}) =&gt; {:a #{:b :c :d}}</code></pre></div><div><span id="invert"></span><h2><b>3 &nbsp;&nbsp; invert: Invert the Edges of a DGraph</b></h2></div><div><p>The inverse of an empty graph is an empty graph.</p></div><div class="code"><pre><code class="clojure">(invert {}) =&gt; {}</code></pre></div><div><p>Each node in the destination set becomes a source edge.</p></div><div class="code"><pre><code class="clojure">(invert {:a #{:b :c}}) =&gt; {:b #{:a} :c #{:a}}</code></pre></div><div><p>When several edges point at the same node, they are placed in the destination set for that node.</p></div><div class="code"><pre><code class="clojure">(invert {:a #{:c} :b #{:c}}) =&gt; {:c #{:a :b}}</code></pre></div><div><span id="souces"></span><h2><b>4 &nbsp;&nbsp; souces</b></h2></div><div><p><code>sources</code> returns the sources in a graph, i.e., the nodes that do not have other nodes pointing to them.</p></div><div class="code"><pre><code class="clojure">(sources {:a #{:b :c} :b #{:c}}) =&gt; #{:a}</code></pre></div><div><span id="toposort"></span><h2><b>5 &nbsp;&nbsp; toposort: Topological Sort</b></h2></div><div><p><code>toposort</code> takes a graph and returns a sequence of its nodes that satisfies the partial order defined by the graph.</p></div><div class="code"><pre><code class="clojure">(toposort {:a #{:b :c} :b #{:c :d} :c #{:e} :d #{:e}}) =&gt; [:a :b :c :d :e]</code></pre></div><div><span id="under-the-hood"></span><h3>5.1 &nbsp;&nbsp; Under the Hood</h3></div><div><p>Internally, <code>toposort</code> takes the following arguments:</p><ol><li><code>graph</code>: the graph to be sorted</li><li><code>inv</code>: its <a href='#invert'>inverse</a></li><li><code>sources</code>: a set of its <a href='#sources'>sources</a></li></ol></div><div><p>When <code>sources</code> is empty, it returns an empty sequence.</p></div><div class="code"><pre><code class="clojure">(toposort {} {} #{}) =&gt; empty?</code></pre></div><div><p>When <code>sources</code> has one element and the graph is empty, the element is returned in the sequence.</p></div><div class="code"><pre><code class="clojure">(toposort {} {} #{:a}) =&gt; [:a]</code></pre></div><div><p>When the first source has destinations in the graph, we check if they become sources themselves.</p></div><div class="code"><pre><code class="clojure">(toposort {:a #{:b}} {:b #{:a}} #{:a}) =&gt; [:a :b]</code></pre></div><div><p>However, when the destinations still have other sources (not yet removed from the graph), we do not add them to the sources list.</p></div><div class="code"><pre><code class="clojure">(let [graph {:a #{:b :c} :b #{:c}}]
- (toposort graph (invert graph) #{:a})) =&gt; [:a :b :c]</code></pre></div>
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p>This library provides a <a href='permacode.hasher.html'>hasher</a> that stores its content in <a href='https://aws.amazon.com/s3/'>Amazon's S3</a>.</p></div><div><p>The library requires configuration providing credentials for accessing S3, as well as a bucket name, that is assumed to pre-exist. It provides the <a href='di.html'>resources</a> <a href='#storage'>storage</a> and <a href='#hasher'>hasher</a> in return.</p></div><div><span id="storage"></span><h2><b>2 &nbsp;&nbsp; storage</b></h2></div><div><p>As its definition in <a href='permacode.hasher.html#introduction'>permacode</a>, storage is a pair of functions (see <a href='permacode.hasher.html#file-store'>file-store</a> as an example), which store content under a key, and fetch stored content given a key, respectively.</p></div><div><p>It depends on <code>s3-config</code>, a map of properties containing the <code>:bucket-name</code> in which values are to be stored, as well as credentials for accessing S3.  See <a href='https://github.com/nside/clj-aws-s3'>clj-aws-s3 documentation</a> for more details.</p></div><div class="code"><pre><code class="clojure">(let [config {:bucket-name &quot;foo&quot;
+             :access-key &quot;bar&quot;
+             :secret-key &quot;baz&quot;}
+     $ (di/injector {:s3-config config})]
+ (module $)
+ (di/startup $)
+ (di/do-with! $ [storage]
+              (let [[store retr] storage
+                    content (.getBytes &quot;foo bar&quot; &quot;UTF-8&quot;)]
+                (store &quot;abcd&quot; content) =&gt; true
+                (provided
+                 (clojure.java.io/input-stream content) =&gt; ..inp..
+                 (s3/put-object config &quot;foo&quot; &quot;abcd&quot; ..inp..) =&gt; irrelevant)
+                (retr &quot;abcd&quot;) =&gt; content
+                (provided
+                 (s3/get-object config &quot;foo&quot; &quot;abcd&quot;) =&gt; {:content ..inp2..}
+                 (hasher/slurp-bytes ..inp2..) =&gt; content))))</code></pre></div><div><span id="hasher"></span><h2><b>3 &nbsp;&nbsp; hasher</b></h2></div><div><p>The <code>hasher</code> resource is a <a href='permacode.hasher.html#nippy-multi-hasher'>nippy-multi-hasher</a> based on the <code>storage</code> resource as its storage.</p></div><div class="code"><pre><code class="clojure">(let [calls (transient [])
+     $ (di/injector {:storage [(fn [k v]
+                                 (conj! calls [:store k v]))
+                               (fn [k])]})]
+ (module $)
+ (di/startup $)
+ (di/do-with! $ [hasher]
+              (let [[hash unhash] hasher]
+                (hash ..expr..) =&gt; ..hashcode..
+                (provided
+                 (nippy/freeze ..expr.. nil) =&gt; ..bin..
+                 (digest/sha2-256 ..bin..) =&gt; ..mhash..
+                 (multihash/base58 ..mhash..) =&gt; ..hashcode..)
+                (persistent! calls) =&gt; [[:store ..hashcode.. ..bin..]])))</code></pre></div><div><span id="usage-example"></span><h2><b>4 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>To actually work against S3 we need to provide real credentials. We provide them using environment variables:</p></div><div class="code"><pre><code class="clojure">:integ
+ (def config {:bucket-name &quot;brosenan-test&quot;
+            :access-key (System/getenv &quot;AWS_ACCESS_KEY&quot;)
+            :secret-key (System/getenv &quot;AWS_SECRET_KEY&quot;)})</code></pre></div><div><p>We provide this to the injector, and start it.</p></div><div class="code"><pre><code class="clojure">:integ
+ (def $ (di/injector {:s3-config config}))
+ (module $)
+ (di/startup $)</code></pre></div><div><p>We will randomize a value to be sure we actually store and retrieve a new value.</p></div><div class="code"><pre><code class="clojure">:integ
+ (def value (rand-int 100000))</code></pre></div><div><p>Now we can store a value.</p></div><div class="code"><pre><code class="clojure">:integ
+ (di/do-with! $ [hasher]
+            (let [[hash unhash] hasher]
+              (def hash-code (hash {:value value}))))</code></pre></div><div><p>...and retrieve it...</p></div><div class="code"><pre><code class="clojure">:integ
+ (di/do-with! $ [hasher]
+            (let [[hash unhash] hasher]
+              (unhash hash-code) =&gt; {:value value}))</code></pre></div>
         </div>
       </div>
     </div>
