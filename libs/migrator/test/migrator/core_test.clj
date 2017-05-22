@@ -2,6 +2,7 @@
   (:require [midje.sweet :refer :all]
             [migrator.core :refer :all]
             [permacode.core :as perm]
+            [permacode.publish :as permpub]
             [di.core :as di]
             [clojure.core.async :as async]
             [zk-plan.core :as zkp]
@@ -10,7 +11,8 @@
             [rabbit-microservices.core :as rms]
             [zk-plan.core :as zkp]
             [dynamo.core :as dyn]
-            [zookeeper :as zk]))
+            [zookeeper :as zk]
+            [clojure.java.io :as io]))
 
 [[:chapter {:title "Introduction"}]]
 "`migrator` is a microservice that listens to events describing new rules being published,
@@ -54,6 +56,7 @@ It relies on the following resources:
                               :err ""})
                        :migration-config {:clone-location "/my/clone/location"
                                           :clone-depth 12}
+                       :hasher :my-hasher
                        :serve (fn [f r]
                                 (assoc! reg r f))})]
    (module $)
@@ -62,17 +65,32 @@ It relies on the following resources:
                                          :name "axiom/app-version"})))
  push-handler => fn?)
 
-"The `push-handler` function responds to such events by calling `git clone` inside the given directory."
+"The `push-handler` function responds to such events by calling `git clone` and `git checkout` 
+to get the specified version of the specified repo inside the given directory.
+Then `permacode.publish/hash-all` is called on the local repo, and then the directory is removed."
 (fact
+ (def published (transient []))
  (push-handler {:kind :fact
                 :name "axiom/app-version"
                 :key "https://example.com/some/repo"
-                :data ["ABCD1234"]}) => nil
+                :data ["ABCD1234"]}
+               (fn [ev]
+                 (conj! published ev))) => nil
  (provided
-  (rand-int 1000000000) => 12345)
+  (rand-int 1000000000) => 12345
+  (io/file "/my/clone/location/repo12345") => ..dir..
+  (permpub/hash-all :my-hasher ..dir..) => {'foo 'perm.ABCD123
+                                            'bar 'perm.EFGH456})
  (persistent! cmds) => [["git" "clone" "--depth" "12" "https://example.com/some/repo" "/my/clone/location/repo12345"]
-                        ["git" "checkout" "ABCD1234" :dir "/my/clone/location/repo12345"]])
+                        ["git" "checkout" "ABCD1234" :dir "/my/clone/location/repo12345"]
+                        ["rm" "-rf" "/my/clone/location/repo12345"]])
 
+"The handler publishes an `:axiom/rule-versions` event."
+(fact
+ (persistent! published) => [{:kind :fact
+                              :name "axiom/rule-versions"
+                              :key "https://example.com/some/repo"
+                              :data ["ABCD1234" #{'perm.ABCD123 'perm.EFGH456}]}])
 
 [[:chapter {:title "rule-migrator"}]]
 "When the [rule-tracker](#rule-tracker) finds out a rule has been introduced (for the first time), a migration process needs to take place

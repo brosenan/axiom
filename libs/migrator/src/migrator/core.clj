@@ -1,12 +1,14 @@
 (ns migrator.core
   (:require [permacode.core :as perm]
+            [permacode.publish :as permpub]
             [di.core :as di]
             [clojure.core.async :as async]
             [zookeeper :as zk]
             [zk-plan.core :as zkp]
             [clojure.string :as str]
             [cloudlog-events.core :as ev]
-            [cloudlog.core :as clg]))
+            [cloudlog.core :as clg]
+            [clojure.java.io :as io]))
 
 (defn fact-declarer [rule link]
   (fn [$ & args]
@@ -168,8 +170,8 @@
                                             (recur (-> rulefunc meta :continuation) (inc link) (doall tasks)))))
                                   (mark-as-ready plan))
                                 nil)))
-  (di/do-with $ [serve sh migration-config]
-              (serve (fn [ev]
+  (di/do-with $ [serve sh migration-config hasher]
+              (serve (fn [ev publish]
                        (let [unique (rand-int 1000000000)
                              dir (str (:clone-location migration-config) "/repo" unique)
                              [version] (:data ev)]
@@ -177,7 +179,13 @@
                              (str (:clone-depth migration-config))
                              (:key ev)
                              dir)
-                         (sh "git" "checkout" version :dir dir))
+                         (sh "git" "checkout" version :dir dir)
+                         (let [hashes (permpub/hash-all hasher (io/file dir))]
+                           (publish {:kind :fact
+                                     :name "axiom/rule-versions"
+                                     :key (:key ev)
+                                     :data [version (set (vals hashes))]}))
+                         (sh "rm" "-rf" dir))
                        nil)
                      {:kind :fact
                       :name "axiom/app-version"})))
