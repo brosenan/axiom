@@ -95,20 +95,31 @@
                             :err &quot;&quot;})
                      :migration-config {:clone-location &quot;/my/clone/location&quot;
                                         :clone-depth 12}
+                     :hasher :my-hasher
                      :serve (fn [f r]
                               (assoc! reg r f))})]
  (module $)
  (di/startup $)
  (def push-handler ((persistent! reg) {:kind :fact
                                        :name &quot;axiom/app-version&quot;})))
- push-handler =&gt; fn?</code></pre></div><div><p>The <code>push-handler</code> function responds to such events by calling <code>git clone</code> inside the given directory.</p></div><div class="code"><pre><code class="clojure">(push-handler {:kind :fact
+ push-handler =&gt; fn?</code></pre></div><div><p>The <code>push-handler</code> function responds to such events by calling <code>git clone</code> and <code>git checkout</code>  to get the specified version of the specified repo inside the given directory. Then <code>permacode.publish/hash-all</code> is called on the local repo, and then the directory is removed.</p></div><div class="code"><pre><code class="clojure">(def published (transient []))
+ (push-handler {:kind :fact
               :name &quot;axiom/app-version&quot;
               :key &quot;https://example.com/some/repo&quot;
-              :data [&quot;ABCD1234&quot;]}) =&gt; nil
+              :data [&quot;ABCD1234&quot;]}
+             (fn [ev]
+               (conj! published ev))) =&gt; nil
  (provided
-(rand-int 1000000000) =&gt; 12345)
+(rand-int 1000000000) =&gt; 12345
+(io/file &quot;/my/clone/location/repo12345&quot;) =&gt; ..dir..
+(permpub/hash-all :my-hasher ..dir..) =&gt; {'foo 'perm.ABCD123
+                                          'bar 'perm.EFGH456})
  (persistent! cmds) =&gt; [[&quot;git&quot; &quot;clone&quot; &quot;--depth&quot; &quot;12&quot; &quot;https://example.com/some/repo&quot; &quot;/my/clone/location/repo12345&quot;]
-                      [&quot;git&quot; &quot;checkout&quot; &quot;ABCD1234&quot; :dir &quot;/my/clone/location/repo12345&quot;]]</code></pre></div><div><span id="rule-migrator"></span><h2><b>3 &nbsp;&nbsp; rule-migrator</b></h2></div><div><p>When the <a href='#rule-tracker'>rule-tracker</a> finds out a rule has been introduced (for the first time), a migration process needs to take place to process all the existing facts that interact with the new rule, to create all the derived facts and intermediate rule tuples that are the result of this interaction.</p></div><div><p><code>rule-migrator</code> is the service function responsible for this. It depends on <a href='zk-plan.html#module'>zk-plan</a>, which it uses to create the migration plan. We will mock this module with functions that record their own operation, so that we will later be able to view the plan that was created.</p></div><div class="code"><pre><code class="clojure">(def calls (transient []))
+                      [&quot;git&quot; &quot;checkout&quot; &quot;ABCD1234&quot; :dir &quot;/my/clone/location/repo12345&quot;]
+                      [&quot;rm&quot; &quot;-rf&quot; &quot;/my/clone/location/repo12345&quot;]]</code></pre></div><div><p>The handler publishes an <code>:axiom/rule-versions</code> event.</p></div><div class="code"><pre><code class="clojure">(persistent! published) =&gt; [{:kind :fact
+                            :name &quot;axiom/rule-versions&quot;
+                            :key &quot;https://example.com/some/repo&quot;
+                            :data [&quot;ABCD1234&quot; #{'perm.ABCD123 'perm.EFGH456}]}]</code></pre></div><div><span id="rule-migrator"></span><h2><b>3 &nbsp;&nbsp; rule-migrator</b></h2></div><div><p>When the <a href='#rule-tracker'>rule-tracker</a> finds out a rule has been introduced (for the first time), a migration process needs to take place to process all the existing facts that interact with the new rule, to create all the derived facts and intermediate rule tuples that are the result of this interaction.</p></div><div><p><code>rule-migrator</code> is the service function responsible for this. It depends on <a href='zk-plan.html#module'>zk-plan</a>, which it uses to create the migration plan. We will mock this module with functions that record their own operation, so that we will later be able to view the plan that was created.</p></div><div class="code"><pre><code class="clojure">(def calls (transient []))
  (def last-task (atom 0))
  (def mock-zk-plan
  {:create-plan (fn [parent]
