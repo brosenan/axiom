@@ -175,6 +175,8 @@
  (def last-task (atom 0))
  (def mock-zk-plan
  {:create-plan (fn [parent]
+                 (when-not (= permval/*hasher* :my-hasher)
+                   (throw (Exception. &quot;A custom hasher needs to be bound&quot;)))
                  (conj! calls [:create-plan parent])
                  :plan-node)
   :add-task (fn [plan func args]
@@ -182,12 +184,13 @@
               (swap! last-task inc)
               @last-task)
   :mark-as-ready (fn [node]
-                   (conj! calls [:mark-as-ready node]))})</code></pre></div><div><p>With this mock, <code>calls</code> will contain a list of the calls that were made. <code>create-plan</code> always returns <code>:plan-node</code>, and <code>add-task</code> returns an ordinal number.</p></div><div><p>Since <code>rule-migrator</code> is a service, we mock <code>declare-service</code> and <code>assign-service</code> to get the actual function. We also provides it a <code>migration-config</code> resource containing the <code>:number-of-shards</code> parameter, determining how much parallelism we wish to have.</p></div><div class="code"><pre><code class="clojure">(let [calls-chan (async/chan 10)
+                   (conj! calls [:mark-as-ready node]))})</code></pre></div><div><p>With this mock, <code>calls</code> will contain a list of the calls that were made. <code>create-plan</code> always returns <code>:plan-node</code>, and <code>add-task</code> returns an ordinal number.</p></div><div><p>Since <code>rule-migrator</code> is a service, we mock <code>declare-service</code> and <code>assign-service</code> to get the actual function. We also provides it a <code>migration-config</code> resource containing the <code>:number-of-shards</code> parameter, determining how much parallelism we wish to have. The <code>hasher</code> resource is used to retrieve the content of the permacode modules.</p></div><div class="code"><pre><code class="clojure">(let [calls-chan (async/chan 10)
      $ (di/injector {:declare-service (fn [key reg] (async/&gt;!! calls-chan [:declare-service key reg]))
                      :assign-service (fn [key func] (async/&gt;!! calls-chan [:assign-service key func]))
                      :zk-plan mock-zk-plan
                      :migration-config {:number-of-shards 3
-                                        :plan-prefix &quot;/my-plans&quot;}})]
+                                        :plan-prefix &quot;/my-plans&quot;}
+                     :hasher :my-hasher})]
  (module $)
  (di/startup $)
  (async/alts!! [calls-chan
@@ -197,7 +200,7 @@
                                 (async/timeout 1000)])]
    ch =&gt; calls-chan
    (take 2 call) =&gt; [:assign-service &quot;migrator.core/rule-migrator&quot;]
-   (def migrate-rules (call 2))))</code></pre></div><div><p>Now, if we call the migration function <code>migrate-rules</code> on a rule, it will create a migration plan. First, it will extract the rules out of the given permacode modules. Then it will sort them according to their dependencies. Finally, it will create a migration plan that will cover all rule functions in these modules, to be migrated one by one, in topological order. </p></div><div><p>The plan will include, for each rule, a singleton <a href='#fact-declarer'>fact-declarer</a> tasks that will start collecting events to be processed by the given rule once the migration is complete; a first phase of <a href='#initial-migrator'>initial-migrators</a> to process link 0 of the rule and any number of <a href='#link-migrator'>link-migrator</a> phases to process the rest of the links.</p></div><div class="code"><pre><code class="clojure">(migrate-rules {:kind :fact
+   (def migrate-rules (call 2))))</code></pre></div><div><p>Now, if we call the migration function <code>migrate-rules</code> on a rule, it will create a migration plan. First, it will extract the rules out of the given permacode modules. Then it will sort them according to their dependencies. Finally, it will create a migration plan that will cover all rule functions in these modules, to be migrated one by one, in topological order.</p></div><div><p>The plan will include, for each rule, a singleton <a href='#fact-declarer'>fact-declarer</a> tasks that will start collecting events to be processed by the given rule once the migration is complete; a first phase of <a href='#initial-migrator'>initial-migrators</a> to process link 0 of the rule and any number of <a href='#link-migrator'>link-migrator</a> phases to process the rest of the links.</p></div><div class="code"><pre><code class="clojure">(migrate-rules {:kind :fact
                :name &quot;axiom/perms-exist&quot;
                :key &quot;https://example.com/some/repo&quot;
                :data [&quot;ABCD1234&quot; #{'perm.ABC1234 'perm.DEF5678}]
@@ -351,8 +354,12 @@
                                              :version 9}]
 (zkp/get-clj-data :zk &quot;/rules/foobar&quot;) =streams=&gt; [2 3 4]
 (zkp/to-bytes irrelevant) =&gt; irrelevant
-(zk/set-data :zk &quot;/rules/foobar&quot; irrelevant irrelevant) =throws=&gt; (Exception. &quot;boo&quot;))</code></pre></div><div><span id="fact-declarer"></span><h3>6.2 &nbsp;&nbsp; fact-declarer</h3></div><div><p><code>fact-declarer</code> is used to declare the service that will accept events related to a certain fact. We call it before we start migration based on that fact so that new events related to this fact that come during the migration process are accumulated in the queue. Once the migration is done, <a href='rabbit-microservices.html#assign-service'>functions assigned to it</a> will receive these events as well as new ones, so there will not be any data loss.</p></div><div><p><code>fact-declarer</code> is a generator function that takes the name of the rule and the link number (as a unique identifier)</p></div><div class="code"><pre><code class="clojure">(def decl-my-fact (fact-declarer 'perm.ABC123/my-rule 2))</code></pre></div><div><p>The returned fact declarer is intended to be used in a <a href='zk-plan.html'>zk-plan</a>, as a <a href='zk-plan.html#add-task'>task</a> function. As such, it needs to accept one or more arguments. It ignores all but the first one, which is an injector (<code>$</code>) passed to it directly by <code>zk-plan</code>.</p></div><div><p>The injector must be able to resolve the resource <code>declare-service</code> (e.g., <a href='rabbit-microservices.html#declare-service'>the one implemented for RabbitMQ</a>). We will mock it here.</p></div><div class="code"><pre><code class="clojure">(let [calls (async/chan 10)
-     $ (di/injector {:declare-service (fn [key reg] (async/&gt;!! calls [:declare-service key reg]))})]
+(zk/set-data :zk &quot;/rules/foobar&quot; irrelevant irrelevant) =throws=&gt; (Exception. &quot;boo&quot;))</code></pre></div><div><span id="fact-declarer"></span><h3>6.2 &nbsp;&nbsp; fact-declarer</h3></div><div><p><code>fact-declarer</code> is used to declare the service that will accept events related to a certain fact. We call it before we start migration based on that fact so that new events related to this fact that come during the migration process are accumulated in the queue. Once the migration is done, <a href='rabbit-microservices.html#assign-service'>functions assigned to it</a> will receive these events as well as new ones, so there will not be any data loss.</p></div><div><p><code>fact-declarer</code> is a generator function that takes the name of the rule and the link number (as a unique identifier)</p></div><div class="code"><pre><code class="clojure">(def decl-my-fact (fact-declarer 'perm.ABC123/my-rule 2))</code></pre></div><div><p>The returned fact declarer is intended to be used in a <a href='zk-plan.html'>zk-plan</a>, as a <a href='zk-plan.html#add-task'>task</a> function. As such, it needs to accept one or more arguments. It ignores all but the first one, which is an injector (<code>$</code>) passed to it directly by <code>zk-plan</code>.</p></div><div><p>The injector must be able to resolve the resources <code>declare-service</code> (e.g., <a href='rabbit-microservices.html#declare-service'>the one implemented for RabbitMQ</a>), and <code>hasher</code> (e.g., <a href='s3.html#hasher'>the one implemented for S3</a>). We will mock them here.</p></div><div class="code"><pre><code class="clojure">(let [calls (async/chan 10)
+     $ (di/injector {:hasher :my-hasher
+                     :declare-service (fn [key reg]
+                                        (when-not (= permval/*hasher* :my-hasher)
+                                          (throw (Exception. &quot;A custom hasher needs to be bound&quot;)))
+                                        (async/&gt;!! calls [:declare-service key reg]))})]
  (decl-my-fact $ :some :args :that :are :ignored) =&gt; nil
  (provided
   (perm/eval-symbol 'perm.ABC123/my-rule) =&gt; timeline)
@@ -362,13 +369,16 @@
                                                                                         :name &quot;test/follows&quot;}] calls])</code></pre></div><div><span id="initial-migrator"></span><h3>6.3 &nbsp;&nbsp; initial-migrator</h3></div><div><p><code>initial-migrator</code> creates a migration function for link 0 of a rule. Link 0 is special in that it only depends on a fact, creates rule tuples based on fact tuples. Other links also depend on previous rule tuples.</p></div><div><p><code>initial-migrator</code> takes the following arguments:</p><ol><li><code>rule</code>: The name of a rule (as a symbol).</li><li><code>writers</code>: The rule's writer-set</li><li><code>shard</code>: The shard number</li><li><code>shards</code>: The total number of shards being used.It returns a closure (function) that operates from within a <a href='zk-plan.html'>zk-plan</a>.</li></ol></div><div class="code"><pre><code class="clojure">(def my-migrator (initial-migrator 'perm.ABC/my-rule #{:some-writer} 2 6))</code></pre></div><div><p>The migration process requires a <code>database-scanner</code> (e.g., <a href='dynamo.html#database-scanner'>this</a>) to scan given shard of the given table (fact). We mock this function by providing <code>:test/follows</code> facts for Alice, who follows Bob, Charlie and Dave. </p></div><div class="code"><pre><code class="clojure">(defn mock-scanner [name shard shards chan]
   (when-not (= [name shard shards] [&quot;test/follows&quot; 2 6])
     (throw (Exception. (str &quot;Unexpected args in mock-scanner: &quot; [name shard shards]))))
+  (when-not (= permval/*hasher* :my-hasher)
+    (throw (Exception. &quot;A custom hasher needs to be bound&quot;)))
   (doseq [followee [&quot;bob&quot; &quot;charlie&quot; &quot;dave&quot;]]
     (async/&gt;!! chan {:kind :fact
                      :name name
                      :key &quot;alice&quot;
                      :data [followee]
                      :change 1}))
-  (async/close! chan))</code></pre></div><div><p>To store the resulting tuples it depends on a <code>database-event-storage-chan</code> (e.g., <a href='dynamo.html#database-event-storage-chan'>this</a>), a channel to which all generated events need to be sent.</p></div><div class="code"><pre><code class="clojure">(def rule-tuple-chan (async/chan 10))</code></pre></div><div><p>As a <code>zk-plan</code> task function, the first argument of the returned closure (<code>my-migrator</code> in our case), is expected to be an injector (<code>$</code>), and all other arguments should be ignored. Once called, it will use <a href='permacode.html#eval-symbol'>permacode.core/eval-symbol</a> to get the rule function. It will evaluate this function on each result comming from the <code>database-scanner</code>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-scanner mock-scanner
+  (async/close! chan))</code></pre></div><div><p>To store the resulting tuples it depends on a <code>database-event-storage-chan</code> (e.g., <a href='dynamo.html#database-event-storage-chan'>this</a>), a channel to which all generated events need to be sent.</p></div><div class="code"><pre><code class="clojure">(def rule-tuple-chan (async/chan 10))</code></pre></div><div><p>As a <code>zk-plan</code> task function, the first argument of the returned closure (<code>my-migrator</code> in our case), is expected to be an injector (<code>$</code>), and all other arguments should be ignored. Once called, it will use <a href='permacode.html#eval-symbol'>permacode.core/eval-symbol</a> to get the rule function. Evaluation leverages the <code>hasher</code> resource. It will evaluate this function on each result comming from the <code>database-scanner</code>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:hasher :my-hasher
+                     :database-scanner mock-scanner
                      :database-event-storage-chan rule-tuple-chan})]
  (my-migrator $ :ignored) =&gt; nil
  (provided
@@ -403,6 +413,8 @@
                 :writers #{:some-writer}}</code></pre></div><div><span id="link-migrator"></span><h3>6.4 &nbsp;&nbsp; link-migrator</h3></div><div><p>For links other than 0, migration requires applying a <a href='cloudlog-events.html#matcher'>matcher</a>. A matcher takes one event (a fact event in our case), and matches it against all matching events (rule events in our case). We need to provide a <code>database-chan</code> to allow the matcher to cross reference facts and rules.</p></div><div><p>The <code>link-migrator</code> function takes the following arguments:</p><ol><li><code>rule</code>: The rule to be migrated.</li><li><code>link</code>: The link number within the rule (> 0).</li><li><code>writers</code>: The rule's writer set.</li><li><code>shard</code>: The shard number to be processed by this node.</li><li><code>shards</code>: The overall number of shards.It returns a closure to be processed as a <code>zk-plan</code> task.</li></ol></div><div class="code"><pre><code class="clojure">(def my-link-migrator (link-migrator 'perm.ABC/my-rule 1 #{:my-writers} 3 17))</code></pre></div><div><p>For the migration process we will need a <code>database-scanner</code> that will provide fact events. We will mock one to produce <code>:test/tweeted</code> facts, stating that Bob, Charlie and Dave all tweeted 'hello'.</p></div><div class="code"><pre><code class="clojure">(defn mock-scanner [name shard shards chan]
   (when-not (= [name shard shards] [&quot;test/tweeted&quot; 3 17])
     (throw (Exception. (str &quot;Unexpected args in mock-scanner: &quot; [name shard shards]))))
+  (when-not (= permval/*hasher* :my-hasher)
+    (throw (Exception. &quot;A custom hasher needs to be bound&quot;)))
   (doseq [user [&quot;bob&quot; &quot;charlie&quot; &quot;dave&quot;]]
     (async/&gt;!! chan {:kind :fact
                      :name name
@@ -434,7 +446,8 @@
        (async/close! out-chan)
        (recur)))))</code></pre></div><div><p>Once more, we will need a <code>database-event-storage-chan</code> (e.g., <a href='dynamo.html#database-event-storage-chan'>this</a>) to store the events we get.</p></div><div class="code"><pre><code class="clojure">(def mock-store-chan (async/chan 10))</code></pre></div><div><p>The closure we got from <code>link-migrator</code> (<code>my-link-migrator</code> in our case) takes an injector as a first argument, and ignores all others. It calls <a href='permacode.html#eval-symbol'>permacode.core/eval-symbol</a> to get the rule and then creates a <a href='cloudlog-events.html#matcher'>matcher</a> based on it.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-scanner mock-scanner
                      :database-chan mock-db-chan
-                     :database-event-storage-chan mock-store-chan})]
+                     :database-event-storage-chan mock-store-chan
+                     :hasher :my-hasher})]
  (my-link-migrator $ :ignored) =&gt; nil
  (provided
   (perm/eval-symbol 'perm.ABC/my-rule) =&gt; timeline))</code></pre></div><div><p>The migration function reads all fact events from the scanner,  for each event it consults the <code>database-chan</code> for matching rule tuples, and the resulting events (timeline facts in our case) are pushed to the <code>database-event-storage-chan</code>.</p></div><div class="code"><pre><code class="clojure">(defn read-event []
