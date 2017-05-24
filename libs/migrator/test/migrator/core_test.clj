@@ -45,6 +45,7 @@ The origin of such operation could be a handler for a [GitHub webhook](#https://
 It relies on the following resources:
 1. `sh`: A shell to run `git` commands in.
 2. `migration-config`: where the `:clone-location` -- the directory where all clones are performed, is specified, and the `:clone-depth`.
+3. `hasher`: to be used for storing the versions loaded from git.
 3. `serve`: which registers this function with the `:axiom/app-version` event."
 (fact
  (def cmds (transient []))
@@ -85,10 +86,10 @@ Then `permacode.publish/hash-all` is called on the local repo, and then the dire
                         ["git" "checkout" "ABCD1234" :dir "/my/clone/location/repo12345"]
                         ["rm" "-rf" "/my/clone/location/repo12345"]])
 
-"The handler publishes an `:axiom/rule-versions` event."
+"The handler publishes an `:axiom/perm-versions` event."
 (fact
  (persistent! published) => [{:kind :fact
-                              :name "axiom/rule-versions"
+                              :name "axiom/perm-versions"
                               :key "https://example.com/some/repo"
                               :data ["ABCD1234" #{'perm.ABCD123 'perm.EFGH456}]}])
 
@@ -623,115 +624,97 @@ From the injector it takes the `publish` resource to publish the desired event."
                        :change 1
                        :writers #{:some-writer}})
 
-[[:chapter {:title "extract-version-rules"}]]
-"`extract-version-rules` is a service function which registers to `:axiom/version` events.
-As such it depends on the `serve` function we will mock in order to get hold of the function itself and the registration it is making."
-(fact
- (let [reg (transient {})
-       $ (di/injector {:serve (fn [f r]
-                                (assoc! reg r f))})]
-   (module $)
-   (di/startup $)
-   (def extract-version-rules ((persistent! reg) {:kind :fact
-                                                  :name "axiom/version"}))
-   extract-version-rules => fn?))
-
-"`:axiom/version` events report on addition or removal of `permacode` module versions.
-`extract-version-rules` extracts all the rule functions from such a version and publishes
+[[:section {:title "extract-version-rules"}]]
+"`extract-version-rules` extracts all the rule functions from such a version and publishes
 corresponding `:axiom/rule` events."
 
-"It publishes only rule functions, identified by having a `:source-fact` meta field."
+"It returns only rule functions, identified by having a `:source-fact` meta field."
 (fact
- (extract-version-rules {:key "perm.1234ABC"} ..pub..) => nil
+ (extract-version-rules 'perm.1234ABC) => ['perm.1234ABC/foo
+                                           'perm.1234ABC/bar]
  (provided
   (perm/module-publics 'perm.1234ABC) => {'foo (with-meta (fn []) {:source-fact ["foo" 1]})
                                           'bar (with-meta (fn []) {:source-fact ["bar" 1]})
                                           'baz (fn [])} ; baz will not be published
-  (..pub.. {:kind :fact
-            :name "axiom/rule"
-            :key 'perm.1234ABC/foo
-            :data []}) => irrelevant
-  (..pub.. {:kind :fact
-            :name "axiom/rule"
-            :key 'perm.1234ABC/bar
-            :data []}) => irrelevant))
+  ))
 
-[[:section {:title "rule-tracker"}]]
-"`rule-tracker` registers to `:axiom/rule` and tracks the quantity of each rule by summing the `:change` [field of the event](cloudlog-events.html#introduction)."
+[[:section {:title "perm-tracker"}]]
+"`perm-tracker` registers to `:axiom/perm-versions` and tracks the quantity of each [permacode module](permacode.html) by summing the `:change`
+[field of the event](cloudlog-events.html#introduction)."
 
 "It depends on the resources [zookeeper-counter-add](#zookeeper-counter-add) `declare-service` and `assign-service`, which we will mock."
 (fact
- (def mock-counters (transient {"/rules/perm.1234ABC.foo" 2}))
- (def calls (async/chan 10))
+ (def mock-counters (transient {"/perms/perm.ABCD123" 2}))
+ (def calls (transient []))
  (let [$ (di/injector {:zookeeper-counter-add (fn [path change]
                                                 (let [old (mock-counters path 0)
                                                       new (+ old change)]
                                                   (assoc! mock-counters path new)
                                                   new))
-                       :declare-service (fn [key reg] (async/>!! calls [:declare-service key reg]))
-                       :assign-service (fn [key func] (async/>!! calls [:assign-service key func]))})]
+                       :declare-service (fn [key reg] (conj! calls [:declare-service key reg]))
+                       :assign-service (fn [key func] (conj! calls [:assign-service key func]))})]
    (module $)
    (di/startup $)
-   (let [[call chan] (async/alts!! [calls
-                                    (async/timeout 1000)])]
-     chan => calls
-     call => [:declare-service "migrator.core/rule-tracker" {:kind :fact
-                                                             :name "axiom/rule"}])))
+   (def calls (persistent! calls))
+   (first calls) => [:declare-service "migrator.core/perm-tracker" {:kind :fact
+                                                                    :name "axiom/perm-versions"}]))
 
 "The function `rule-tracker` is the second argument given to `assign-service`."
 (fact
- (let [[call chan] (async/alts!! [calls
-                                  (async/timeout 1000)])]
-   chan => calls
-   (take 2 call) => [:assign-service "migrator.core/rule-tracker"]
+ (let [call (second calls)]
+   (take 2 call) => [:assign-service "migrator.core/perm-tracker"]
    (def rule-tracker (call 2))))
 
-"The `rule-tracker` service function is given an `:axiom/rule` event and a `publish` function."
+"The `perm-tracker` service function is given an `:axiom/perm-versions` event and a `publish` function."
 (fact
  (rule-tracker {:kind :fact
-                :name "axiom/rule"
-                :key 'perm.1234ABC/foo
-                :data []
-                :change 3} (fn publish [ev]
-                             (throw (Exception. "This should not be called")))) => nil)
+                :name "axiom/rule-versions"
+                :key "https://example.com/some/repo"
+                :data ["ABCD1234" #{'perm.ABCD123}]
+                :change 3}
+               (fn publish [ev]
+                 (throw (Exception. "This should not be called")))) => nil)
 
 "It calls `zookeeper-counter-add` to increment the counter corresponding to the rule."
 (fact
- (mock-counters "/rules/perm.1234ABC.foo") => 5)
+ (mock-counters "/perms/perm.ABCD123") => 5)
 
-"If the rule goes from 0 to a positive count, an `:axiom/rule-exists` event with `:change = 1` is published."
+"If one or more perms go from 0 to a positive count, an `:axiom/perms-exist` event with `:change = 1` is published."
 (fact
  (rule-tracker {:kind :fact
-                :name "axiom/rule"
-                :key 'perm.1234ABC/bar
-                :data []
-                :change 2} ..pub..) => nil
+                :name "axiom/rule-versions"
+                :key "https://example.com/some/repo"
+                :data ["ABCD1234" #{'perm.ABCD123
+                                    'perm.EFGH456}]
+                :change 3} ..pub..) => nil
  (provided
   (..pub.. {:kind :fact
-            :name "axiom/rule-exists"
-            :key 'perm.1234ABC/bar
-            :data []
+            :name "axiom/perms-exist"
+            :key "https://example.com/some/repo"
+            :data ["ABCD1234" #{'perm.EFGH456}]
             :change 1}) => irrelevant))
 
 "This of-course only happens when the change is positive."
 (fact
  (rule-tracker {:kind :fact
-                :name "axiom/rule"
-                :key 'perm.1234ABC/baz
-                :data []
-                :change -2} (fn publish [ev]
-                             (throw (Exception. "This should not be called")))) => nil)
+                :name "axiom/rule-versions"
+                :key "https://example.com/some/repo"
+                :data ["ABCD1234" #{'perm.FOOBAR}]
+                :change -3} (fn publish [ev]
+                              (throw (Exception. "This should not be called")))) => nil)
 
-"If the aggregated value of the rule goes down to 0, an `:axiom/rule-exists` event with `:change = -1` is published."
+"If the aggregated value of the rule goes down to 0, an `:axiom/perms-exist` event with `:change = -1` is published."
 (fact
  (rule-tracker {:kind :fact
-                :name "axiom/rule"
-                :key 'perm.1234ABC/foo
-                :change -5} ..pub..) => nil
+                :name "axiom/rule-versions"
+                :key "https://example.com/some/repo"
+                :data ["ABCD1234" #{'perm.ABCD123
+                                    'perm.EFGH456}]
+                :change -3} ..pub..) => nil
  (provided
   (..pub.. {:kind :fact
-            :name "axiom/rule-exists"
-            :key 'perm.1234ABC/foo
-            :data []
+            :name "axiom/perms-exist"
+            :key "https://example.com/some/repo"
+            :data ["ABCD1234" #{'perm.EFGH456}]
             :change -1}) => irrelevant))
 

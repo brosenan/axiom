@@ -77,6 +77,11 @@
                 :writers writers})
       :not-nil)))
 
+(defn extract-version-rules [version]
+  (let [pubs (perm/module-publics version)]
+    (for [[k v] (filter (fn [[k v]] (-> v meta :source-fact)) pubs)]
+      (symbol (str version) (str k)))))
+
 (defn module [$]
   (di/provide $ zookeeper-counter-add [zookeeper]
               (fn zookeeper-counter-add
@@ -101,43 +106,44 @@
                            change))))
                 ([path change]
                  (zookeeper-counter-add path change 3))))
-
-  (di/do-with $ [serve]
-    (serve (fn extract-version-rules
-             [ev publish]
-             (let [pubs (perm/module-publics (symbol (:key ev)))]
-               (doseq [[k v] pubs]
-                 (when (-> v meta :source-fact)
-                   (publish {:kind :fact
-                             :name "axiom/rule"
-                             :key (symbol (:key ev) (str k))
-                             :data []})))))
-
-           {:kind :fact
-            :name "axiom/version"}))
   (di/do-with $ [zookeeper-counter-add
                  declare-service
                  assign-service]
-              (declare-service "migrator.core/rule-tracker" {:kind :fact :name "axiom/rule"})
-              (assign-service "migrator.core/rule-tracker"
+              (declare-service "migrator.core/perm-tracker" {:kind :fact :name "axiom/perm-versions"})
+              (assign-service "migrator.core/perm-tracker"
                               (fn rule-tracker
                                 [ev publish]
-                                (let [path (str "/rules/" (str/replace (:key ev) \/ \.))
-                                      new (zookeeper-counter-add path (:change ev))]
-                                  (when (and (= new (:change ev))
-                                             (> new 0))
-                                    (publish {:kind :fact
-                                              :name "axiom/rule-exists"
-                                              :key (:key ev)
-                                              :data []
-                                              :change 1}))
-                                  (when (and (= new 0)
-                                             (< (:change ev) 0))
-                                    (publish {:kind :fact
-                                              :name "axiom/rule-exists"
-                                              :key (:key ev)
-                                              :data []
-                                              :change -1}))
+                                (let [ver (-> ev :data first)
+                                      perms (-> ev :data second)]
+                                  (loop [perms (seq perms)
+                                         new-perms #{}
+                                         removed-perms #{}]
+                                    (cond (empty? perms)
+                                          (do
+                                            (when-not (empty? new-perms)
+                                                (publish {:kind :fact
+                                                          :name "axiom/perms-exist"
+                                                          :key (:key ev)
+                                                          :data [ver new-perms]
+                                                          :change 1}))
+                                            (when-not (empty? removed-perms)
+                                              (publish {:kind :fact
+                                                        :name "axiom/perms-exist"
+                                                        :key (:key ev)
+                                                        :data [ver removed-perms]
+                                                        :change -1})))
+                                          :else
+                                          (let [perm (first perms)
+                                                path (str "/perms/" perm)
+                                                new-val (zookeeper-counter-add path (:change ev))]
+                                            (cond (and (= new-val 0)
+                                                       (< (:change ev) 0))
+                                                  (recur (rest perms) new-perms (conj removed-perms perm))
+                                                  (and (= new-val (:change ev))
+                                                       (> (:change ev) 0))
+                                                  (recur (rest perms) (conj new-perms perm) removed-perms)
+                                                  :else
+                                                  (recur (rest perms) new-perms removed-perms)))))
                                   nil))))
   (di/do-with $ [zk-plan
                  declare-service
@@ -182,7 +188,7 @@
                          (sh "git" "checkout" version :dir dir)
                          (let [hashes (permpub/hash-all hasher (io/file dir))]
                            (publish {:kind :fact
-                                     :name "axiom/rule-versions"
+                                     :name "axiom/perm-versions"
                                      :key (:key ev)
                                      :data [version (set (vals hashes))]}))
                          (sh "rm" "-rf" dir))
