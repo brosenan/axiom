@@ -18,19 +18,26 @@
 "`migrator` is a microservice that listens to events describing new rules being published,
 and initiates data migration using [zk-plan](zk-plan.html)."
 
-"Consider for example the `timeline` clause originally introduced in our [cloudlog documentation](cloudlog.html#joins)."
+"Consider for example the following two clause originally introduced in our [cloudlog documentation](cloudlog.html)."
 (clg/defrule timeline [user author tweet]
   [:test/follows user author] (clg/by-anyone)
   [:test/tweeted author tweet] (clg/by-anyone))
 
-"If we introduce this rule when `:test/follows` and `:test/tweeted` facts already exist, a migration process is necessary to do the following:
+(clg/defrule trending [tweet]
+  [:test/influencer influencer] (clg/by-anyone)
+  [timeline influencer tweet] (clg/by-anyone))
+
+"If we introduce these rules when `:test/follows`, `:test/tweeted` and `:test/influencer` facts already exist, a migration process is necessary to do the following:
 1. Create timeline entries for all the tweets that already have followers.
-2. Create intermediate data so that new followers will receive existing tweets in their timelines.
-3. Create intermediate data so that new tweets will be added to the timelines of existing followers."
+2. Create trending entries based on newly-calculated timeline entries for all existing influencers.
+3. Create intermediate data so that new followers will receive existing tweets in their timelines.
+4. Create intermediate data so that new tweets will be added to the timelines of existing followers.
+5. Create intermediate data so that new timeline entries of existing influencers will be taken into account for trending."
 
 "To allow this to happen, we need to go through all the `:test/follows` facts first and create intermediate rule tuples based on them.
 Then we need to go through all the `:test/tweeted` facts and match them against the tuples we generated in the previous step to know
-to which timelines each tweet needs to go."
+to which timelines each tweet needs to go.
+Then, after all timeline entries are calculated we can go through all influencers and create trending data."
 
 "Going through all the existing facts with a certain name can be a lengthy process.
 To speed things up we do the following:
@@ -93,9 +100,90 @@ Then `permacode.publish/hash-all` is called on the local repo, and then the dire
                               :key "https://example.com/some/repo"
                               :data ["ABCD1234" #{'perm.ABCD123 'perm.EFGH456}]}])
 
+[[:chapter {:title "perm-tracker"}]]
+"`perm-tracker` registers to `:axiom/perm-versions` and tracks the quantity of each [permacode module](permacode.html) by summing the `:change`
+[field of the event](cloudlog-events.html#introduction)."
+
+"It depends on the resources [zookeeper-counter-add](#zookeeper-counter-add) `declare-service` and `assign-service`, which we will mock."
+(fact
+ (def mock-counters (transient {"/perms/perm.ABCD123" 2}))
+ (def calls (transient []))
+ (let [$ (di/injector {:zookeeper-counter-add (fn [path change]
+                                                (let [old (mock-counters path 0)
+                                                      new (+ old change)]
+                                                  (assoc! mock-counters path new)
+                                                  new))
+                       :declare-service (fn [key reg] (conj! calls [:declare-service key reg]))
+                       :assign-service (fn [key func] (conj! calls [:assign-service key func]))})]
+   (module $)
+   (di/startup $)
+   (def calls (persistent! calls))
+   (first calls) => [:declare-service "migrator.core/perm-tracker" {:kind :fact
+                                                                    :name "axiom/perm-versions"}]))
+
+"The function `rule-tracker` is the second argument given to `assign-service`."
+(fact
+ (let [call (second calls)]
+   (take 2 call) => [:assign-service "migrator.core/perm-tracker"]
+   (def rule-tracker (call 2))))
+
+"The `perm-tracker` service function is given an `:axiom/perm-versions` event and a `publish` function."
+(fact
+ (rule-tracker {:kind :fact
+                :name "axiom/rule-versions"
+                :key "https://example.com/some/repo"
+                :data ["ABCD1234" #{'perm.ABCD123}]
+                :change 3}
+               (fn publish [ev]
+                 (throw (Exception. "This should not be called")))) => nil)
+
+"It calls `zookeeper-counter-add` to increment the counter corresponding to the rule."
+(fact
+ (mock-counters "/perms/perm.ABCD123") => 5)
+
+"If one or more perms go from 0 to a positive count, an `:axiom/perms-exist` event with `:change = 1` is published."
+(fact
+ (rule-tracker {:kind :fact
+                :name "axiom/rule-versions"
+                :key "https://example.com/some/repo"
+                :data ["ABCD1234" #{'perm.ABCD123
+                                    'perm.EFGH456}]
+                :change 3} ..pub..) => nil
+ (provided
+  (..pub.. {:kind :fact
+            :name "axiom/perms-exist"
+            :key "https://example.com/some/repo"
+            :data ["ABCD1234" #{'perm.EFGH456}]
+            :change 1}) => irrelevant))
+
+"This of-course only happens when the change is positive."
+(fact
+ (rule-tracker {:kind :fact
+                :name "axiom/rule-versions"
+                :key "https://example.com/some/repo"
+                :data ["ABCD1234" #{'perm.FOOBAR}]
+                :change -3} (fn publish [ev]
+                              (throw (Exception. "This should not be called")))) => nil)
+
+"If the aggregated value of the rule goes down to 0, an `:axiom/perms-exist` event with `:change = -1` is published."
+(fact
+ (rule-tracker {:kind :fact
+                :name "axiom/rule-versions"
+                :key "https://example.com/some/repo"
+                :data ["ABCD1234" #{'perm.ABCD123
+                                    'perm.EFGH456}]
+                :change -3} ..pub..) => nil
+ (provided
+  (..pub.. {:kind :fact
+            :name "axiom/perms-exist"
+            :key "https://example.com/some/repo"
+            :data ["ABCD1234" #{'perm.EFGH456}]
+            :change -1}) => irrelevant))
+
 [[:chapter {:title "rule-migrator"}]]
-"When the [rule-tracker](#rule-tracker) finds out a rule has been introduced (for the first time), a migration process needs to take place
-to process all the existing facts that interact with the new rule, to create all the derived facts and intermediate rule tuples that are the result of this interaction."
+"When the [perm-tracker](#perm-tracker) finds out new permacode modules have been introduced (for the first time), a migration process needs to take place
+to process all the existing facts that interact with any new rules defined in these modules,
+to create all the derived facts and intermediate rule tuples that are the result of this interaction."
 
 "`rule-migrator` is the service function responsible for this.
 It depends on [zk-plan](zk-plan.html#module), which it uses to create the migration plan.
@@ -130,37 +218,52 @@ We also provides it a `migration-config` resource containing the `:number-of-sha
    (di/startup $)
    (async/alts!! [calls-chan
                   (async/timeout 1000)]) => [[:declare-service "migrator.core/rule-migrator" {:kind :fact
-                                                                                              :name "axiom/rule-exists"}] calls-chan]
+                                                                                              :name "axiom/perms-exist"}] calls-chan]
    (let [[call ch] (async/alts!! [calls-chan
                                   (async/timeout 1000)])]
      ch => calls-chan
      (take 2 call) => [:assign-service "migrator.core/rule-migrator"]
-     (def migrate-rule (call 2)))))
+     (def migrate-rules (call 2)))))
 
-"Now, if we call the migration function `migrate-rule` on a rule, it will create a plan for migrating it.
-The plan will include singleton [fact-declarer](#fact-declarer) tasks that will start collecting events to be processed by the given rule
+"Now, if we call the migration function `migrate-rules` on a rule, it will create a migration plan.
+First, it will extract the rules out of the given permacode modules.
+Then it will sort them according to their dependencies.
+Finally, it will create a migration plan that will cover all rule functions in these modules, to be migrated one by one, in topological order. "
+
+"The plan will include, for each rule, a singleton [fact-declarer](#fact-declarer) tasks that will start collecting events to be processed by the given rule
 once the migration is complete; a first phase of [initial-migrators](#initial-migrator) to process link 0 of the rule
 and any number of [link-migrator](#link-migrator) phases to process the rest of the links."
 (fact
- (migrate-rule {:kind :fact
-                :name "axiom/rule-exists"
-                :key 'perm.1234ABC/timeline
-                :date []
-                :writers #{:some-writers}
-                :change 1}) => nil
+ (migrate-rules {:kind :fact
+                 :name "axiom/perms-exist"
+                 :key "https://example.com/some/repo"
+                 :data ["ABCD1234" #{'perm.ABC1234 'perm.DEF5678}]
+                 :writers #{:some-writers}
+                 :change 1}) => nil
  (provided
-  (perm/eval-symbol 'perm.1234ABC/timeline) => timeline)
+  (extract-version-rules 'perm.ABC1234) => [timeline]
+  (extract-version-rules 'perm.DEF5678) => [trending]
+  (clg/sort-rules [trending timeline]) => [timeline trending])
  (persistent! calls)
  => [[:create-plan "/my-plans"]
-     [:add-task :plan-node `(fact-declarer 'perm.1234ABC/timeline 0) []] ;; => 1
-     [:add-task :plan-node `(initial-migrator 'perm.1234ABC/timeline #{:some-writers} 0 3) [1]] ;; => 2
-     [:add-task :plan-node `(initial-migrator 'perm.1234ABC/timeline #{:some-writers} 1 3) [1]] ;; => 3
-     [:add-task :plan-node `(initial-migrator 'perm.1234ABC/timeline #{:some-writers} 2 3) [1]] ;; => 4
-     [:add-task :plan-node `(fact-declarer 'perm.1234ABC/timeline 1) [2 3 4]] ;; => 5
-     [:add-task :plan-node `(link-migrator 'perm.1234ABC/timeline 1 #{:some-writers} 0 3) [5]] ;; => 6
-     [:add-task :plan-node `(link-migrator 'perm.1234ABC/timeline 1 #{:some-writers} 1 3) [5]] ;; => 7
-     [:add-task :plan-node `(link-migrator 'perm.1234ABC/timeline 1 #{:some-writers} 2 3) [5]] ;; => 8
-     [:add-task :plan-node `(migration-end-notifier 'perm.1234ABC/timeline #{:some-writers}) [6 7 8]] ;; => 9
+     [:add-task :plan-node `(fact-declarer 'migrator.core-test/timeline 0) []] ;; => 1
+     [:add-task :plan-node `(initial-migrator 'migrator.core-test/timeline #{:some-writers} 0 3) [1]] ;; => 2
+     [:add-task :plan-node `(initial-migrator 'migrator.core-test/timeline #{:some-writers} 1 3) [1]] ;; => 3
+     [:add-task :plan-node `(initial-migrator 'migrator.core-test/timeline #{:some-writers} 2 3) [1]] ;; => 4
+     [:add-task :plan-node `(fact-declarer 'migrator.core-test/timeline 1) [2 3 4]] ;; => 5
+     [:add-task :plan-node `(link-migrator 'migrator.core-test/timeline 1 #{:some-writers} 0 3) [5]] ;; => 6
+     [:add-task :plan-node `(link-migrator 'migrator.core-test/timeline 1 #{:some-writers} 1 3) [5]] ;; => 7
+     [:add-task :plan-node `(link-migrator 'migrator.core-test/timeline 1 #{:some-writers} 2 3) [5]] ;; => 8
+     [:add-task :plan-node `(migration-end-notifier 'migrator.core-test/timeline #{:some-writers}) [6 7 8]] ;; => 9
+     [:add-task :plan-node `(fact-declarer 'migrator.core-test/trending 0) [9]] ;; => 10
+     [:add-task :plan-node `(initial-migrator 'migrator.core-test/trending #{:some-writers} 0 3) [10]] ;; => 11
+     [:add-task :plan-node `(initial-migrator 'migrator.core-test/trending #{:some-writers} 1 3) [10]] ;; => 12
+     [:add-task :plan-node `(initial-migrator 'migrator.core-test/trending #{:some-writers} 2 3) [10]] ;; => 13
+     [:add-task :plan-node `(fact-declarer 'migrator.core-test/trending 1) [11 12 13]] ;; => 14
+     [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 #{:some-writers} 0 3) [14]] ;; => 15
+     [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 #{:some-writers} 1 3) [14]] ;; => 16
+     [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 #{:some-writers} 2 3) [14]] ;; => 17
+     [:add-task :plan-node `(migration-end-notifier 'migrator.core-test/trending #{:some-writers}) [15 16 17]] ;; => 18
      [:mark-as-ready :plan-node]])
 
 [[:chapter {:title "Usage Example"}]]
@@ -638,83 +741,5 @@ corresponding `:axiom/rule` events."
                                           'baz (fn [])} ; baz will not be published
   ))
 
-[[:section {:title "perm-tracker"}]]
-"`perm-tracker` registers to `:axiom/perm-versions` and tracks the quantity of each [permacode module](permacode.html) by summing the `:change`
-[field of the event](cloudlog-events.html#introduction)."
 
-"It depends on the resources [zookeeper-counter-add](#zookeeper-counter-add) `declare-service` and `assign-service`, which we will mock."
-(fact
- (def mock-counters (transient {"/perms/perm.ABCD123" 2}))
- (def calls (transient []))
- (let [$ (di/injector {:zookeeper-counter-add (fn [path change]
-                                                (let [old (mock-counters path 0)
-                                                      new (+ old change)]
-                                                  (assoc! mock-counters path new)
-                                                  new))
-                       :declare-service (fn [key reg] (conj! calls [:declare-service key reg]))
-                       :assign-service (fn [key func] (conj! calls [:assign-service key func]))})]
-   (module $)
-   (di/startup $)
-   (def calls (persistent! calls))
-   (first calls) => [:declare-service "migrator.core/perm-tracker" {:kind :fact
-                                                                    :name "axiom/perm-versions"}]))
-
-"The function `rule-tracker` is the second argument given to `assign-service`."
-(fact
- (let [call (second calls)]
-   (take 2 call) => [:assign-service "migrator.core/perm-tracker"]
-   (def rule-tracker (call 2))))
-
-"The `perm-tracker` service function is given an `:axiom/perm-versions` event and a `publish` function."
-(fact
- (rule-tracker {:kind :fact
-                :name "axiom/rule-versions"
-                :key "https://example.com/some/repo"
-                :data ["ABCD1234" #{'perm.ABCD123}]
-                :change 3}
-               (fn publish [ev]
-                 (throw (Exception. "This should not be called")))) => nil)
-
-"It calls `zookeeper-counter-add` to increment the counter corresponding to the rule."
-(fact
- (mock-counters "/perms/perm.ABCD123") => 5)
-
-"If one or more perms go from 0 to a positive count, an `:axiom/perms-exist` event with `:change = 1` is published."
-(fact
- (rule-tracker {:kind :fact
-                :name "axiom/rule-versions"
-                :key "https://example.com/some/repo"
-                :data ["ABCD1234" #{'perm.ABCD123
-                                    'perm.EFGH456}]
-                :change 3} ..pub..) => nil
- (provided
-  (..pub.. {:kind :fact
-            :name "axiom/perms-exist"
-            :key "https://example.com/some/repo"
-            :data ["ABCD1234" #{'perm.EFGH456}]
-            :change 1}) => irrelevant))
-
-"This of-course only happens when the change is positive."
-(fact
- (rule-tracker {:kind :fact
-                :name "axiom/rule-versions"
-                :key "https://example.com/some/repo"
-                :data ["ABCD1234" #{'perm.FOOBAR}]
-                :change -3} (fn publish [ev]
-                              (throw (Exception. "This should not be called")))) => nil)
-
-"If the aggregated value of the rule goes down to 0, an `:axiom/perms-exist` event with `:change = -1` is published."
-(fact
- (rule-tracker {:kind :fact
-                :name "axiom/rule-versions"
-                :key "https://example.com/some/repo"
-                :data ["ABCD1234" #{'perm.ABCD123
-                                    'perm.EFGH456}]
-                :change -3} ..pub..) => nil
- (provided
-  (..pub.. {:kind :fact
-            :name "axiom/perms-exist"
-            :key "https://example.com/some/repo"
-            :data ["ABCD1234" #{'perm.EFGH456}]
-            :change -1}) => irrelevant))
 

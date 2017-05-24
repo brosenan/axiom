@@ -8,7 +8,8 @@
             [clojure.string :as str]
             [cloudlog-events.core :as ev]
             [cloudlog.core :as clg]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [clojure.set :as set]))
 
 (defn fact-declarer [rule link]
   (fn [$ & args]
@@ -111,7 +112,7 @@
                  assign-service]
               (declare-service "migrator.core/perm-tracker" {:kind :fact :name "axiom/perm-versions"})
               (assign-service "migrator.core/perm-tracker"
-                              (fn rule-tracker
+                              (fn perm-tracker
                                 [ev publish]
                                 (let [ver (-> ev :data first)
                                       perms (-> ev :data second)]
@@ -150,30 +151,39 @@
                  assign-service
                  migration-config]
               (declare-service "migrator.core/rule-migrator" {:kind :fact
-                                                              :name "axiom/rule-exists"})
+                                                              :name "axiom/perms-exist"})
               (assign-service "migrator.core/rule-migrator"
                               (fn [ev]
-                                (let [rule (:key ev)
-                                      rulefunc (perm/eval-symbol rule)
-                                      shards (:number-of-shards migration-config)
-                                      {:keys [create-plan add-task mark-as-ready]} zk-plan
+                                (let [[gitver perms] (:data ev)
+                                      ruleset (apply set/union (map extract-version-rules perms))
                                       writers (:writers ev)
-                                      plan (create-plan (:plan-prefix migration-config))]
-                                  (loop [rulefunc rulefunc
-                                         link 0
-                                         deps []]
-                                    (cond (nil? rulefunc)
-                                          (add-task plan `(migration-end-notifier '~rule ~writers) deps)
-                                          :else
-                                          (let [singleton-task (add-task plan `(fact-declarer '~rule ~link) deps)
-                                                tasks (for [shard (range shards)]
-                                                        (add-task plan
-                                                                  (cond (= link 0)
-                                                                        `(initial-migrator '~rule ~writers ~shard ~shards)
+                                      {:keys [create-plan add-task mark-as-ready]} zk-plan
+                                      plan (create-plan (:plan-prefix migration-config))
+                                      shards (:number-of-shards migration-config)]
+                                  (loop [ruleseq (clg/sort-rules (seq ruleset))
+                                         last-task nil]
+                                    (when-not (empty? ruleseq)
+                                      (let [rulefunc (first ruleseq)
+                                            rule (-> rulefunc clg/rule-target-fact first str (subs 1) symbol)
+                                            last-task (loop [rulefunc rulefunc
+                                                             link 0
+                                                             deps (cond last-task
+                                                                        [last-task]
                                                                         :else
-                                                                        `(link-migrator '~rule ~link ~writers ~shard ~shards))
-                                                                  [singleton-task]))]
-                                            (recur (-> rulefunc meta :continuation) (inc link) (doall tasks)))))
+                                                                        [])]
+                                                        (cond (nil? rulefunc)
+                                                              (add-task plan `(migration-end-notifier '~rule ~writers) deps)
+                                                              :else
+                                                              (let [singleton-task (add-task plan `(fact-declarer '~rule ~link) deps)
+                                                                    tasks (for [shard (range shards)]
+                                                                            (add-task plan
+                                                                                      (cond (= link 0)
+                                                                                            `(initial-migrator '~rule ~writers ~shard ~shards)
+                                                                                            :else
+                                                                                            `(link-migrator '~rule ~link ~writers ~shard ~shards))
+                                                                                      [singleton-task]))]
+                                                                (recur (-> rulefunc meta :continuation) (inc link) (doall tasks)))))]
+                                        (recur (rest ruleseq) last-task))))
                                   (mark-as-ready plan))
                                 nil)))
   (di/do-with $ [serve sh migration-config hasher]
