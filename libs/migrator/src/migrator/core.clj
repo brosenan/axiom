@@ -1,6 +1,7 @@
 (ns migrator.core
   (:require [permacode.core :as perm]
             [permacode.publish :as permpub]
+            [permacode.validate :as permval]
             [di.core :as di]
             [clojure.core.async :as async]
             [zookeeper :as zk]
@@ -13,57 +14,57 @@
 
 (defn fact-declarer [rule link]
   (fn [$ & args]
-    (di/do-with! $ [declare-service]
-      (let [rulefunc (perm/eval-symbol rule)]
-        (declare-service (str "fact-for-rule/" rule "!" link) {:kind :fact
-                                                               :name (clg/fact-table (-> rulefunc meta :source-fact))}))
-      :not-nil)
+    (di/do-with! $ [declare-service hasher]
+                 (binding [permval/*hasher* hasher]
+                   (let [rulefunc (perm/eval-symbol rule)]
+                     (declare-service (str "fact-for-rule/" rule "!" link) {:kind :fact
+                                                                            :name (clg/fact-table (-> rulefunc meta :source-fact))}))))
     nil))
 
 (defn initial-migrator [rule writers shard shards]
   (fn [$ & args]
     (di/do-with! $ [database-scanner
-                               database-event-storage-chan]
-      (let [rule (perm/eval-symbol rule)
-            em (ev/emitter rule writers)
-            inp (async/chan)]
-        (async/thread
-          (database-scanner (-> rule meta :source-fact clg/fact-table) shard shards inp))
-        (loop []
-          (let [ev (async/<!! inp)]
-            (when-not (nil? ev)
-              (let [out (em ev)]
-                (doseq [ev out]
-                  (async/>!! database-event-storage-chan [ev (async/chan)])))
-              (recur)))))
-      :not-nil)
+                    database-event-storage-chan
+                    hasher]
+                 (binding [permval/*hasher* hasher]
+                   (let [rule (perm/eval-symbol rule)
+                         em (ev/emitter rule writers)
+                         inp (async/chan)]
+                     (async/thread
+                       (database-scanner (-> rule meta :source-fact clg/fact-table) shard shards inp))
+                     (loop []
+                       (let [ev (async/<!! inp)]
+                         (when-not (nil? ev)
+                           (let [out (em ev)]
+                             (doseq [ev out]
+                               (async/>!! database-event-storage-chan [ev (async/chan)])))
+                           (recur)))))))
     nil))
 
 (defn link-migrator [rule link writers shard shards]
   (fn [$ & args]
     (di/do-with! $ [database-chan
-                               database-scanner]
-      (let [rule (perm/eval-symbol rule)
-            matcher (ev/matcher rule link database-chan)
-            scan-chan (async/chan)]
-        (async/thread
-          (database-scanner (ev/source-fact-table rule link) shard shards scan-chan))
-        (loop []
-          (let [ev (async/<!! scan-chan)
-                out-chan (async/chan)]
-            (when-not (nil? ev)
-              (matcher ev out-chan)
-              (di/do-with! $ [database-event-storage-chan]
-                (loop []
-                  (let [ev (async/<!! out-chan)]
-                    (when-not (nil? ev)
-                      (async/>!! database-event-storage-chan [ev (async/chan)])
-                      ;; TODO: wait for acks before completing
-                      (recur))))
-                :not-nil)
-              (recur)))))
-      :not-nil)
-
+                    database-scanner
+                    hasher]
+                 (binding [permval/*hasher* hasher]
+                   (let [rule (perm/eval-symbol rule)
+                         matcher (ev/matcher rule link database-chan)
+                         scan-chan (async/chan)]
+                     (async/thread
+                       (database-scanner (ev/source-fact-table rule link) shard shards scan-chan))
+                     (loop []
+                       (let [ev (async/<!! scan-chan)
+                             out-chan (async/chan)]
+                         (when-not (nil? ev)
+                           (matcher ev out-chan)
+                           (di/do-with! $ [database-event-storage-chan]
+                                        (loop []
+                                          (let [ev (async/<!! out-chan)]
+                                            (when-not (nil? ev)
+                                              (async/>!! database-event-storage-chan [ev (async/chan)])
+                                              ;; TODO: wait for acks before completing
+                                              (recur)))))
+                           (recur)))))))
     nil))
 
 (defn migration-end-notifier [rule writers]
@@ -149,42 +150,44 @@
   (di/do-with $ [zk-plan
                  declare-service
                  assign-service
-                 migration-config]
+                 migration-config
+                 hasher]
               (declare-service "migrator.core/rule-migrator" {:kind :fact
                                                               :name "axiom/perms-exist"})
               (assign-service "migrator.core/rule-migrator"
                               (fn [ev]
-                                (let [[gitver perms] (:data ev)
-                                      ruleset (apply set/union (map extract-version-rules perms))
-                                      writers (:writers ev)
-                                      {:keys [create-plan add-task mark-as-ready]} zk-plan
-                                      plan (create-plan (:plan-prefix migration-config))
-                                      shards (:number-of-shards migration-config)]
-                                  (loop [ruleseq (clg/sort-rules (seq ruleset))
-                                         last-task nil]
-                                    (when-not (empty? ruleseq)
-                                      (let [rulefunc (first ruleseq)
-                                            rule (-> rulefunc clg/rule-target-fact first str (subs 1) symbol)
-                                            last-task (loop [rulefunc rulefunc
-                                                             link 0
-                                                             deps (cond last-task
-                                                                        [last-task]
-                                                                        :else
-                                                                        [])]
-                                                        (cond (nil? rulefunc)
-                                                              (add-task plan `(migration-end-notifier '~rule ~writers) deps)
-                                                              :else
-                                                              (let [singleton-task (add-task plan `(fact-declarer '~rule ~link) deps)
-                                                                    tasks (for [shard (range shards)]
-                                                                            (add-task plan
-                                                                                      (cond (= link 0)
-                                                                                            `(initial-migrator '~rule ~writers ~shard ~shards)
-                                                                                            :else
-                                                                                            `(link-migrator '~rule ~link ~writers ~shard ~shards))
-                                                                                      [singleton-task]))]
-                                                                (recur (-> rulefunc meta :continuation) (inc link) (doall tasks)))))]
-                                        (recur (rest ruleseq) last-task))))
-                                  (mark-as-ready plan))
+                                (binding [permval/*hasher* hasher]
+                                  (let [[gitver perms] (:data ev)
+                                        ruleset (apply set/union (map extract-version-rules perms))
+                                        writers (:writers ev)
+                                        {:keys [create-plan add-task mark-as-ready]} zk-plan
+                                        plan (create-plan (:plan-prefix migration-config))
+                                        shards (:number-of-shards migration-config)]
+                                    (loop [ruleseq (clg/sort-rules (seq ruleset))
+                                           last-task nil]
+                                      (when-not (empty? ruleseq)
+                                        (let [rulefunc (first ruleseq)
+                                              rule (-> rulefunc clg/rule-target-fact first str (subs 1) symbol)
+                                              last-task (loop [rulefunc rulefunc
+                                                               link 0
+                                                               deps (cond last-task
+                                                                          [last-task]
+                                                                          :else
+                                                                          [])]
+                                                          (cond (nil? rulefunc)
+                                                                (add-task plan `(migration-end-notifier '~rule ~writers) deps)
+                                                                :else
+                                                                (let [singleton-task (add-task plan `(fact-declarer '~rule ~link) deps)
+                                                                      tasks (for [shard (range shards)]
+                                                                              (add-task plan
+                                                                                        (cond (= link 0)
+                                                                                              `(initial-migrator '~rule ~writers ~shard ~shards)
+                                                                                              :else
+                                                                                              `(link-migrator '~rule ~link ~writers ~shard ~shards))
+                                                                                        [singleton-task]))]
+                                                                  (recur (-> rulefunc meta :continuation) (inc link) (doall tasks)))))]
+                                          (recur (rest ruleseq) last-task))))
+                                    (mark-as-ready plan)))
                                 nil)))
   (di/do-with $ [serve sh migration-config hasher]
               (serve (fn [ev publish]

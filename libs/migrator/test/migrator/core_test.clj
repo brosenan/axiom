@@ -3,6 +3,7 @@
             [migrator.core :refer :all]
             [permacode.core :as perm]
             [permacode.publish :as permpub]
+            [permacode.validate :as permval]
             [di.core :as di]
             [clojure.core.async :as async]
             [zk-plan.core :as zkp]
@@ -193,6 +194,8 @@ We will mock this module with functions that record their own operation, so that
  (def last-task (atom 0))
  (def mock-zk-plan
    {:create-plan (fn [parent]
+                   (when-not (= permval/*hasher* :my-hasher)
+                     (throw (Exception. "A custom hasher needs to be bound")))
                    (conj! calls [:create-plan parent])
                    :plan-node)
     :add-task (fn [plan func args]
@@ -206,14 +209,16 @@ We will mock this module with functions that record their own operation, so that
 `create-plan` always returns `:plan-node`, and `add-task` returns an ordinal number."
 
 "Since `rule-migrator` is a service, we mock `declare-service` and `assign-service` to get the actual function.
-We also provides it a `migration-config` resource containing the `:number-of-shards` parameter, determining how much parallelism we wish to have."
+We also provides it a `migration-config` resource containing the `:number-of-shards` parameter, determining how much parallelism we wish to have.
+The `hasher` resource is used to retrieve the content of the permacode modules."
 (fact
  (let [calls-chan (async/chan 10)
        $ (di/injector {:declare-service (fn [key reg] (async/>!! calls-chan [:declare-service key reg]))
                        :assign-service (fn [key func] (async/>!! calls-chan [:assign-service key func]))
                        :zk-plan mock-zk-plan
                        :migration-config {:number-of-shards 3
-                                          :plan-prefix "/my-plans"}})]
+                                          :plan-prefix "/my-plans"}
+                       :hasher :my-hasher})]
    (module $)
    (di/startup $)
    (async/alts!! [calls-chan
@@ -228,7 +233,7 @@ We also provides it a `migration-config` resource containing the `:number-of-sha
 "Now, if we call the migration function `migrate-rules` on a rule, it will create a migration plan.
 First, it will extract the rules out of the given permacode modules.
 Then it will sort them according to their dependencies.
-Finally, it will create a migration plan that will cover all rule functions in these modules, to be migrated one by one, in topological order. "
+Finally, it will create a migration plan that will cover all rule functions in these modules, to be migrated one by one, in topological order."
 
 "The plan will include, for each rule, a singleton [fact-declarer](#fact-declarer) tasks that will start collecting events to be processed by the given rule
 once the migration is complete; a first phase of [initial-migrators](#initial-migrator) to process link 0 of the rule
@@ -479,11 +484,16 @@ these events as well as new ones, so there will not be any data loss."
 As such, it needs to accept one or more arguments.
 It ignores all but the first one, which is an injector (`$`) passed to it directly by `zk-plan`."
 
-"The injector must be able to resolve the resource `declare-service` (e.g., [the one implemented for RabbitMQ](rabbit-microservices.html#declare-service)).
-We will mock it here."
+"The injector must be able to resolve the resources `declare-service` (e.g., [the one implemented for RabbitMQ](rabbit-microservices.html#declare-service)),
+and `hasher` (e.g., [the one implemented for S3](s3.html#hasher)).
+We will mock them here."
 (fact
  (let [calls (async/chan 10)
-       $ (di/injector {:declare-service (fn [key reg] (async/>!! calls [:declare-service key reg]))})]
+       $ (di/injector {:hasher :my-hasher
+                       :declare-service (fn [key reg]
+                                          (when-not (= permval/*hasher* :my-hasher)
+                                            (throw (Exception. "A custom hasher needs to be bound")))
+                                          (async/>!! calls [:declare-service key reg]))})]
    (decl-my-fact $ :some :args :that :are :ignored) => nil
    (provided
     (perm/eval-symbol 'perm.ABC123/my-rule) => timeline)
@@ -510,6 +520,8 @@ We mock this function by providing `:test/follows` facts for Alice, who follows 
 (defn mock-scanner [name shard shards chan]
   (when-not (= [name shard shards] ["test/follows" 2 6])
     (throw (Exception. (str "Unexpected args in mock-scanner: " [name shard shards]))))
+  (when-not (= permval/*hasher* :my-hasher)
+    (throw (Exception. "A custom hasher needs to be bound")))
   (doseq [followee ["bob" "charlie" "dave"]]
     (async/>!! chan {:kind :fact
                      :name name
@@ -525,9 +537,11 @@ a channel to which all generated events need to be sent."
 "As a `zk-plan` task function, the first argument of the returned closure (`my-migrator` in our case), is expected to be an injector (`$`),
 and all other arguments should be ignored.
 Once called, it will use [permacode.core/eval-symbol](permacode.html#eval-symbol) to get the rule function.
+Evaluation leverages the `hasher` resource.
 It will evaluate this function on each result comming from the `database-scanner`."
 (fact
- (let [$ (di/injector {:database-scanner mock-scanner
+ (let [$ (di/injector {:hasher :my-hasher
+                       :database-scanner mock-scanner
                        :database-event-storage-chan rule-tuple-chan})]
    (my-migrator $ :ignored) => nil
    (provided
@@ -586,6 +600,8 @@ We will mock one to produce `:test/tweeted` facts, stating that Bob, Charlie and
 (defn mock-scanner [name shard shards chan]
   (when-not (= [name shard shards] ["test/tweeted" 3 17])
     (throw (Exception. (str "Unexpected args in mock-scanner: " [name shard shards]))))
+  (when-not (= permval/*hasher* :my-hasher)
+    (throw (Exception. "A custom hasher needs to be bound")))
   (doseq [user ["bob" "charlie" "dave"]]
     (async/>!! chan {:kind :fact
                      :name name
@@ -633,7 +649,8 @@ based on it."
 (fact
  (let [$ (di/injector {:database-scanner mock-scanner
                        :database-chan mock-db-chan
-                       :database-event-storage-chan mock-store-chan})]
+                       :database-event-storage-chan mock-store-chan
+                       :hasher :my-hasher})]
    (my-link-migrator $ :ignored) => nil
    (provided
     (perm/eval-symbol 'perm.ABC/my-rule) => timeline)))
