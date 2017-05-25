@@ -21,14 +21,14 @@
                                                                             :name (clg/fact-table (-> rulefunc meta :source-fact))}))))
     nil))
 
-(defn initial-migrator [rule writers shard shards]
+(defn initial-migrator [rule-name shard shards]
   (fn [$ & args]
     (di/do-with! $ [database-scanner
                     database-event-storage-chan
                     hasher]
                  (binding [permval/*hasher* hasher]
-                   (let [rule (perm/eval-symbol rule)
-                         em (ev/emitter rule writers)
+                   (let [rule (perm/eval-symbol rule-name)
+                         em (ev/emitter rule #{(namespace rule-name)})
                          inp (async/chan)]
                      (async/thread
                        (database-scanner (-> rule meta :source-fact clg/fact-table) shard shards inp))
@@ -41,7 +41,7 @@
                            (recur)))))))
     nil))
 
-(defn link-migrator [rule link writers shard shards]
+(defn link-migrator [rule link shard shards]
   (fn [$ & args]
     (di/do-with! $ [database-chan
                     database-scanner
@@ -181,9 +181,9 @@
                                                                       tasks (for [shard (range shards)]
                                                                               (add-task plan
                                                                                         (cond (= link 0)
-                                                                                              `(initial-migrator '~rule ~writers ~shard ~shards)
+                                                                                              `(initial-migrator '~rule ~shard ~shards)
                                                                                               :else
-                                                                                              `(link-migrator '~rule ~link ~writers ~shard ~shards))
+                                                                                              `(link-migrator '~rule ~link ~shard ~shards))
                                                                                         [singleton-task]))]
                                                                   (recur (-> rulefunc meta :continuation) (inc link) (doall tasks)))))]
                                           (recur (rest ruleseq) last-task))))

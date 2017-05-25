@@ -252,22 +252,22 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
  (persistent! calls)
  => [[:create-plan "/my-plans"]
      [:add-task :plan-node `(fact-declarer 'migrator.core-test/timeline 0) []] ;; => 1
-     [:add-task :plan-node `(initial-migrator 'migrator.core-test/timeline #{:some-writers} 0 3) [1]] ;; => 2
-     [:add-task :plan-node `(initial-migrator 'migrator.core-test/timeline #{:some-writers} 1 3) [1]] ;; => 3
-     [:add-task :plan-node `(initial-migrator 'migrator.core-test/timeline #{:some-writers} 2 3) [1]] ;; => 4
+     [:add-task :plan-node `(initial-migrator 'migrator.core-test/timeline 0 3) [1]] ;; => 2
+     [:add-task :plan-node `(initial-migrator 'migrator.core-test/timeline 1 3) [1]] ;; => 3
+     [:add-task :plan-node `(initial-migrator 'migrator.core-test/timeline 2 3) [1]] ;; => 4
      [:add-task :plan-node `(fact-declarer 'migrator.core-test/timeline 1) [2 3 4]] ;; => 5
-     [:add-task :plan-node `(link-migrator 'migrator.core-test/timeline 1 #{:some-writers} 0 3) [5]] ;; => 6
-     [:add-task :plan-node `(link-migrator 'migrator.core-test/timeline 1 #{:some-writers} 1 3) [5]] ;; => 7
-     [:add-task :plan-node `(link-migrator 'migrator.core-test/timeline 1 #{:some-writers} 2 3) [5]] ;; => 8
+     [:add-task :plan-node `(link-migrator 'migrator.core-test/timeline 1 0 3) [5]] ;; => 6
+     [:add-task :plan-node `(link-migrator 'migrator.core-test/timeline 1 1 3) [5]] ;; => 7
+     [:add-task :plan-node `(link-migrator 'migrator.core-test/timeline 1 2 3) [5]] ;; => 8
      [:add-task :plan-node `(migration-end-notifier 'migrator.core-test/timeline #{:some-writers}) [6 7 8]] ;; => 9
      [:add-task :plan-node `(fact-declarer 'migrator.core-test/trending 0) [9]] ;; => 10
-     [:add-task :plan-node `(initial-migrator 'migrator.core-test/trending #{:some-writers} 0 3) [10]] ;; => 11
-     [:add-task :plan-node `(initial-migrator 'migrator.core-test/trending #{:some-writers} 1 3) [10]] ;; => 12
-     [:add-task :plan-node `(initial-migrator 'migrator.core-test/trending #{:some-writers} 2 3) [10]] ;; => 13
+     [:add-task :plan-node `(initial-migrator 'migrator.core-test/trending 0 3) [10]] ;; => 11
+     [:add-task :plan-node `(initial-migrator 'migrator.core-test/trending 1 3) [10]] ;; => 12
+     [:add-task :plan-node `(initial-migrator 'migrator.core-test/trending 2 3) [10]] ;; => 13
      [:add-task :plan-node `(fact-declarer 'migrator.core-test/trending 1) [11 12 13]] ;; => 14
-     [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 #{:some-writers} 0 3) [14]] ;; => 15
-     [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 #{:some-writers} 1 3) [14]] ;; => 16
-     [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 #{:some-writers} 2 3) [14]] ;; => 17
+     [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 0 3) [14]] ;; => 15
+     [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 1 3) [14]] ;; => 16
+     [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 2 3) [14]] ;; => 17
      [:add-task :plan-node `(migration-end-notifier 'migrator.core-test/trending #{:some-writers}) [15 16 17]] ;; => 18
      [:mark-as-ready :plan-node]])
 
@@ -509,11 +509,10 @@ Other links also depend on previous rule tuples."
 
 "`initial-migrator` takes the following arguments:
 1. `rule`: The name of a rule (as a symbol).
-2. `writers`: The rule's writer-set
-3. `shard`: The shard number
-4. `shards`: The total number of shards being used.
+2. `shard`: The shard number
+3. `shards`: The total number of shards being used.
 It returns a closure (function) that operates from within a [zk-plan](zk-plan.html)."
-(def my-migrator (initial-migrator 'perm.ABC/my-rule #{:some-writer} 2 6))
+(def my-migrator (initial-migrator 'perm.ABC/my-rule 2 6))
 
 "The migration process requires a `database-scanner` (e.g., [this](dynamo.html#database-scanner)) to scan given shard of the given table (fact).
 We mock this function by providing `:test/follows` facts for Alice, who follows Bob, Charlie and Dave. "
@@ -564,21 +563,21 @@ In our case, these should be one per each fact."
                   :kind :rule
                   :name "migrator.core-test/timeline!0"
                   :readers nil
-                  :writers #{:some-writer}}
+                  :writers #{"perm.ABC"}}
  (read-event) => {:change 1
                   :data ["alice" "charlie"]
                   :key "charlie"
                   :kind :rule
                   :name "migrator.core-test/timeline!0"
                   :readers nil
-                  :writers #{:some-writer}}
+                  :writers #{"perm.ABC"}}
  (read-event) => {:change 1
                   :data ["alice" "dave"]
                   :key "dave"
                   :kind :rule
                   :name "migrator.core-test/timeline!0"
                   :readers nil
-                  :writers #{:some-writer}})
+                  :writers #{"perm.ABC"}})
 
 [[:section {:title "link-migrator"}]]
 "For links other than 0, migration requires applying a [matcher](cloudlog-events.html#matcher).
@@ -589,11 +588,10 @@ We need to provide a `database-chan` to allow the matcher to cross reference fac
 "The `link-migrator` function takes the following arguments:
 1. `rule`: The rule to be migrated.
 2. `link`: The link number within the rule (> 0).
-3. `writers`: The rule's writer set.
-4. `shard`: The shard number to be processed by this node.
-5. `shards`: The overall number of shards.
+3. `shard`: The shard number to be processed by this node.
+4. `shards`: The overall number of shards.
 It returns a closure to be processed as a `zk-plan` task."
-(def my-link-migrator (link-migrator 'perm.ABC/my-rule 1 #{:my-writers} 3 17))
+(def my-link-migrator (link-migrator 'perm.ABC/my-rule 1 3 17))
 
 "For the migration process we will need a `database-scanner` that will provide fact events.
 We will mock one to produce `:test/tweeted` facts, stating that Bob, Charlie and Dave all tweeted 'hello'."
