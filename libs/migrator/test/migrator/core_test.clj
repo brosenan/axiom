@@ -13,7 +13,8 @@
             [zk-plan.core :as zkp]
             [dynamo.core :as dyn]
             [zookeeper :as zk]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [s3.core :as s3]))
 
 [[:chapter {:title "Introduction"}]]
 "`migrator` is a microservice that listens to events describing new rules being published,
@@ -272,7 +273,7 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
      [:mark-as-ready :plan-node]])
 
 [[:chapter {:title "Usage Example"}]]
-"In this example we will migrate the rules provided in our [tweetlog example](https://github.com/brosenan/axiom/blob/master/libs/examples/test/examples/tweetlog_test.clj)."
+"In this example we will migrate the rules provided in our [tweetlog example](https://github.com/brosenan/tweetlog-clj)."
 
 "First, we need to provide configuration to connect to Zookeeper, RabbitMQ and DynamoDB (local)."
 (def config
@@ -291,7 +292,10 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
                  :host "localhost"
                  :port 5672}
    :migration-config {:number-of-shards 3
-                      :plan-prefix "/my-plans"}})
+                      :plan-prefix "/my-plans"}
+   :s3-config {:bucket-name "brosenan-test"
+               :access-key (System/getenv "AWS_ACCESS_KEY")
+               :secret-key (System/getenv "AWS_SECRET_KEY")}})
 
 "We now create an injector based on the config, and inject dependencies to the migrator and its dependencies."
 (fact
@@ -301,23 +305,19 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
  (rms/module $)
  (zkp/module $)
  (dyn/module $)
+ (s3/module $)
  (di/startup $))
 
 "Let's create the root elements we need in Zookeeper"
 (fact
  :integ
  (di/do-with! $ [zookeeper]
-   (when (zk/exists zookeeper "/rules")
-     (zk/delete-all zookeeper "/rules"))
-   (zk/create zookeeper "/rules" :persistent? true)
+   (when (zk/exists zookeeper "/perms")
+     (zk/delete-all zookeeper "/perms"))
+   (zk/create zookeeper "/perms" :persistent? true)
    (when (zk/exists zookeeper "/my-plans")
      (zk/delete-all zookeeper "/my-plans"))
    (zk/create zookeeper "/my-plans" :persistent? true)))
-
-"Let's let the services some time to register themselves."
-(fact
- :integ
- (Thread/sleep 1000))
 
 "The next step would be to generate test data.
 We will start with tweets:"
@@ -337,8 +337,7 @@ We will start with tweets:"
                :change 1
                :writers #{[:user= user]}
                :readers #{}})
-     (swap! time inc))
-   :not-nil))
+     (swap! time inc))))
 
 "Now let's create a full-factorial following matrix (everyone follows everyone else)."
 (fact
@@ -373,22 +372,20 @@ The following service function listens to such events and for the rule `followee
             (when (= (name (:key ev)) "followee-tweets")
               (async/close! done)))
           {:kind :fact
-           :name "axiom/rule-ready"})
-   :not-nil))
+           :name "axiom/rule-ready"})))
 
-"To kick the migration, we need to publish an `axiom/version` event with a version of the example application."
+"To kick the migration, we need to publish an `axiom/app-version` event with a version of the example application."
 (fact
  :integ
  (di/do-with! $ [publish]
    (publish {:kind :fact
-             :name "axiom/version"
-             :key "perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt"
-             :data []
+             :name "axiom/app-version"
+             :key "https://github.com/brosenan/tweetlog-clj.git"
+             :data ["2ad3f8bf79e7c5ac157479f21fe4a52794a0cfbc"]
              :ts 1000
              :change 1
              :writers #{:my-app}
-             :readers #{}})
-   :not-nil))
+             :readers #{}})))
 
 "So now we wait for the migration to complete."
 (fact

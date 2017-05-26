@@ -25,14 +25,14 @@
 
  (defmulti process-conds (fn [conds symbols] (class (first conds))))
 
-                                        ; fact
+ ;; fact
  (defmethod process-conds  clojure.lang.IPersistentVector [conds symbols]
    (let [target (first conds)
          target-name (first target)]
      (if (= (count conds) 1)
        (do ; Target fact
          [[(vec (rest target))] {:target-fact [target-name (count (rest target))]}])
-                                        ; Continuation
+       ;; Continuation
        (let [[func meta] (generate-rule-func (first conds) (rest conds) symbols)
              key (second target)
              params (vec (set/intersection symbols (symbols/symbols func)))
@@ -42,7 +42,7 @@
            (permacode.core/error "variables " missing " are unbound in the key for " (first target)))
          [`[[~key ~@params]] meta]))))
 
-                                        ; guard
+ ;; guard
  (defmethod process-conds  clojure.lang.ISeq [conds symbols]
    (let [cond (first conds)
          [body meta] (process-conds (rest conds) (propagate-symbols cond symbols))
@@ -68,17 +68,24 @@
  (defn generate-rule-func [source-fact conds ext-symbols]
    (let [symbols (set/difference (symbols/symbols (rest source-fact)) ext-symbols)
          [body meta] (process-conds conds (set/union symbols ext-symbols))
-         meta (merge meta {:source-fact [(fact-name (first source-fact)) (count (rest source-fact))]})
+         source-fact-name (first source-fact)
+         meta (merge meta {:source-fact [(fact-name (first source-fact)) (count (rest source-fact))]
+                           :checked (or (:checked meta)
+                                        (symbol? source-fact-name))})
          vars (set symbols)
          term-has-vars (fn [term]
                          (not (empty? (set/intersection (symbols/symbols term) vars))))
          travmap (unify/traverse (vec (rest source-fact)) (constantly true))
          [conds bindings] (unify/conds-and-bindings (map identity travmap) term-has-vars)
+         body (if (symbol? source-fact-name)
+                `(by (-> ~source-fact-name meta :ns str) ~body)
+                ;; else
+                body)
          func `(fn [~'$input$]
                  (if (and ~@conds)
                    (let ~bindings ~body)
-                                        ; else
-                    []))]
+                   ;; else
+                   []))]
      [func meta]))
 
  (defn validate-rule [metadata]

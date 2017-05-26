@@ -11,7 +11,8 @@
                                   [examples "MONOLITH-SNAPSHOT"]
                                   [zk-plan "0.0.1-SNAPSHOT"]
                                   [rabbit-microservices "0.0.1-SNAPSHOT"]
-                                  [dynamo "0.0.1-SNAPSHOT"]]}
+                                  [dynamo "0.0.1-SNAPSHOT"]
+                                  [s3 "MONOLITH-SNAPSHOT"]]}
              :midje {}})
 
   

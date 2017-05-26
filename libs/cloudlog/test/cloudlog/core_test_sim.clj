@@ -100,7 +100,7 @@ and a set of facts.  It extends this set of facts with derived facts that are pr
 This rule aggregates the timelines of certain *influencers* into a single *trending* timeline."
 
 (fact
- (let [derived (simulate-rules-with [timeline trending] :test
+ (let [derived (simulate-rules-with [timeline trending] "cloudlog.core_test"
                                     [:test/influencer "alice"]
                                     [:test/follows "alice" "bob"]
                                     [:test/tweeted "bob" "hello"])]
@@ -110,7 +110,7 @@ This rule aggregates the timelines of certain *influencers* into a single *trend
 "We topologically-sort the rules so the order in which they appear in the call to `simulate-rules-with`
 does not matter."
 (fact
- (let [derived (simulate-rules-with [trending timeline] :test
+ (let [derived (simulate-rules-with [trending timeline] "cloudlog.core_test"
                                     [:test/influencer "alice"]
                                     [:test/follows "alice" "bob"]
                                     [:test/tweeted "bob" "hello"])]
@@ -118,14 +118,14 @@ does not matter."
 
 "The second argument (writer group identifier) has the same meaning as in `simulate-with`."
 (fact
- (let [derived (simulate-rules-with [trending timeline] :test
+ (let [derived (simulate-rules-with [trending timeline] "cloudlog.core_test"
                                     [:test/influencer "alice"]
                                     [:test/follows "alice" "bob"]
                                     [:test/tweeted "bob" "hello"])]
    (-> (derived [:cloudlog.core_test/trending 1])
        first
        meta
-       :writers) => #{:test}))
+       :writers) => #{"cloudlog.core_test"}))
 
 "The rule collection can include elements that are not rules, which are ignored."
 (fact
@@ -175,7 +175,7 @@ and any number of facts.  It returs a set of tuples returned from this query."
 (fact
  (let [rules (map (fn [[k v]] @v) (ns-publics 'cloudlog.core_test))]
    (run-query rules
-              (f [:test/multi-keyword-search ["rant" "politics"]]) 1 :test #{}
+              (f [:test/multi-keyword-search ["rant" "politics"]]) 1 "cloudlog.core_test" #{}
               (f [:test/doc 100 "This is a song about love."])
               (f [:test/doc 200 "This is a rant about politics."])
               (f [:test/doc 200 "This is a rant about love."])
@@ -186,7 +186,7 @@ and any number of facts.  It returs a set of tuples returned from this query."
 (fact
  (let [rules (map (fn [[k v]] @v) (ns-publics 'cloudlog.core_test))]
    (run-query rules
-              (f [:test/multi-keyword-search ["this" "sentence"]]) 1 :test #{:me}
+              (f [:test/multi-keyword-search ["this" "sentence"]]) 1 "cloudlog.core_test" #{:me}
               (f [:test/doc 100 "This is a sentence"] :readers interset/universe)
               (f [:test/doc 200 "This is another sentence"] :readers #{:someone-else}))
    => #{["This is a sentence"]}))

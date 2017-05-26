@@ -203,16 +203,16 @@ For example, if we wish to create a \"trending\" timeline, aggregating the timel
 of users identified as \"influencers\", we would probably write a rule of the following form:"
 (defrule trending [tweet]
   [:test/influencer influencer] (by-anyone)
-  [timeline influencer tweet] (by-anyone))
+  [timeline influencer tweet])
 
 "Now we can simulate our rule (using [simulate-with](#simulate-with)):"
 (fact
- (simulate-with trending :test
+ (simulate-with trending "cloudlog.core_test"
                 [:test/influencer "gina"]
                 [:test/influencer "tina"]
-                [::timeline "tina" "purple is the new black!"]
-                [::timeline "gina" "pink is the new purple!"]
-                [::timeline "some-lamo" "orange is the new bananna"])
+                (f [::timeline "tina" "purple is the new black!"] :writers #{"cloudlog.core_test"})
+                (f [::timeline "gina" "pink is the new purple!"] :writers #{"cloudlog.core_test"})
+                (f [::timeline "some-lamo" "orange is the new bananna"] :writers #{"cloudlog.core_test"}))
  => #{["purple is the new black!"]
       ["pink is the new purple!"]})
 
@@ -284,6 +284,33 @@ Cloudlog will not allow us to do this.  For example, if we forget to place a `by
                  [:test/tweeted author tweet]))
  => (throws "Rule is insecure. :test/tweeted is not checked."))
 
+"One place where `by*` guards are not needed is [derived facts](#derived-facts).
+Derived facts are assumed to be written by a rule, for which the namespace (a [permacode](permacode.html) version) provides a unique identifier.
+Since [permacode uses a strong cryptographic hash](permacode.hasher.html#nippy-multi-hasher) for versioning, we can trust
+this hash to identify the rule.
+Placing a malicious rule under a fake identity of one of the application's rules requires a [preimage attack](https://en.wikipedia.org/wiki/Preimage_attack)
+over the hash key.
+This means that the attacker would need to generate the malicious rule in such a way that it will have the same hash code as the innocent one.
+This is known to be infeasible for the SHA256, the algorithm we use."
+
+"Consider the `trending` rule we defined [above](#derived-facts).
+When it references `timeline` it doesn't use a `by*` guard.
+However, it is still guarded against malicious postings of `timeline` facts,
+and would only consider ones that are made by `cloudlog.core_test` -- `timeline`'s namespace."
+
+"In the following example, \"orange is the new bananna\" is a fake `timeline` entry made by user
+`some-lamo` presumably on behalf of `tina`.
+As you can see, Cloudlog blocks it from appearing as a `trending` result."
+(fact
+ (simulate-with trending "cloudlog.core_test"
+                [:test/influencer "gina"]
+                [:test/influencer "tina"]
+                (f [::timeline "tina" "purple is the new black!"] :writers #{"cloudlog.core_test"})
+                (f [::timeline "gina" "pink is the new purple!"] :writers #{"cloudlog.core_test"})
+                (f [::timeline "tina" "orange is the new bananna"] :writers #{[:user= "some-lamo"]}))
+ => #{["purple is the new black!"]
+      ["pink is the new purple!"]})
+
 [[:chapter {:title "defclause: Top-Down Logic" :tag "defclause"}]]
 "Regular rules defined using `defrule` define *bottom-up logic*.  Bottom-up logic is applied when facts are added or removed,
 creating or removing derived facts as needed.
@@ -306,7 +333,7 @@ The following clause does just that."
   [:test/multi-keyword-search keywords -> text]
   (let [keywords (map clojure.string/lower-case keywords)
         first-kw (first keywords)])
-  [index-docs first-kw id] (by :test)
+  [index-docs first-kw id]
   [:test/doc id text] (by-anyone)
   (let [lc-text (clojure.string/lower-case text)])
   (when (every? #(clojure.string/includes? lc-text %)
@@ -336,17 +363,18 @@ preceded by a `$unique$` parameter, which identifies a specific question (hence 
 
 "In this case, the answer's arity is also `2` -- the unique identifier that matches the question
 and the output paramter."
-(fact (simulate-with multi-keyword-search :test
-                     [:test/multi-keyword-search? 1234 ["hello" "world"]]
-                     [:test/multi-keyword-search? 2345 ["foo" "bar"]]
-                     (f [::index-docs "foo" "doc1"] :writers #{:test})
-                     (f [::index-docs "foo" "doc2"] :writers #{:test})
-                     (f [::index-docs "hello" "doc5"] :writers #{:test})
-                     [:test/doc "doc1" "Foo goes into a Bar..."]
-                     [:test/doc "doc2" "Foo goes into a Pub..."]
-                     [:test/doc "doc5" "World peace starts with a small Hello!"])
-      => #{[1234 "World peace starts with a small Hello!"]
-           [2345 "Foo goes into a Bar..."]})
+(fact
+ (simulate-with multi-keyword-search "cloudlog.core_test"
+                   [:test/multi-keyword-search? 1234 ["hello" "world"]]
+                   [:test/multi-keyword-search? 2345 ["foo" "bar"]]
+                   (f [::index-docs "foo" "doc1"] :writers #{"cloudlog.core_test"})
+                   (f [::index-docs "foo" "doc2"] :writers #{"cloudlog.core_test"})
+                   (f [::index-docs "hello" "doc5"] :writers #{"cloudlog.core_test"})
+                   [:test/doc "doc1" "Foo goes into a Bar..."]
+                   [:test/doc "doc2" "Foo goes into a Pub..."]
+                   [:test/doc "doc5" "World peace starts with a small Hello!"])
+    => #{[1234 "World peace starts with a small Hello!"]
+         [2345 "Foo goes into a Bar..."]})
 
 [[:file {:src "libs/cloudlog/test/cloudlog/core_test_sim.clj"}]]
 [[:file {:src "libs/cloudlog/test/cloudlog/core_test_facttable.clj"}]]
