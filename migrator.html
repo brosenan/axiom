@@ -396,21 +396,21 @@
                 :kind :rule
                 :name &quot;migrator.core-test/timeline!0&quot;
                 :readers nil
-                :writers #{&quot;perm.ABC&quot;}}
+                :writers #{&quot;migrator.core-test&quot;}}
  (read-event) =&gt; {:change 1
                 :data [&quot;alice&quot; &quot;charlie&quot;]
                 :key &quot;charlie&quot;
                 :kind :rule
                 :name &quot;migrator.core-test/timeline!0&quot;
                 :readers nil
-                :writers #{&quot;perm.ABC&quot;}}
+                :writers #{&quot;migrator.core-test&quot;}}
  (read-event) =&gt; {:change 1
                 :data [&quot;alice&quot; &quot;dave&quot;]
                 :key &quot;dave&quot;
                 :kind :rule
                 :name &quot;migrator.core-test/timeline!0&quot;
                 :readers nil
-                :writers #{&quot;perm.ABC&quot;}}</code></pre></div><div><span id="link-migrator"></span><h3>6.4 &nbsp;&nbsp; link-migrator</h3></div><div><p>For links other than 0, migration requires applying a <a href='cloudlog-events.html#matcher'>matcher</a>. A matcher takes one event (a fact event in our case), and matches it against all matching events (rule events in our case). We need to provide a <code>database-chan</code> to allow the matcher to cross reference facts and rules.</p></div><div><p>The <code>link-migrator</code> function takes the following arguments:</p><ol><li><code>rule</code>: The rule to be migrated.</li><li><code>link</code>: The link number within the rule (> 0).</li><li><code>shard</code>: The shard number to be processed by this node.</li><li><code>shards</code>: The overall number of shards.It returns a closure to be processed as a <code>zk-plan</code> task.</li></ol></div><div class="code"><pre><code class="clojure">(def my-link-migrator (link-migrator 'perm.ABC/my-rule 1 3 17))</code></pre></div><div><p>For the migration process we will need a <code>database-scanner</code> that will provide fact events. We will mock one to produce <code>:test/tweeted</code> facts, stating that Bob, Charlie and Dave all tweeted 'hello'.</p></div><div class="code"><pre><code class="clojure">(defn mock-scanner [name shard shards chan]
+                :writers #{&quot;migrator.core-test&quot;}}</code></pre></div><div><span id="link-migrator"></span><h3>6.4 &nbsp;&nbsp; link-migrator</h3></div><div><p>For links other than 0, migration requires applying a <a href='cloudlog-events.html#matcher'>matcher</a>. A matcher takes one event (a fact event in our case), and matches it against all matching events (rule events in our case). We need to provide a <code>database-chan</code> to allow the matcher to cross reference facts and rules.</p></div><div><p>The <code>link-migrator</code> function takes the following arguments:</p><ol><li><code>rule</code>: The rule to be migrated.</li><li><code>link</code>: The link number within the rule (> 0).</li><li><code>shard</code>: The shard number to be processed by this node.</li><li><code>shards</code>: The overall number of shards.It returns a closure to be processed as a <code>zk-plan</code> task.</li></ol></div><div class="code"><pre><code class="clojure">(def my-link-migrator (link-migrator 'perm.ABC/my-rule 1 3 17))</code></pre></div><div><p>For the migration process we will need a <code>database-scanner</code> that will provide fact events. We will mock one to produce <code>:test/tweeted</code> facts, stating that Bob, Charlie and Dave all tweeted 'hello'.</p></div><div class="code"><pre><code class="clojure">(defn mock-scanner [name shard shards chan]
   (when-not (= [name shard shards] [&quot;test/tweeted&quot; 3 17])
     (throw (Exception. (str &quot;Unexpected args in mock-scanner: &quot; [name shard shards]))))
   (when-not (= permval/*hasher* :my-hasher)
