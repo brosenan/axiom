@@ -186,7 +186,7 @@ named sets).  The event will look like this:"
 
 "The `emitter` applying the `ticket-by-gender-and-location` rule will keep the `:readers` set as-is:"
 (def ticket-by-gender-and-location-event
-  (let [em (emitter ticket-by-gender-and-location #{"dating-app.com"})]
+  (let [em (emitter ticket-by-gender-and-location #{"cloudlog-events.core_test"})]
     (first (em alices-ticket-event))))
 (fact
  (:readers ticket-by-gender-and-location-event) => #{:male :long-time-users})
@@ -202,7 +202,7 @@ Note that Bob is not a member of the `:long-time-users` set, since he's new to t
 
 Here too, the `emitter` function does not change the `:readers` set."
 (def dating-matches-event
-  (let [em (emitter dating-matches #{"dating-app.com"})]
+  (let [em (emitter dating-matches #{"cloudlog-events.core_test"})]
     (first (em bobs-watch-event))))
 (fact
  (:readers dating-matches-event) => #{:male [:user= "bob"]})
