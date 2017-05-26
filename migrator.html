@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 25 May 2017</h5>
+              <h5>Date: 26 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -230,7 +230,7 @@
    [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 1 3) [14]] ;; =&gt; 16
    [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 2 3) [14]] ;; =&gt; 17
    [:add-task :plan-node `(migration-end-notifier 'migrator.core-test/trending #{:some-writers}) [15 16 17]] ;; =&gt; 18
-   [:mark-as-ready :plan-node]]</code></pre></div><div><span id="usage-example"></span><h2><b>5 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>In this example we will migrate the rules provided in our <a href='https://github.com/brosenan/axiom/blob/master/libs/examples/test/examples/tweetlog_test.clj'>tweetlog example</a>.</p></div><div><p>First, we need to provide configuration to connect to Zookeeper, RabbitMQ and DynamoDB (local).</p></div><div class="code"><pre><code class="clojure">(def config
+   [:mark-as-ready :plan-node]]</code></pre></div><div><span id="usage-example"></span><h2><b>5 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>In this example we will migrate the rules provided in our <a href='https://github.com/brosenan/tweetlog-clj'>tweetlog example</a>.</p></div><div><p>First, we need to provide configuration to connect to Zookeeper, RabbitMQ and DynamoDB (local).</p></div><div class="code"><pre><code class="clojure">(def config
   {:zookeeper-config {:url &quot;127.0.0.1:2181&quot;}
    :zk-plan-config {:num-threads 5
                     :parent &quot;/my-plans&quot;}
@@ -246,21 +246,24 @@
                  :host &quot;localhost&quot;
                  :port 5672}
    :migration-config {:number-of-shards 3
-                      :plan-prefix &quot;/my-plans&quot;}})</code></pre></div><div><p>We now create an injector based on the config, and inject dependencies to the migrator and its dependencies.</p></div><div class="code"><pre><code class="clojure">:integ
+                      :plan-prefix &quot;/my-plans&quot;}
+   :s3-config {:bucket-name &quot;brosenan-test&quot;
+               :access-key (System/getenv &quot;AWS_ACCESS_KEY&quot;)
+               :secret-key (System/getenv &quot;AWS_SECRET_KEY&quot;)}})</code></pre></div><div><p>We now create an injector based on the config, and inject dependencies to the migrator and its dependencies.</p></div><div class="code"><pre><code class="clojure">:integ
  (def $ (di/injector config))
  (module $)
  (rms/module $)
  (zkp/module $)
  (dyn/module $)
+ (s3/module $)
  (di/startup $)</code></pre></div><div><p>Let's create the root elements we need in Zookeeper</p></div><div class="code"><pre><code class="clojure">:integ
  (di/do-with! $ [zookeeper]
- (when (zk/exists zookeeper &quot;/rules&quot;)
-   (zk/delete-all zookeeper &quot;/rules&quot;))
- (zk/create zookeeper &quot;/rules&quot; :persistent? true)
+ (when (zk/exists zookeeper &quot;/perms&quot;)
+   (zk/delete-all zookeeper &quot;/perms&quot;))
+ (zk/create zookeeper &quot;/perms&quot; :persistent? true)
  (when (zk/exists zookeeper &quot;/my-plans&quot;)
    (zk/delete-all zookeeper &quot;/my-plans&quot;))
- (zk/create zookeeper &quot;/my-plans&quot; :persistent? true))</code></pre></div><div><p>Let's let the services some time to register themselves.</p></div><div class="code"><pre><code class="clojure">:integ
- (Thread/sleep 1000)</code></pre></div><div><p>The next step would be to generate test data. We will start with tweets:</p></div><div class="code"><pre><code class="clojure">:integ
+ (zk/create zookeeper &quot;/my-plans&quot; :persistent? true))</code></pre></div><div><p>The next step would be to generate test data. We will start with tweets:</p></div><div class="code"><pre><code class="clojure">:integ
  (def users [&quot;alice&quot; &quot;bob&quot; &quot;charlie&quot;])
  (def time (atom 1000))
  (di/do-with! $ [publish]
@@ -275,8 +278,7 @@
              :change 1
              :writers #{[:user= user]}
              :readers #{}})
-   (swap! time inc))
- :not-nil)</code></pre></div><div><p>Now let's create a full-factorial following matrix (everyone follows everyone else).</p></div><div class="code"><pre><code class="clojure">:integ
+   (swap! time inc)))</code></pre></div><div><p>Now let's create a full-factorial following matrix (everyone follows everyone else).</p></div><div class="code"><pre><code class="clojure">:integ
  (di/do-with! $ [publish]
  (doseq [u1 users
          u2 users]
@@ -298,18 +300,16 @@
           (when (= (name (:key ev)) &quot;followee-tweets&quot;)
             (async/close! done)))
         {:kind :fact
-         :name &quot;axiom/rule-ready&quot;})
- :not-nil)</code></pre></div><div><p>To kick the migration, we need to publish an <code>axiom/version</code> event with a version of the example application.</p></div><div class="code"><pre><code class="clojure">:integ
+         :name &quot;axiom/rule-ready&quot;}))</code></pre></div><div><p>To kick the migration, we need to publish an <code>axiom/app-version</code> event with a version of the example application.</p></div><div class="code"><pre><code class="clojure">:integ
  (di/do-with! $ [publish]
  (publish {:kind :fact
-           :name &quot;axiom/version&quot;
-           :key &quot;perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt&quot;
-           :data []
+           :name &quot;axiom/app-version&quot;
+           :key &quot;https://github.com/brosenan/tweetlog-clj.git&quot;
+           :data [&quot;2ad3f8bf79e7c5ac157479f21fe4a52794a0cfbc&quot;]
            :ts 1000
            :change 1
            :writers #{:my-app}
-           :readers #{}})
- :not-nil)</code></pre></div><div><p>So now we wait for the migration to complete.</p></div><div class="code"><pre><code class="clojure">:integ
+           :readers #{}}))</code></pre></div><div><p>So now we wait for the migration to complete.</p></div><div class="code"><pre><code class="clojure">:integ
  (async/&lt;!! done)</code></pre></div><div><p>After the migration, all facts have been processed by the rules. This means that Alice's timeline should contain 18 tweets.</p></div><div class="code"><pre><code class="clojure">:integ
  (di/do-with! $ [database-chan]
  (let [chan-out (async/chan 30)]
