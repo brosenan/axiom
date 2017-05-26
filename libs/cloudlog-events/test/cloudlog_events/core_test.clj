@@ -63,9 +63,11 @@ representing such a fact and applies the rule function associated with the event
 
 "For a simple rule, the result is a sequence of derived fact."
 (fact
- (let [em (emitter foo-yx #{})]
+ (let [em (emitter foo-yx)]
    (em (event :fact "test/foo" 2 [3]))
-   => [(event :fact "cloudlog-events.core_test/foo-yx" 3 [2])]))
+   => [(event :fact "cloudlog-events.core_test/foo-yx" 3 [2]
+              ;; writers will be discussed later
+              :writers #{"cloudlog-events.core_test"})]))
 
 "For a join, the result is an event representing the *rule* produced from the fact.
 
@@ -83,9 +85,10 @@ Our implementation does not emit the rule syntactically.  Instead it provides a 
 that contains its underlying data.  But we still treat it as a rule."
 
 (fact
- (let [em (emitter timeline #{})]
+ (let [em (emitter timeline)]
    (em (event :fact "test/follows" "alice" ["bob"]))
-   => [(event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"])]))
+   => [(event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"]
+              :writers #{"cloudlog-events.core_test"})]))
 "The `:name` component in the produced events is derived from the name of the rule, a 'bang' (`!`) and
 the index of the link that emitted this event in the overall rule.  An emitter always represents
 the first link in a rule, so this value is always 0."
@@ -101,12 +104,11 @@ but with a complement `:change` value) and to replace the underlying datum with 
 The `:writers` set is key to how Clojure applications manage *integrity*."
 
 "When a rule is applied to a fact, the resulting event carries the `:writers` set associated
-with the rule.  The `emitter` function takes its `:writers` set as a second argument.
-Typically, an application's writer is represented by its Internet domain"
+with the rule, which is its namespace, for reasons we discuss [in our discussion of integrity for derived facts](cloudlog.html#integrity)."
 (fact
- (let [em (emitter foo-yx #{"example.com"})]
+ (let [em (emitter foo-yx)]
    (em (event :fact "test/foo" 2 [3] :writers #{:foo :bar}))
-   => [(event :fact "cloudlog-events.core_test/foo-yx" 3 [2] :writers #{"example.com"})]))
+   => [(event :fact "cloudlog-events.core_test/foo-yx" 3 [2] :writers #{"cloudlog-events.core_test"})]))
 
 "`:readers` represents a set of users allowed to read an axiom. We will revisit `:readers` when discussing
 [multiplier](#multiplier)."
@@ -118,7 +120,7 @@ To support this, we pass them as metadata on the data."
                    (when-not (= (meta vec) {:writers #{:w}
                                             :readers #{:r}})
                      (throw (Exception. "Did not get readers and writers as meta"))))
-       em (emitter some-rule #{})]
+       em (emitter some-rule)]
    (em (event :fact "something" 1 [2 3] :writers #{:w} :readers #{:r}))
    => irrelevant))
 
@@ -133,9 +135,9 @@ that are produced from this combination."
 "The returned function takes two arguments: a *rule event* and a matching *fact event*.
 It returns a sequence of events created by this combination."
 (fact
- (mult1 (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"])
+ (mult1 (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"] :writers #{"cloudlog-events.core_test"})
         (event :fact "test/tweeted" "bob" ["something"]))
- => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["something"])])
+ => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["something"] :writers #{"cloudlog-events.core_test"})])
 
 "We call this unit a *multiplier*, because it multiplies the `:change` field of the rule and the fact event.
 Imagine we have `n` facts and `m` rules with a certain key.  In order to have all possible derived events
@@ -186,7 +188,7 @@ named sets).  The event will look like this:"
 
 "The `emitter` applying the `ticket-by-gender-and-location` rule will keep the `:readers` set as-is:"
 (def ticket-by-gender-and-location-event
-  (let [em (emitter ticket-by-gender-and-location #{"cloudlog-events.core_test"})]
+  (let [em (emitter ticket-by-gender-and-location)]
     (first (em alices-ticket-event))))
 (fact
  (:readers ticket-by-gender-and-location-event) => #{:male :long-time-users})
@@ -202,7 +204,7 @@ Note that Bob is not a member of the `:long-time-users` set, since he's new to t
 
 Here too, the `emitter` function does not change the `:readers` set."
 (def dating-matches-event
-  (let [em (emitter dating-matches #{"cloudlog-events.core_test"})]
+  (let [em (emitter dating-matches)]
     (first (em bobs-watch-event))))
 (fact
  (:readers dating-matches-event) => #{:male [:user= "bob"]})
@@ -250,7 +252,7 @@ these timestamps."
 
 "An `emitter` function simply moves the `:ts` attribute from its input event to its output."
 (fact
- (let [em (emitter foo-yx #{})
+ (let [em (emitter foo-yx)
        ev (first (em (event :fact ":test/foo" 1 [2] :ts 1234)))]
    (:ts ev) => 1234))
 

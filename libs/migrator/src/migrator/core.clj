@@ -28,7 +28,7 @@
                     hasher]
                  (binding [permval/*hasher* hasher]
                    (let [rule (perm/eval-symbol rule-name)
-                         em (ev/emitter rule #{(namespace rule-name)})
+                         em (ev/emitter rule)
                          inp (async/chan)]
                      (async/thread
                        (database-scanner (-> rule meta :source-fact clg/fact-table) shard shards inp))

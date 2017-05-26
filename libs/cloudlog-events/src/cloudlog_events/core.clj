@@ -3,9 +3,10 @@
             [cloudlog.interset :as interset]
             [clojure.core.async :as async]))
 
-(defn emitter [rulefunc writers & {:keys [link mult readers] :or {link 0
-                                                                  mult 1
-                                                                  readers interset/universe}}]
+(defn emitter [rulefunc & {:keys [link mult readers rule-writers] :or {link 0
+                                                                       mult 1
+                                                                       readers interset/universe
+                                                                       rule-writers #{(-> rulefunc meta :ns str)}}}]
   (fn [event]
     (for [data (rulefunc (with-meta (vec (cons (:key event) (:data event)))
                            {:writers (:writers event)
@@ -18,7 +19,7 @@
                        :name (str (cloudlog/fact-table [rulefunc]) "!" link)}))
        {:key (first data)
         :data (rest data)
-        :writers writers
+        :writers rule-writers
         :change (* (:change event) mult)
         :readers (interset/intersection (:readers event) readers)}))))
 
@@ -27,14 +28,15 @@
                     func rulefunc]
                (if (> i 0)
                  (recur (dec i) (-> func meta :continuation))
-                                        ; else
+                 ;; else
                  func))]
     (fn [rule-ev fact-ev]
       (let [rulefunc' (cont (cons (:key rule-ev) (:data rule-ev)))
-            em (emitter (with-meta rulefunc' (meta cont)) (:writers rule-ev)
+            em (emitter (with-meta rulefunc' (meta cont))
                         :link index
                         :mult (:change rule-ev)
-                        :readers (:readers rule-ev))]
+                        :readers (:readers rule-ev)
+                        :rule-writers (:writers rule-ev))]
         (em fact-ev)))))
 
 (defn source-fact-table [rulefunc link]

@@ -560,21 +560,21 @@ In our case, these should be one per each fact."
                   :kind :rule
                   :name "migrator.core-test/timeline!0"
                   :readers nil
-                  :writers #{"perm.ABC"}}
+                  :writers #{"migrator.core-test"}}
  (read-event) => {:change 1
                   :data ["alice" "charlie"]
                   :key "charlie"
                   :kind :rule
                   :name "migrator.core-test/timeline!0"
                   :readers nil
-                  :writers #{"perm.ABC"}}
+                  :writers #{"migrator.core-test"}}
  (read-event) => {:change 1
                   :data ["alice" "dave"]
                   :key "dave"
                   :kind :rule
                   :name "migrator.core-test/timeline!0"
                   :readers nil
-                  :writers #{"perm.ABC"}})
+                  :writers #{"migrator.core-test"}})
 
 [[:section {:title "link-migrator"}]]
 "For links other than 0, migration requires applying a [matcher](cloudlog-events.html#matcher).
