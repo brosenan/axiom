@@ -121,3 +121,13 @@
              ~@exprs)
            :else
            (throw (Exception. (str "Resource(s) " ~'$missing " are not available, but " ~'$existing " are"))))))
+
+(defmacro do-with-default! [$ binding & exprs]
+  (when-not (vector? binding)
+    (throw (Exception. (str "The second argument of do-with-default! must be a vector. Given: " binding))))
+  (when-not (= (count binding) 2)
+    (throw (Exception. (str "The second argument of do-with-default! must be of size 2. Given: " binding))))
+  (let [[name value] binding]
+    `(let [~name (or (-> @~$ :resources ~(keyword name))
+                     ~value)]
+       ~@exprs)))

@@ -208,6 +208,38 @@ This is done by returning an object containing only these two fields:
    (do-with! $ [bar]
              (inc bar)) => (throws #"Resource\(s\) \#\{:bar\} are not available, but \#.*:foo.* are")))
 
+[[:chapter {:title "do-with-default!"}]]
+"In cases when we do not know if a certain resource exists in the injector,
+we wish to be able to get this resource if it exists or take another default value if it does not.
+`do-with-default!` allows us to do just that.
+Its structure resembles that of a `let` form.
+It takes an injector (`$`), a vector consisting of a single resource name and a default value for this resource,
+and zero or more expressions to be evaluated."
+
+"If the resource exists, its name inside the expression is bound to its value, as in [do-with!](#do-with-0)."
+(fact
+ (let [$ (injector {:foo 2})]
+   (startup $)
+   (do-with-default! $ [foo 4]
+                     (inc foo)) => 3))
+
+"If the resource does not exist, the name is bound to the provided default value."
+(fact
+ (let [$ (injector)]
+   (startup $)
+   (do-with-default! $ [foo 4]
+                     (inc foo)) => 5))
+
+"If the second argument is not a vector, a compile-time exception is thrown."
+(fact
+ (macroexpand `(do-with-default! $ :not-a-vector foo bar baz))
+ => (throws "The second argument of do-with-default! must be a vector. Given: :not-a-vector"))
+
+"If the second argument is not of size 2, a compile-time exception is thrown."
+(fact
+ (macroexpand `(do-with-default! $ [:not :of :size :two] foo bar baz))
+ => (throws "The second argument of do-with-default! must be of size 2. Given: [:not :of :size :two]"))
+
 [[:chapter {:title "Default Rules"}]]
 "An empty injector comes with some rules pre-loaded.
 These rules are intended to provide a set of basic capabilities to be used in modules."

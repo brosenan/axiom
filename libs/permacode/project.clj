@@ -7,7 +7,8 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [mvxcvi/multihash "2.0.1"]
                  [com.taoensso/nippy "2.13.0"]
-                 [aysylu/loom "1.0.0"]]
+                 [aysylu/loom "1.0.0"]
+                 [di "MONOLITH-SNAPSHOT"]]
   :profiles {:dev {:dependencies [[midje "1.8.3"]
                                   [im.chit/lucid.publish "1.2.8"]
                                   [im.chit/hara.string.prose "2.4.8"]]}}
