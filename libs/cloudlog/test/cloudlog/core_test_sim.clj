@@ -24,12 +24,11 @@ the system implementing Cloudlog, without having to load data to databases, laun
 [[:section {:title "simulate-with"}]]
 "The `simulate-with` function accepts the following arguments:
 1. A single rule function to be simulated,
-2. A group identifier to be placed as the [writer-set](#integrity) for derived facts coming out of this rule, and
-3. Zero or more facts, making up the test environmnet for the simulation.
+2. Zero or more facts, making up the test environmnet for the simulation.
 It returns a set of tuples, representing the different values the rule gets given the facts.
 For example:"
 (fact
- (simulate-with timeline :test
+ (simulate-with timeline
                 [:test/follows "alice" "bob"]
                 [:test/follows "alice" "charlie"]
                 [:test/tweeted "bob" "hello"]

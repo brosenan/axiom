@@ -133,7 +133,7 @@
        (for [res results]
          (with-meta res (merge (meta res) {:readers (interset/intersection readers tuple-readers)}))))))
 
- (defn simulate* [rule factmap writer & [readers]]
+ (defn simulate* [rule factmap & [readers]]
    (let [source-fact (-> rule meta :source-fact)
          after-first (->> (factmap source-fact)
                           (map (apply-with-conf rule readers))
@@ -148,8 +148,8 @@
        ;else
        after-first)))
 
- (defn simulate-with [rule writer & facts]
-   (simulate* rule (with* facts) writer))
+ (defn simulate-with [rule & facts]
+   (simulate* rule (with* facts)))
 
  (defmulti fact-table (fn [[name arity]] (class name)))
 
