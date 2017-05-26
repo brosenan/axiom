@@ -134,7 +134,8 @@
          (with-meta res (merge (meta res) {:readers (interset/intersection readers tuple-readers)}))))))
 
  (defn simulate* [rule factmap & [readers]]
-   (let [source-fact (-> rule meta :source-fact)
+   (let [writer (-> rule meta :ns str)
+         source-fact (-> rule meta :source-fact)
          after-first (->> (factmap source-fact)
                           (map (apply-with-conf rule readers))
                           (reduce concat)
@@ -144,7 +145,9 @@
      (if cont
        (let [next-rules (map (fn [t] [(cont t) (-> t meta :readers)]) after-first)]
          (into #{} (reduce concat (for [[next-rule next-readers] next-rules]
-                                    (simulate* (with-meta next-rule (meta cont)) factmap writer next-readers)))))
+                                    (simulate* (with-meta next-rule (merge
+                                                                     {:ns (-> rule meta :ns)}
+                                                                     (meta cont))) factmap next-readers)))))
        ;else
        after-first)))
 
@@ -193,14 +196,14 @@
           (reduce concat)
           (filter identity))))
 
- (defn simulate-rules-with* [rules writer facts]
+ (defn simulate-rules-with* [rules facts]
       (if (empty? rules)
         facts
         ; else
-        (recur (rest rules) writer (merge-with set/union facts {(rule-target-fact (first rules)) (simulate* (first rules) facts writer)}))))
+        (recur (rest rules) (merge-with set/union facts {(rule-target-fact (first rules)) (simulate* (first rules) facts)}))))
  
- (defn simulate-rules-with [rules writer & facts]
-   (simulate-rules-with* (sort-rules rules) writer (with* facts)))
+ (defn simulate-rules-with [rules & facts]
+   (simulate-rules-with* (sort-rules rules) (with* facts)))
 
  (defn f [f & others]
    (with-meta f (loop [l others
@@ -218,7 +221,7 @@
    (let [query-head (first query)
          query-body (rest query)
          key [(append-to-keyword query-head "?") (inc (count (rest query)))]
-         facts (apply simulate-rules-with rules writer (vec (concat [(first key) :unique-id] query-body)) facts)]
+         facts (apply simulate-rules-with rules (vec (concat [(first key) :unique-id] query-body)) facts)]
      (->> [(append-to-keyword query-head "!") (inc arity)]
           facts
           (map (preserve-meta rest))

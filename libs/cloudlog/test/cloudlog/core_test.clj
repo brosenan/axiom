@@ -250,7 +250,7 @@ Below is a secure version of the `timeline` rule, that only takes into account t
 "Now, if both Eve and Alice create tweets alegedly made by Alice, 
 Bob (who follows Alice) will only see the ones genuinly made by Alice."
 (fact
- (simulate-with secure-timeline :test
+ (simulate-with secure-timeline
                 (f [:test/follows "bob" "alice"] :writers #{[:user= "bob"]})
                 (f [:test/tweeted "alice" "Alice loves Bob"] :writers #{[:user= "alice"]})
                 (f [:test/tweeted "alice" "Alice hates Bob"] :writers #{[:user= "eve"]}))
@@ -262,7 +262,7 @@ of having unauthorized updates take effect. For example, in the `secure-timeline
 we checked the integrity of tweets, but \"forgot\" to check the integrity of following relationships.
 This mistake can help Eve get messages through to Bob although he does not follow her:"
 (fact
- (simulate-with secure-timeline :test
+ (simulate-with secure-timeline
                 (f [:test/follows "bob" "eve"] :writers #{[:user= "eve"]})
                 (f [:test/tweeted "eve" "Alice hates Bob"] :writers #{[:user= "eve"]}))
  => #{["bob" "Alice hates Bob"]})
@@ -302,7 +302,7 @@ and would only consider ones that are made by `cloudlog.core_test` -- `timeline`
 `some-lamo` presumably on behalf of `tina`.
 As you can see, Cloudlog blocks it from appearing as a `trending` result."
 (fact
- (simulate-with trending "cloudlog.core_test"
+ (simulate-with trending
                 [:test/influencer "gina"]
                 [:test/influencer "tina"]
                 (f [::timeline "tina" "purple is the new black!"] :writers #{"cloudlog.core_test"})
@@ -364,7 +364,7 @@ preceded by a `$unique$` parameter, which identifies a specific question (hence 
 "In this case, the answer's arity is also `2` -- the unique identifier that matches the question
 and the output paramter."
 (fact
- (simulate-with multi-keyword-search "cloudlog.core_test"
+ (simulate-with multi-keyword-search
                    [:test/multi-keyword-search? 1234 ["hello" "world"]]
                    [:test/multi-keyword-search? 2345 ["foo" "bar"]]
                    (f [::index-docs "foo" "doc1"] :writers #{"cloudlog.core_test"})

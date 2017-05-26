@@ -39,17 +39,17 @@ For example:"
 
 "Resulting tuples are given a writer-set containing the given group identifier."
 (fact
- (-> (simulate-with timeline :test
+ (-> (simulate-with timeline
                     [:test/follows "alice" "bob"]
                     [:test/tweeted "bob" "hello"])
-     first meta :writers) => #{:test})
+     first meta :writers) => #{"cloudlog.core_test"})
 
 "The simulation calculates the reader-set for the result.
 Generally, this is the [intersection](cloudlog.interset.html#intersection) of the reader sets of all participating facts."
 (fact
  (let [X #{:a :b}
        Y #{:b :c}]
-   (-> (simulate-with timeline :test
+   (-> (simulate-with timeline
                       (f [:test/follows "alice" "bob"] :readers X)
                       (f [:test/tweeted "bob" "hello"] :readers Y))
        first meta :readers) => (interset/intersection X Y)))
@@ -75,18 +75,17 @@ fact names and arities to sets of value tuples.  For example:"
 
 
 [[:subsection {:title "simulate*"}]]
-"This map is then given as a parameter to `simulate*` -- the function that the `simulate` macro evaluates to, along
-with the rule function to be simulated.
+"This map is then given as a parameter to `simulate*`, along with the rule function to be simulated."
 
-A simple rule is simulated by applying tuples from the set corresponding to the rule's source-fact,
+"A simple rule is simulated by applying tuples from the set corresponding to the rule's source-fact,
 and then aggregating the results."
 (fact
- (simulate* foo-yx {[:test/foo 2] #{[1 2] [3 4]}} :test) => #{[2 1] [4 3]})
+ (simulate* foo-yx {[:test/foo 2] #{[1 2] [3 4]}}) => #{[2 1] [4 3]})
 
 "In rules with joins, the continuations are followed."
 (fact
  (simulate* timeline (with* [[:test/follows "alice" "bob"]
-                             [:test/tweeted "bob" "hello"]]) :test)
+                             [:test/tweeted "bob" "hello"]]))
  => #{["alice" "hello"]})
 
 [[:chapter {:title "simulate-rules-with: Perform a simulation Based on a Complete Namespace" :tag "simulate-rules-with"}]]
@@ -99,7 +98,7 @@ and a set of facts.  It extends this set of facts with derived facts that are pr
 This rule aggregates the timelines of certain *influencers* into a single *trending* timeline."
 
 (fact
- (let [derived (simulate-rules-with [timeline trending] "cloudlog.core_test"
+ (let [derived (simulate-rules-with [timeline trending]
                                     [:test/influencer "alice"]
                                     [:test/follows "alice" "bob"]
                                     [:test/tweeted "bob" "hello"])]
@@ -109,7 +108,7 @@ This rule aggregates the timelines of certain *influencers* into a single *trend
 "We topologically-sort the rules so the order in which they appear in the call to `simulate-rules-with`
 does not matter."
 (fact
- (let [derived (simulate-rules-with [trending timeline] "cloudlog.core_test"
+ (let [derived (simulate-rules-with [trending timeline]
                                     [:test/influencer "alice"]
                                     [:test/follows "alice" "bob"]
                                     [:test/tweeted "bob" "hello"])]
@@ -117,7 +116,7 @@ does not matter."
 
 "The second argument (writer group identifier) has the same meaning as in `simulate-with`."
 (fact
- (let [derived (simulate-rules-with [trending timeline] "cloudlog.core_test"
+ (let [derived (simulate-rules-with [trending timeline]
                                     [:test/influencer "alice"]
                                     [:test/follows "alice" "bob"]
                                     [:test/tweeted "bob" "hello"])]
@@ -128,7 +127,7 @@ does not matter."
 
 "The rule collection can include elements that are not rules, which are ignored."
 (fact
- (let [derived (simulate-rules-with [1 "foo" timeline inc] :test
+ (let [derived (simulate-rules-with [1 "foo" timeline inc]
                                     [:test/follows "alice" "bob"]
                                     [:test/tweeted "bob" "hello"])]
    (derived [:cloudlog.core_test/timeline 2]) => #{["alice" "hello"]}))
