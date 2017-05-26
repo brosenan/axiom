@@ -1,4 +1,4 @@
-(defproject cloudlog-events "0.1.0-SNAPSHOT"
+(defproject cloudlog-events "MONOLITH-SNAPSHOT"
   :description "Event processors for Cloudlog"
   :url "https://github.com/brosenan/cloudlog-events"
   :license {:name "Eclipse Public License"

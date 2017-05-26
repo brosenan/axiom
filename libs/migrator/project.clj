@@ -1,18 +1,18 @@
-(defproject migrator "0.0.1-SNAPSHOT"
+(defproject migrator "MONOLITH-SNAPSHOT"
   :description "Cool new project to do things and stuff"
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [permacode "MONOLITH-SNAPSHOT"]
                  [zookeeper-clj "0.9.4"]
-                 [zk-plan "0.0.1-SNAPSHOT"]
-                 [cloudlog-events "0.1.0-SNAPSHOT"]
+                 [zk-plan "MONOLITH-SNAPSHOT"]
+                 [cloudlog-events "MONOLITH-SNAPSHOT"]
                  [s3 "MONOLITH-SNAPSHOT"]]
   :monolith/inherit true
   :profiles {:dev {:dependencies [[midje "1.7.0"]
                                   [cloudlog "MONOLITH-SNAPSHOT"]
                                   [examples "MONOLITH-SNAPSHOT"]
-                                  [zk-plan "0.0.1-SNAPSHOT"]
-                                  [rabbit-microservices "0.0.1-SNAPSHOT"]
-                                  [dynamo "0.0.1-SNAPSHOT"]]}
+                                  [zk-plan "MONOLITH-SNAPSHOT"]
+                                  [rabbit-microservices "MONOLITH-SNAPSHOT"]
+                                  [dynamo "MONOLITH-SNAPSHOT"]]}
              :midje {}})
 
   
