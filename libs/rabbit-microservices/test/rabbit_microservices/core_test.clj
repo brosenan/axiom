@@ -38,8 +38,9 @@ It is provided a partial event, and calls the given function on any event that m
    (di/startup $)
    (di/do-with! $ [serve]
      (serve my-service {:partial :event}) => nil
-     (persistent! calls) => [[:declare-service "rabbit-microservices.core-test/my-service" {:partial :event}]
-                             [:assign-service "rabbit-microservices.core-test/my-service" my-service]])))
+     (persistent! calls)
+     => [[:declare-service "rabbit-microservices.core-test/my-service" {:partial :event}]
+         [:assign-service "rabbit-microservices.core-test/my-service" my-service]])))
 
 
 [[:chapter {:title "declare-service: Declare an AMQP Queue" :tag "declare-service"}]]
@@ -82,6 +83,9 @@ The third of which is expected to be bound to an explicit `ack` function."
  (assign-service "foobar" my-other-service) => nil
  (provided
   (lc/subscribe :some-chan "foobar" irrelevant {:auto-ack false}) => irrelevant))
+
+"The `lc/subscribe` function is given a closure returned by [handle-event](#handle-event).
+Please refer to it for more information."
 
 [[:chapter {:title "publish: Publish an Event from the Outside" :tag "publish"}]]
 "`publish` is a service that allows its users to publish events from outside the context of a service.
@@ -263,10 +267,7 @@ If it takes one parameter, we pass this parameter a de-serialization of the even
 (fact
  (def alive (atom true))
  (def received (atom '()))
- (defn my-func
-   {:reg {:kind :fact
-          :name "foo/bar"}}
-   [ev]
+ (defn my-func [ev]
    (swap! received #(conj % ev)))
  (def my-event {:kind :fact
                 :name "foo/bar"
@@ -289,10 +290,7 @@ All fields that are not specified in the event default to their values in the ev
  (def event2 {:name "foo/baz"
               :key 5555
               :data [1 2 3 4]})
- (defn my-func
-   {:reg {:kind :fact
-          :name "foo/bar"}}
-   [ev publish]
+ (defn my-func [ev publish]
    (publish event2))
  (def event-that-was-sent
    (merge my-event event2))
@@ -309,10 +307,7 @@ All fields that are not specified in the event default to their values in the ev
  )
 "If the wrapped function accepts three parameters, the third parameter is taken to be an `ack` function, that explicitly acknowledges the received event."
 (fact
- (defn my-func
-   {:reg {:kind :fact
-          :name "foo/bar"}}
-   [ev publish ack]
+ (defn my-func [ev publish ack]
    (ack))
  (handle-event my-func alive :the-channel {:delivery-tag "foo"} my-event-bin) => nil
  (provided
