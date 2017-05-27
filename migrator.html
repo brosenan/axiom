@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 26 May 2017</h5>
+              <h5>Date: 27 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -246,8 +246,10 @@
                  :host &quot;localhost&quot;
                  :port 5672}
    :migration-config {:number-of-shards 3
-                      :plan-prefix &quot;/my-plans&quot;}
-   :s3-config {:bucket-name &quot;brosenan-test&quot;
+                      :plan-prefix &quot;/my-plans&quot;
+                      :clone-location &quot;/tmp&quot;
+                      :clone-depth 10}
+   :s3-config {:bucket-name (System/getenv &quot;PERMACODE_S3_BUCKET&quot;)
                :access-key (System/getenv &quot;AWS_ACCESS_KEY&quot;)
                :secret-key (System/getenv &quot;AWS_SECRET_KEY&quot;)}})</code></pre></div><div><p>We now create an injector based on the config, and inject dependencies to the migrator and its dependencies.</p></div><div class="code"><pre><code class="clojure">:integ
  (def $ (di/injector config))
@@ -305,16 +307,16 @@
  (publish {:kind :fact
            :name &quot;axiom/app-version&quot;
            :key &quot;https://github.com/brosenan/tweetlog-clj.git&quot;
-           :data [&quot;2ad3f8bf79e7c5ac157479f21fe4a52794a0cfbc&quot;]
+           :data [&quot;d3a8c6c5b946279186f857381e751801a657f70c&quot;]
            :ts 1000
            :change 1
-           :writers #{:my-app}
+           :writers #{}
            :readers #{}}))</code></pre></div><div><p>So now we wait for the migration to complete.</p></div><div class="code"><pre><code class="clojure">:integ
  (async/&lt;!! done)</code></pre></div><div><p>After the migration, all facts have been processed by the rules. This means that Alice's timeline should contain 18 tweets.</p></div><div class="code"><pre><code class="clojure">:integ
  (di/do-with! $ [database-chan]
  (let [chan-out (async/chan 30)]
    (async/&gt;!! database-chan [{:kind :fact
-                              :name &quot;perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt/followee-tweets&quot;
+                              :name &quot;perm.658ac01d48c03279d36a81f39055773f7faf5997/followee-tweets&quot;
                               :key &quot;alice&quot;} chan-out])
    (loop [res 0]
      (let [ev (async/&lt;!! chan-out)]

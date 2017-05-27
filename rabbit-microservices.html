@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 26 May 2017</h5>
+              <h5>Date: 27 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -91,8 +91,9 @@
  (di/startup $)
  (di/do-with! $ [serve]
    (serve my-service {:partial :event}) =&gt; nil
-   (persistent! calls) =&gt; [[:declare-service &quot;rabbit-microservices.core-test/my-service&quot; {:partial :event}]
-                           [:assign-service &quot;rabbit-microservices.core-test/my-service&quot; my-service]]))</code></pre></div><div><span id="declare-service"></span><h2><b>3 &nbsp;&nbsp; declare-service: Declare an AMQP Queue</b></h2></div><div><p><code>declare-service</code> depends on an <code>amqp-service</code> resource (which itself depends on <code>amqp-config</code>).</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:amqp-service {:chan :some-chan}})]
+   (persistent! calls)
+   =&gt; [[:declare-service &quot;rabbit-microservices.core-test/my-service&quot; {:partial :event}]
+       [:assign-service &quot;rabbit-microservices.core-test/my-service&quot; my-service]]))</code></pre></div><div><span id="declare-service"></span><h2><b>3 &nbsp;&nbsp; declare-service: Declare an AMQP Queue</b></h2></div><div><p><code>declare-service</code> depends on an <code>amqp-service</code> resource (which itself depends on <code>amqp-config</code>).</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:amqp-service {:chan :some-chan}})]
  (module $)
  (di/startup $)
  (def declare-service (di/do-with! $ [declare-service] declare-service)))</code></pre></div><div><p><code>declare-service</code> declares a queue and binds it to the <code>facts</code> exchange to receive events matching the given partial event.</p></div><div class="code"><pre><code class="clojure">(declare-service &quot;foobar&quot; {:kind :fact
@@ -107,7 +108,7 @@
  (provided
 (lc/subscribe :some-chan &quot;foobar&quot; irrelevant {:auto-ack true}) =&gt; irrelevant)</code></pre></div><div><p>Auto acknowledgement is disabled when the provided function has three parameters. The third of which is expected to be bound to an explicit <code>ack</code> function.</p></div><div class="code"><pre><code class="clojure">(defn my-other-service [event publish ack])</code></pre></div><div class="code"><pre><code class="clojure">(assign-service &quot;foobar&quot; my-other-service) =&gt; nil
  (provided
-(lc/subscribe :some-chan &quot;foobar&quot; irrelevant {:auto-ack false}) =&gt; irrelevant)</code></pre></div><div><span id="publish"></span><h2><b>5 &nbsp;&nbsp; publish: Publish an Event from the Outside</b></h2></div><div><p><code>publish</code> is a service that allows its users to publish events from outside the context of a service. It depends on <code>amqp-service</code>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:amqp-service {:chan :some-chan}})]
+(lc/subscribe :some-chan &quot;foobar&quot; irrelevant {:auto-ack false}) =&gt; irrelevant)</code></pre></div><div><p>The <code>lc/subscribe</code> function is given a closure returned by <a href='#handle-event'>handle-event</a>. Please refer to it for more information.</p></div><div><span id="publish"></span><h2><b>5 &nbsp;&nbsp; publish: Publish an Event from the Outside</b></h2></div><div><p><code>publish</code> is a service that allows its users to publish events from outside the context of a service. It depends on <code>amqp-service</code>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:amqp-service {:chan :some-chan}})]
  (module $)
  (di/startup $)
  (def publish (di/do-with! $ [publish] publish)))</code></pre></div><div class="code"><pre><code class="clojure">(publish ..ev..) =&gt; nil
@@ -217,10 +218,7 @@
                              :readers #{:you}}) base) =&gt; false)</code></pre></div><div><p><code>event-routing-key</code> can handle partial events. If <code>:name</code> is omitted, a pattern that matches all facts is returned.</p></div><div class="code"><pre><code class="clojure">(event-routing-key {:kind :fact}) =&gt; &quot;f.#&quot;</code></pre></div><div><p>If <code>:name</code> is provided, but <code>:key</code> is omitted, a pattern matching all keys with that name is returned.</p></div><div class="code"><pre><code class="clojure">(event-routing-key {:kind :fact
                    :name &quot;foo/bar&quot;}) =&gt; #&quot;f&#92;.[0-9a-f]+&#92;.#&quot;</code></pre></div><div><span id="handle-event"></span><h3>7.3 &nbsp;&nbsp; handle-event</h3></div><div><p><code>handle-event</code> takes a function to be called when an event arrives and the <code>:alive</code> atom for the service  along with arguments provided by a subscription to a queue,  so that the function <code>&#40;partial handle-event some-func alive&#41;</code> can be used with <code>lc/subscribe</code>.</p></div><div><p>The wrapped function can take one, two, or three parameters. If it takes one parameter, we pass this parameter a de-serialization of the event.</p></div><div class="code"><pre><code class="clojure">(def alive (atom true))
  (def received (atom '()))
- (defn my-func
- {:reg {:kind :fact
-        :name &quot;foo/bar&quot;}}
- [ev]
+ (defn my-func [ev]
  (swap! received #(conj % ev)))
  (def my-event {:kind :fact
               :name &quot;foo/bar&quot;
@@ -237,10 +235,7 @@
  @received =&gt; [my-event]</code></pre></div><div><p>If the wrapped function accepts two parameters, the second parameter is taken to be a <code>publish</code> function, which publishes events on the facts exchange. The event handler (<code>my-func</code> in the example below) does not have to specify all fields in the event it publishes (<code>event2</code> in the example). All fields that are not specified in the event default to their values in the event that triggerred the function (<code>event-that-was-sent</code> in the example).</p></div><div class="code"><pre><code class="clojure">(def event2 {:name &quot;foo/baz&quot;
             :key 5555
             :data [1 2 3 4]})
- (defn my-func
- {:reg {:kind :fact
-        :name &quot;foo/bar&quot;}}
- [ev publish]
+ (defn my-func [ev publish]
  (publish event2))
  (def event-that-was-sent
  (merge my-event event2))
@@ -249,10 +244,7 @@
 (nippy/freeze event-that-was-sent) =&gt; ..bin..
 (lb/publish :the-channel facts-exch (event-routing-key event2) ..bin.. :meta-attrs) =&gt; irrelevant)</code></pre></div><div><p>When the <code>alive</code> atom evaluates to <code>false</code>, the publish function does nothing.</p></div><div class="code"><pre><code class="clojure">(reset! alive false)
  (handle-event my-func alive :the-channel :meta-attrs my-event-bin) =&gt; nil
- ; Nothing is published</code></pre></div><div><p>If the wrapped function accepts three parameters, the third parameter is taken to be an <code>ack</code> function, that explicitly acknowledges the received event.</p></div><div class="code"><pre><code class="clojure">(defn my-func
- {:reg {:kind :fact
-        :name &quot;foo/bar&quot;}}
- [ev publish ack]
+ ; Nothing is published</code></pre></div><div><p>If the wrapped function accepts three parameters, the third parameter is taken to be an <code>ack</code> function, that explicitly acknowledges the received event.</p></div><div class="code"><pre><code class="clojure">(defn my-func [ev publish ack]
  (ack))
  (handle-event my-func alive :the-channel {:delivery-tag &quot;foo&quot;} my-event-bin) =&gt; nil
  (provided
