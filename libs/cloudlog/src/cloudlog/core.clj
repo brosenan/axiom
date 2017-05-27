@@ -10,6 +10,13 @@
 (permacode.core/pure
  (declare generate-rule-func)
 
+ (defmacro by [set body]
+   `(when (contains? (-> ~'$input$ meta :writers) ~set)
+      ~body))
+
+ (defmacro by-anyone [body]
+   body)
+
  (defmulti propagate-symbols (fn [cond symbols] (first cond)) :default :no-bindings)
  (defmethod propagate-symbols :no-bindings [cond symbols]
    symbols)
@@ -78,7 +85,8 @@
          travmap (unify/traverse (vec (rest source-fact)) (constantly true))
          [conds bindings] (unify/conds-and-bindings (map identity travmap) term-has-vars)
          body (if (symbol? source-fact-name)
-                `(by (-> ~source-fact-name meta :ns str) ~body)
+                `(when (contains? (-> ~'$input$ meta :writers) (-> ~source-fact-name meta :ns str))
+                   ~body)
                 ;; else
                 body)
          func `(fn [~'$input$]
@@ -163,13 +171,6 @@
          name (-> name meta :name)]
      (str ns "/" name)))
  (prefer-method fact-table clojure.lang.Named clojure.lang.IFn)
-
- (defmacro by [set body]
-   `(when (contains? (-> ~'$input$ meta :writers) ~set)
-      ~body))
-
- (defmacro by-anyone [body]
-   body)
 
  (defn rule-cont [rule]
    (loop [func rule
