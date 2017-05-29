@@ -41,8 +41,7 @@
           (async/>!! chan (merge body {:kind :fact
                                        :name table
                                        :key (read-string (:key item))
-                                       :ts (:ts item)}))
-))
+                                       :ts (:ts item)}))))
       (async/close! chan))
     nil))
 

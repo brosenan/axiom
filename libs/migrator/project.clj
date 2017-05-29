@@ -5,7 +5,7 @@
                  [zookeeper-clj "0.9.4"]
                  [zk-plan "MONOLITH-SNAPSHOT"]
                  [cloudlog-events "MONOLITH-SNAPSHOT"]
-                 [s3 "MONOLITH-SNAPSHOT"]]
+                 [s3 "MONOLITH-SNAPSHOT" :exclusions [com.amazonaws/aws-java-sdk]]]
   :monolith/inherit true
   :profiles {:dev {:dependencies [[midje "1.7.0"]
                                   [cloudlog "MONOLITH-SNAPSHOT"]

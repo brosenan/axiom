@@ -121,33 +121,45 @@ It calls zk/createn to create a new zookeeper node"
 - calls `get-task-from-any-plan` to get a task to work on
 - if a task is returned (we have something to do), it calls `perform-task` to run it"
 (fact
- (worker ..parent.. ..attrs.. ..$..) => irrelevant
- (provided
-  (get-task-from-any-plan :zk ..parent..) => "/foo/bar"
-  (perform-task :zk "/foo/bar" ..$..) => irrelevant
-  (zk/exists irrelevant irrelevant) => nil))
+ (let [alive (atom true)]
+   (worker ..parent.. ..attrs.. alive ..$..) => irrelevant
+   (provided
+    (get-task-from-any-plan :zk ..parent..) => "/foo/bar"
+    (perform-task :zk "/foo/bar" ..$..) => irrelevant
+    (zk/exists irrelevant irrelevant) => nil)))
 
 "If `get-task-from-any-plan` returns `nil`, we call `calc-sleep-time` to calculate for how long
 we need to sleep before the next retry.
 We retry until we get a task."
 (fact
- (worker ..parent.. ..attrs.. ..$..) => irrelevant
- (provided
-  (get-task-from-any-plan :zk ..parent..) =streams=> [nil nil "/foo/bar"]
-  (calc-sleep-time ..attrs.. 0) => 1
-  (calc-sleep-time ..attrs.. 1) => 2
-  (perform-task irrelevant irrelevant ..$..) => irrelevant
-  (zk/exists irrelevant irrelevant) => nil))
+ (let [alive (atom true)]
+   (worker ..parent.. ..attrs.. alive ..$..) => irrelevant
+   (provided
+    (get-task-from-any-plan :zk ..parent..) =streams=> [nil nil "/foo/bar"]
+    (calc-sleep-time ..attrs.. 0) => 1
+    (calc-sleep-time ..attrs.. 1) => 2
+    (perform-task irrelevant irrelevant ..$..) => irrelevant
+    (zk/exists irrelevant irrelevant) => nil)))
 
 "If `perform-task` exists (abnomally) before clearing the task node, 
 we remove the `owner` node from it to allow another task to complete the job"
 (fact
- (worker ..parent.. ..attrs.. ..$..) => (throws Exception)
- (provided
-  (get-task-from-any-plan :zk ..parent..) => "/foo/bar"
-  (perform-task :zk "/foo/bar" ..$..) =throws=> (Exception.)
-  (zk/exists :zk "/foo/bar") => {:some "thing"}
-  (zk/delete :zk "/foo/bar/owner") => irrelevant))
+ (let [alive (atom true)]
+   (worker ..parent.. ..attrs.. alive ..$..) => (throws Exception)
+   (provided
+    (get-task-from-any-plan :zk ..parent..) => "/foo/bar"
+    (perform-task :zk "/foo/bar" ..$..) =throws=> (Exception.)
+    (zk/exists :zk "/foo/bar") => {:some "thing"}
+    (zk/delete :zk "/foo/bar/owner") => irrelevant)))
+
+
+"When `get-task-from-any-plan` returns `nil` and the thread is shut down (`alive` is `false`),
+we return without waiting."
+(fact
+ (let [alive (atom false)]
+   (worker ..parent.. ..attrs.. alive ..$..) => irrelevant
+   (provided
+    (get-task-from-any-plan :zk ..parent..) => nil)))
 
 [[:chapter {:title "plan-completed?"}]]
 "
@@ -227,6 +239,7 @@ The other `M-K` tasks are built with `K` arguments each, which are randomly sele
 - (Re) Create the parent
 - Create the plan
 - Wait until the plan is complete
+- Shut down
 - Go home happy."
 (fact
  :integ ; This is an integration test
@@ -248,8 +261,8 @@ The other `M-K` tasks are built with `K` arguments each, which are randomly sele
                         (recur)))
                     (doseq [m (range M)]
                       (when-not (contains? @workers-completed m)
-                        (println "Task " m " was not completed"))))))))
-         
+                        (println "Task " m " was not completed"))))))
+   (di/shutdown $)))
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "get-task"}]]
@@ -470,15 +483,17 @@ In such a case, `perform-task` returns without doing anything."
 "It reads the function definition from the content of the task node.
 If no parameters exist in the task it executes the function without parameters."
 (fact
+ (def $ (di/injector))
+ (di/startup $)
  (defn foo [$])
- (execute-function ..zk.. ..task.. ..$..) => 4
+ (execute-function ..zk.. ..task.. $) => 4
  (provided
   (get-clj-data ..zk.. ..task..) => 'foo
-  (foo ..$..) => 4
+  (foo $) => 4
   (zk/children ..zk.. ..task..) => '("foo" "task-1234")))
 "It passes the task arguments to the function"
 (fact
- (execute-function ..zk.. "/foo/task-1234" ..$..) => [1 2 3]
+ (execute-function ..zk.. "/foo/task-1234" $) => [1 2 3]
  (provided
   (get-clj-data ..zk.. "/foo/task-1234") => '(fn [$ & args] args)
   (zk/children ..zk.. "/foo/task-1234") => '("arg-00001" "arg-00002" "arg-00000")
@@ -488,7 +503,7 @@ If no parameters exist in the task it executes the function without parameters."
 
 "If the node is removed before we manage to get the arguments we return `:task-does-not-exist` without doing anything."
 (fact
- (execute-function ..zk.. "/foo/task-1234" ..$..) => :task-does-not-exist
+ (execute-function ..zk.. "/foo/task-1234" $) => :task-does-not-exist
  (provided
   (get-clj-data ..zk.. "/foo/task-1234") => '(fn [$ & args] args)
   (zk/children ..zk.. "/foo/task-1234") => false))

@@ -88,7 +88,7 @@ Then `permacode.publish/hash-all` is called on the local repo, and then the dire
                  (conj! published ev))) => nil
  (provided
   (rand-int 1000000000) => 12345
-  (io/file "/my/clone/location/repo12345") => ..dir..
+  (io/file "/my/clone/location/repo12345/src") => ..dir..
   (permpub/hash-all :my-hasher ..dir..) => {'foo 'perm.ABCD123
                                             'bar 'perm.EFGH456})
  (persistent! cmds) => [["git" "clone" "--depth" "12" "https://example.com/some/repo" "/my/clone/location/repo12345"]
@@ -292,8 +292,10 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
                  :host "localhost"
                  :port 5672}
    :migration-config {:number-of-shards 3
-                      :plan-prefix "/my-plans"}
-   :s3-config {:bucket-name "brosenan-test"
+                      :plan-prefix "/my-plans"
+                      :clone-location "/tmp"
+                      :clone-depth 10}
+   :s3-config {:bucket-name (System/getenv "PERMACODE_S3_BUCKET")
                :access-key (System/getenv "AWS_ACCESS_KEY")
                :secret-key (System/getenv "AWS_SECRET_KEY")}})
 
@@ -335,7 +337,7 @@ We will start with tweets:"
                :data [(str greeting " " greeted " from " user)]
                :ts @time
                :change 1
-               :writers #{[:user= user]}
+               :writers #{user}
                :readers #{}})
      (swap! time inc))))
 
@@ -352,7 +354,7 @@ We will start with tweets:"
                  :data [u2]
                  :ts @time
                  :change 1
-                 :writers #{[:user= u1]}
+                 :writers #{u1}
                  :readers #{}}))
      (swap! time inc))
    :not-nil))
@@ -381,10 +383,10 @@ The following service function listens to such events and for the rule `followee
    (publish {:kind :fact
              :name "axiom/app-version"
              :key "https://github.com/brosenan/tweetlog-clj.git"
-             :data ["2ad3f8bf79e7c5ac157479f21fe4a52794a0cfbc"]
+             :data ["d3a8c6c5b946279186f857381e751801a657f70c"]
              :ts 1000
              :change 1
-             :writers #{:my-app}
+             :writers #{}
              :readers #{}})))
 
 "So now we wait for the migration to complete."
@@ -399,7 +401,7 @@ This means that Alice's timeline should contain 18 tweets."
  (di/do-with! $ [database-chan]
    (let [chan-out (async/chan 30)]
      (async/>!! database-chan [{:kind :fact
-                                :name "perm.QmbKp6zzeEZCU2nrxeJWv8eBWrWBJtAL8fkPd14hG1i7dt/followee-tweets"
+                                :name "perm.QmdLhmeiaJTMPdv7oT7mUsztdtjHq7f16Dw6nkR6JhxswP/followee-tweets"
                                 :key "alice"} chan-out])
      (loop [res 0]
        (let [ev (async/<!! chan-out)]
@@ -407,6 +409,11 @@ This means that Alice's timeline should contain 18 tweets."
                res
                :else
                (recur (inc res))))))) => 18)
+
+"Finally, we shut down the injector to stop the workers."
+(fact
+ :integ
+ (di/shutdown $))
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "zookeeper-counter-add"}]]
@@ -745,13 +752,23 @@ corresponding `:axiom/rule` events."
 
 "It returns only rule functions, identified by having a `:source-fact` meta field."
 (fact
- (extract-version-rules 'perm.1234ABC) => ['perm.1234ABC/foo
-                                           'perm.1234ABC/bar]
- (provided
-  (perm/module-publics 'perm.1234ABC) => {'foo (with-meta (fn []) {:source-fact ["foo" 1]})
-                                          'bar (with-meta (fn []) {:source-fact ["bar" 1]})
-                                          'baz (fn [])} ; baz will not be published
-  ))
+ (let [foo (with-meta (fn []) {:source-fact ["foo" 1]})
+       bar (with-meta (fn []) {:source-fact ["bar" 1]})
+       baz (fn [])]
+   (extract-version-rules 'perm.1234ABC) => [foo
+                                             bar]
+   (provided
+    (perm/module-publics 'perm.1234ABC) => {'foo foo
+                                            'bar bar
+                                            'baz baz} ; baz will not be published
+    )))
 
-
-
+"It excludes clauses, for which the `:source-fact` ends with a question mark (`?`)."
+(fact
+ (let [foo (with-meta (fn []) {:source-fact ["foo" 1]})
+       bar (with-meta (fn []) {:source-fact ["bar?" 1]})]
+   (extract-version-rules 'perm.1234ABC) => [foo]
+   (provided
+    (perm/module-publics 'perm.1234ABC) => {'foo foo
+                                            'bar bar} ; bar will not be published
+    )))

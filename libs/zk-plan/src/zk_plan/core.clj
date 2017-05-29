@@ -63,20 +63,22 @@
     (read-string (String. data "UTF-8"))))
 
 (defn execute-function [zk node $]
-  (let [func (get-clj-data zk node)
-        _ (println "executing function: " func)
-        func' (eval func)
-        children (zk/children zk node)]
-    (cond children
-      (let [vals (->> children
-                      (filter #(re-matches #"arg-\d+" %))
-                      sort
-                      (map #(str node "/" %))
-                      (map #(get-clj-data zk %)))
-            res (apply func' $ vals)]
-        res)
-      :else
-      :task-does-not-exist)))
+  (di/do-with! $ [info]
+               (let [func (get-clj-data zk node)
+                     _ (info {:source "zk-plan"
+                              :desc (str "executing function: " func)})
+                     func' (eval func)
+                     children (zk/children zk node)]
+                 (cond children
+                       (let [vals (->> children
+                                       (filter #(re-matches #"arg-\d+" %))
+                                       sort
+                                       (map #(str node "/" %))
+                                       (map #(get-clj-data zk %)))
+                             res (apply func' $ vals)]
+                         res)
+                       :else
+                       :task-does-not-exist))))
 
 (defn propagate-result [zk prov value]
   (let [dep (get-clj-data zk prov)
@@ -140,7 +142,7 @@
           ;; else
           (int val))))))
 
-(defn ^:private worker [zk parent attrs $]
+(defn ^:private worker [zk parent attrs alive $]
   (loop [count 0]
     (let [task (get-task-from-any-plan zk parent)]
       (if task
@@ -150,7 +152,7 @@
             (when (zk/exists zk task)
               (zk/delete zk (str task "/owner")))))
         ;; else
-        (do
+        (when @alive
           (Thread/sleep (calc-sleep-time attrs count))
           (recur (inc count)))))))
 
@@ -170,15 +172,23 @@
                :worker (partial worker zookeeper)
                :plan-completed? (partial plan-completed? zookeeper)})
 
-  (di/do-with $ [zk-plan zk-plan-config]
-              (let [{:keys [worker]} zk-plan]
-                (let [threads (map (fn [_] (Thread. (fn []
-                                                      (loop []
+  (di/do-with $ [zk-plan zk-plan-config info]
+              (let [alive (atom true)
+                    {:keys [worker]} zk-plan
+                    threads (map (fn [_] (Thread. (fn []
+                                                    (loop []
+                                                      (when @alive
                                                         (try
-                                                          (worker (:parent zk-plan-config) {} $)
+                                                          (worker (:parent zk-plan-config) {} alive $)
                                                           (catch Exception e
                                                             (.printStackTrace e)))
-                                                        (recur))))) (range (:num-threads zk-plan-config)))]
-                  (doseq [thread threads]
-                    (.start thread))
-                  threads))))
+                                                        (recur)))))) (range (:num-threads zk-plan-config)))]
+                (doseq [thread threads]
+                  (.start thread))
+                {:resource threads
+                 :shutdown (fn []
+                             (reset! alive false)
+                             (info {:source "zk-plan"
+                                    :desc "Waiting for threads to shut down..."})
+                             (doseq [thread threads]
+                               (.join thread)))})))

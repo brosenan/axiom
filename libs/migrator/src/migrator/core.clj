@@ -10,7 +10,8 @@
             [cloudlog-events.core :as ev]
             [cloudlog.core :as clg]
             [clojure.java.io :as io]
-            [clojure.set :as set]))
+            [clojure.set :as set]
+            [clojure.string :as str]))
 
 (defn fact-declarer [rule link]
   (fn [$ & args]
@@ -80,9 +81,11 @@
       :not-nil)))
 
 (defn extract-version-rules [version]
-  (let [pubs (perm/module-publics version)]
-    (for [[k v] (filter (fn [[k v]] (-> v meta :source-fact)) pubs)]
-      (symbol (str version) (str k)))))
+  (->> (perm/module-publics version)
+       (filter (fn [[k v]] (let [src (-> v meta :source-fact)]
+                             (and src
+                                  (not (str/ends-with? (first src) "?"))))))
+       vals))
 
 (defn module [$]
   (di/provide $ zookeeper-counter-add [zookeeper]
@@ -151,7 +154,8 @@
                  declare-service
                  assign-service
                  migration-config
-                 hasher]
+                 hasher
+                 info]
               (declare-service "migrator.core/rule-migrator" {:kind :fact
                                                               :name "axiom/perms-exist"})
               (assign-service "migrator.core/rule-migrator"
@@ -168,6 +172,8 @@
                                       (when-not (empty? ruleseq)
                                         (let [rulefunc (first ruleseq)
                                               rule (-> rulefunc clg/rule-target-fact first str (subs 1) symbol)
+                                              _ (info {:source "migrator"
+                                                       :desc (str "migrating rule " rule)})
                                               last-task (loop [rulefunc rulefunc
                                                                link 0
                                                                deps (cond last-task
@@ -199,7 +205,7 @@
                              (:key ev)
                              dir)
                          (sh "git" "checkout" version :dir dir)
-                         (let [hashes (permpub/hash-all hasher (io/file dir))]
+                         (let [hashes (permpub/hash-all hasher (io/file (str dir "/src")))]
                            (publish {:kind :fact
                                      :name "axiom/perm-versions"
                                      :key (:key ev)

@@ -190,8 +190,8 @@
                                                     {(rule-target-fact rule) (set (map (fn [x] (-> x meta :source-fact)) conts))})))
          inv-sort (graph/toposort inv-graph)
          target-fact-map (reduce (partial merge-with set/union) {} (for [rule rules]
-                                                              (let [conts (rule-cont rule)]
-                                                                {(rule-target-fact rule) #{rule}})))]
+                                                                     (let [conts (rule-cont rule)]
+                                                                       {(rule-target-fact rule) #{rule}})))]
      (->> (reverse inv-sort)
           (map target-fact-map)
           (reduce concat)
