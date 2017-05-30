@@ -20,7 +20,8 @@ Each such topology is a chain of bolts representing the different links in the r
 A last bolt writes the derived facts to a queue."
 
 [[:chapter "topology"]]
-"The `topology` function takes a [permacode](permacode.html)-prefixed symbol representing a rule as parameter and returns a Storm topology object."
+"The `topology` function takes a [permacode](permacode.html)-prefixed symbol representing a rule as parameter and a `config` map,
+and returns a Storm topology object."
 
 "For this discussion we will refer to the `timeline` rule described [here](cloudlog.html#joins)."
 (clg/defrule timeline [user tweet]
@@ -31,30 +32,34 @@ A last bolt writes the derived facts to a queue."
 
 "The corresponding topology will have [two spouts and three bolts](http://storm.apache.org/releases/1.1.0/Concepts.html).
 The two spouts correspond to the two fact-streams (`:test/follows` and `:test/tweeted` respectively),
-two bolts correspond to the two links that process these facts, and a third link outputs `timeline` entries."
+two bolts correspond to the two links that process these facts, and a third link outputs `timeline` entries.
+All bolts and spouts take the `config` parameter as their last parameter."
 (fact
- (topology 'perm.ABCD1234/timeline) => ..topology..
+ (topology 'perm.ABCD1234/timeline ..config..) => ..topology..
  (provided
   ;; We extract the actual function based on the symbol
   (perm/eval-symbol 'perm.ABCD1234/timeline) => timeline
   ;; Then we define the two spouts based on the fact streams
-  (fact-spout "test/follows") => ..spout0..
+  (fact-spout "test/follows" ..config..) => ..spout0..
   (s/spout-spec ..spout0..) => ..spoutspec0..
-  (fact-spout "test/tweeted") => ..spout1..
+  (fact-spout "test/tweeted" ..config..) => ..spout1..
   (s/spout-spec ..spout1..) => ..spoutspec1..
   ;; An initial link bolt based on the initial fact
-  (initial-link-bolt 'perm.ABCD1234/timeline) => ..bolt0..
+  (initial-link-bolt 'perm.ABCD1234/timeline ..config..) => ..bolt0..
   (s/bolt-spec {"f0" ["key"]} ..bolt0..) => ..boltspec0..
   ;; and a regular link based on both the second fact and the initial link.
-  (link-bolt 'perm.ABCD1234/timeline 1) => ..bolt1..
+  (link-bolt 'perm.ABCD1234/timeline 1 ..config..) => ..bolt1..
   (s/bolt-spec {"f1" ["key"]
                 "l0" ["key"]} ..bolt1..) => ..boltspec1..
   ;; Finally, we add the output bolt
-  (s/bolt-spec {"l1" :shuffle} output-bolt) => ..outbolt..
+  (output-bolt ..config..) => ..outbolt..
+  (s/bolt-spec {"l1" :shuffle} ..outbolt..) => ..outboltspec..
   ;; and create the complete topology
   (s/topology {"f0" ..spoutspec0..
                "f1" ..spoutspec1..}
               {"l0" ..boltspec0..
                "l1" ..boltspec1..
-               "out" ..outbolt..}) => ..topology..))
+               "out" ..outboltspec..}) => ..topology..))
+
+
 
