@@ -160,7 +160,7 @@ It is supposed to be all pure, so it's a good test case..."
              key (second target)
              params (vec (set/intersection symbols (symbols/symbols func)))
              missing (set/difference (symbols/symbols key) symbols)
-             meta {:continuation (with-meta `(fn [[~'$key$ ~@params]] ~func) meta)}]
+             meta {:continuation (with-meta `(fn [[key# ~@params]] ~func) meta)}]
          (when-not (empty? missing)
            (permacode.core/error "variables " missing " are unbound in the key for " (first target)))
          [`[[~key ~@params]] meta]))))
@@ -183,15 +183,15 @@ It is supposed to be all pure, so it's a good test case..."
          [body meta] (process-conds conds (set/union symbols ext-symbols))
          meta (merge meta {:source-fact [(first source-fact) (count (rest source-fact))]})
          vars (vec symbols)
-         func `(fn [~'$input$]
+         func `(fn [input#]
                  ~(if (empty? vars)
                                         ; No unbound variables
-                    `(if (= ~'$input$ [~@(rest source-fact)])
+                    `(if (= input# [~@(rest source-fact)])
                        ~body
                        [])
                                         ; vars contains the unbound variables
-                    `(let [~'$poss$ ((unify/unify-fn ~vars [~@(rest source-fact)] ~vars) ~'$input$)]
-                       (apply concat (for [~vars ~'$poss$] 
+                    `(let [poss# ((unify/unify-fn ~vars [~@(rest source-fact)] ~vars) input#)]
+                       (apply concat (for [~vars poss#] 
                                        ~body)))))]
      [func meta]))
 
@@ -213,8 +213,8 @@ It is supposed to be all pure, so it's a good test case..."
    (keyword (namespace keywd) (str (name keywd) suffix)))
 
  (defmacro defclause [clausename pred args-in args-out & body]
-   (let [source-fact `[~(append-to-keyword pred "?") ~'$unique$ ~@args-in]
-         conds (concat body [`[~(append-to-keyword pred "!") ~'$unique$ ~@args-out]])
+   (let [source-fact `[~(append-to-keyword pred "?") unique# ~@args-in]
+         conds (concat body [`[~(append-to-keyword pred "!") unique# ~@args-out]])
          [func meta] (generate-rule-func source-fact conds #{})]
      `(def ~clausename (with-meta ~func ~(merge meta {:ns *ns* :name (str clausename)})))))
 
@@ -252,7 +252,7 @@ It is supposed to be all pure, so it's a good test case..."
  (prefer-method fact-table clojure.lang.Named clojure.lang.IFn)
 
  (defmacro by [set body]
-   `(when (contains? (-> ~'$input$ meta :writers) ~set)
+   `(when (contains? (-> input# meta :writers) ~set)
       ~body))
 
  (defmacro by-anyone [body]

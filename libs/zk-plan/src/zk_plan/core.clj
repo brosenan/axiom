@@ -94,7 +94,7 @@
   (cond (> times 1)
         `(try
            ~@exprs
-           (catch Throwable ~'$e
+           (catch Throwable e#
              (retry ~(dec times)
                     ~@exprs)))
         :else

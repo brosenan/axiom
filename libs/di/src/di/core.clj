@@ -52,16 +52,16 @@
 
 
 (defmacro provide [$ resource deps & exprs]
-  `(swap! ~$ (fn [~'$inj] (update-in ~'$inj [:rules] (fn [~'$rules]
-                                                       (conj ~'$rules
+  `(swap! ~$ (fn [inj#] (update-in inj# [:rules] (fn [rules#]
+                                                       (conj rules#
                                                               (with-meta
                                                                 (fn [{:keys ~deps}] ~@exprs)
                                                                 {:resource ~(keyword resource)
                                                                  :deps ~(vec (map keyword deps))})))))))
 
 (defmacro do-with [$ deps & exprs]
-  `(swap! ~$ (fn [~'$inj] (update-in ~'$inj [:rules] (fn [~'$rules]
-                                                       (conj ~'$rules
+  `(swap! ~$ (fn [inj#] (update-in inj# [:rules] (fn [rules#]
+                                                       (conj rules#
                                                              (with-meta
                                                                (fn [{:keys ~deps}] ~@exprs)
                                                                {:deps ~(vec (map keyword deps))})))))))
@@ -113,14 +113,14 @@
     (func)))
 
 (defmacro do-with! [$ deps & exprs]
-  `(let [~'$existing (set (keys (:resources @~$)))
-         ~'$missing (set/difference ~(set (map keyword deps))
-                                    ~'$existing)]
-     (cond (empty? ~'$missing)
+  `(let [existing# (set (keys (:resources @~$)))
+         missing# (set/difference ~(set (map keyword deps))
+                                    existing#)]
+     (cond (empty? missing#)
            (let [{:keys ~deps} (:resources @~$)]
              ~@exprs)
            :else
-           (throw (Exception. (str "Resource(s) " ~'$missing " are not available, but " ~'$existing " are"))))))
+           (throw (Exception. (str "Resource(s) " missing# " are not available, but " existing# " are"))))))
 
 (defmacro do-with-default! [$ binding & exprs]
   (when-not (vector? binding)

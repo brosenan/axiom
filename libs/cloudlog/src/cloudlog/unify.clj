@@ -36,7 +36,7 @@
                          (not (empty? (set/intersection (sym/symbols term) vars))))
          travmap (traverse unifiable (constantly true))
          [conds bindings] (conds-and-bindings (map identity travmap) term-has-vars)]
-     `(fn [~'$input$]
+     `(fn [input#]
         (if (and ~@conds)
           (let ~bindings [~expr])
           ; else

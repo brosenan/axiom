@@ -68,9 +68,9 @@ and returns a list of conditions and a list of bindings."
 (fact
  (conds-and-bindings [] (constantly true)) => [[] []]
  (conds-and-bindings [[[0] 'x] [[1] 'y]] (constantly true))
- => `[[] [~'x (~'$input$ 0)
-          ~'y (~'$input$ 1)]]
+ => `[[] [~'x (input# 0)
+          ~'y (input# 1)]]
  (conds-and-bindings [[[0] 'x] [[1] "foo"]] symbol?)
- => `[[(= (~'$input$ 1) "foo")]
-      [~'x (~'$input$ 0)]])
+ => `[[(= (input# 1) "foo")]
+      [~'x (input# 0)]])
 
