@@ -84,32 +84,33 @@
                 </ul>
               </nav>
           </div>
-          <div class="code"><pre><code class="clojure">[[:chapter &quot;Introduction&quot;]]</code></pre></div><div><p><a href='http://storm.apache.org'>Apache Storm</a> is an open-source distributed realtime computation system. With Storm, a computation is expressed in terms of a <em>topology</em>,  which consists of <em>spouts</em> &ndash; data sources, and <em>bolts</em> &ndash; data handlers. Spouts create <em>tuples</em> with data, and bolts process this data and provide output. Many Storm topologies can run on a single Storm cluster.</p></div><div><p>This module provides a service that subcribes to <code>:axiom/rule-ready</code> events and deploys topologies based on these rules to a Storm cluster. Each such topology is a chain of bolts representing the different links in the rule, fed by spouts which emit facts read from a queue. A last bolt writes the derived facts to a queue.</p></div><div class="code"><pre><code class="clojure">[[:chapter &quot;topology&quot;]]</code></pre></div><div><p>The <code>topology</code> function takes a <a href='permacode.html'>permacode</a>-prefixed symbol representing a rule as parameter and returns a Storm topology object.</p></div><div><p>For this discussion we will refer to the <code>timeline</code> rule described <a href='cloudlog.html#joins'>here</a>.</p></div><div class="code"><pre><code class="clojure">(clg/defrule timeline [user tweet]
+          <div class="code"><pre><code class="clojure">[[:chapter &quot;Introduction&quot;]]</code></pre></div><div><p><a href='http://storm.apache.org'>Apache Storm</a> is an open-source distributed realtime computation system. With Storm, a computation is expressed in terms of a <em>topology</em>,  which consists of <em>spouts</em> &ndash; data sources, and <em>bolts</em> &ndash; data handlers. Spouts create <em>tuples</em> with data, and bolts process this data and provide output. Many Storm topologies can run on a single Storm cluster.</p></div><div><p>This module provides a service that subcribes to <code>:axiom/rule-ready</code> events and deploys topologies based on these rules to a Storm cluster. Each such topology is a chain of bolts representing the different links in the rule, fed by spouts which emit facts read from a queue. A last bolt writes the derived facts to a queue.</p></div><div class="code"><pre><code class="clojure">[[:chapter &quot;topology&quot;]]</code></pre></div><div><p>The <code>topology</code> function takes a <a href='permacode.html'>permacode</a>-prefixed symbol representing a rule as parameter and a <code>config</code> map, and returns a Storm topology object.</p></div><div><p>For this discussion we will refer to the <code>timeline</code> rule described <a href='cloudlog.html#joins'>here</a>.</p></div><div class="code"><pre><code class="clojure">(clg/defrule timeline [user tweet]
      [:test/follows user author] (clg/by-anyone)
-     [:test/tweeted author tweet] (clg/by-anyone))</code></pre></div><div><p>This rule has two <em>links</em>, one responding to <code>:test/follows</code> facts and the other &ndash; to <code>:test/tweeted</code> facts.</p></div><div><p>The corresponding topology will have <a href='http://storm.apache.org/releases/1.1.0/Concepts.html'>two spouts and three bolts</a>. The two spouts correspond to the two fact-streams (<code>:test/follows</code> and <code>:test/tweeted</code> respectively), two bolts correspond to the two links that process these facts, and a third link outputs <code>timeline</code> entries.</p></div><div class="code"><pre><code class="clojure">(topology 'perm.ABCD1234/timeline) =&gt; ..topology..
+     [:test/tweeted author tweet] (clg/by-anyone))</code></pre></div><div><p>This rule has two <em>links</em>, one responding to <code>:test/follows</code> facts and the other &ndash; to <code>:test/tweeted</code> facts.</p></div><div><p>The corresponding topology will have <a href='http://storm.apache.org/releases/1.1.0/Concepts.html'>two spouts and three bolts</a>. The two spouts correspond to the two fact-streams (<code>:test/follows</code> and <code>:test/tweeted</code> respectively), two bolts correspond to the two links that process these facts, and a third link outputs <code>timeline</code> entries. All bolts and spouts take the <code>config</code> parameter as their last parameter.</p></div><div class="code"><pre><code class="clojure">(topology 'perm.ABCD1234/timeline ..config..) =&gt; ..topology..
  (provided
 ;; We extract the actual function based on the symbol
 (perm/eval-symbol 'perm.ABCD1234/timeline) =&gt; timeline
 ;; Then we define the two spouts based on the fact streams
-(fact-spout &quot;test/follows&quot;) =&gt; ..spout0..
+(fact-spout &quot;test/follows&quot; ..config..) =&gt; ..spout0..
 (s/spout-spec ..spout0..) =&gt; ..spoutspec0..
-(fact-spout &quot;test/tweeted&quot;) =&gt; ..spout1..
+(fact-spout &quot;test/tweeted&quot; ..config..) =&gt; ..spout1..
 (s/spout-spec ..spout1..) =&gt; ..spoutspec1..
 ;; An initial link bolt based on the initial fact
-(initial-link-bolt 'perm.ABCD1234/timeline) =&gt; ..bolt0..
+(initial-link-bolt 'perm.ABCD1234/timeline ..config..) =&gt; ..bolt0..
 (s/bolt-spec {&quot;f0&quot; [&quot;key&quot;]} ..bolt0..) =&gt; ..boltspec0..
 ;; and a regular link based on both the second fact and the initial link.
-(link-bolt 'perm.ABCD1234/timeline 1) =&gt; ..bolt1..
+(link-bolt 'perm.ABCD1234/timeline 1 ..config..) =&gt; ..bolt1..
 (s/bolt-spec {&quot;f1&quot; [&quot;key&quot;]
               &quot;l0&quot; [&quot;key&quot;]} ..bolt1..) =&gt; ..boltspec1..
 ;; Finally, we add the output bolt
-(s/bolt-spec {&quot;l1&quot; :shuffle} output-bolt) =&gt; ..outbolt..
+(output-bolt ..config..) =&gt; ..outbolt..
+(s/bolt-spec {&quot;l1&quot; :shuffle} ..outbolt..) =&gt; ..outboltspec..
 ;; and create the complete topology
 (s/topology {&quot;f0&quot; ..spoutspec0..
              &quot;f1&quot; ..spoutspec1..}
             {&quot;l0&quot; ..boltspec0..
              &quot;l1&quot; ..boltspec1..
-             &quot;out&quot; ..outbolt..}) =&gt; ..topology..)</code></pre></div>
+             &quot;out&quot; ..outboltspec..}) =&gt; ..topology..)</code></pre></div>
         </div>
       </div>
     </div>
