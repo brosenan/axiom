@@ -11,7 +11,7 @@
  (declare generate-rule-func)
 
  (defmacro by [set body]
-   `(when (contains? (-> input# meta :writers) ~set)
+   `(when (contains? (-> ~'$input$ meta :writers) ~set)
       ~body))
 
  (defmacro by-anyone [body]
@@ -85,11 +85,11 @@
          travmap (unify/traverse (vec (rest source-fact)) (constantly true))
          [conds bindings] (unify/conds-and-bindings (map identity travmap) term-has-vars)
          body (if (symbol? source-fact-name)
-                `(when (contains? (-> input# meta :writers) (-> ~source-fact-name meta :ns str))
+                `(when (contains? (-> ~'$input$ meta :writers) (-> ~source-fact-name meta :ns str))
                    ~body)
                 ;; else
                 body)
-         func `(fn [input#]
+         func `(fn [~'$input$]
                  (if (and ~@conds)
                    (let ~bindings ~body)
                    ;; else
@@ -119,8 +119,8 @@
 
  (defmacro defclause [clausename target-form & body]
    (let [[pred args-in args-out] (parse-target-form target-form)
-         source-fact `[~(append-to-keyword pred "?") unique# ~@args-in]
-         conds (concat body [`[~(append-to-keyword pred "!") unique# ~@args-out]])
+         source-fact `[~(append-to-keyword pred "?") ~'$unique$ ~@args-in]
+         conds (concat body [`[~(append-to-keyword pred "!") ~'$unique$ ~@args-out]])
          [func meta] (generate-rule-func source-fact conds #{})
          meta (assoc meta :checked true)] ; The query is assumed to be checked
      (validate-rule meta)
