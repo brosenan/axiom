@@ -8,7 +8,7 @@
   <!-- Enable responsiveness on mobile devices-->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
   <link rel="shortcut icon" href="favicon.ico">
-  <title>axiom//permacode.symbols - Extracting Symbols Used by Expressions</title>
+  <title>axiom//storm.core - Converting Cloudlog Rules to Apache Storm Topologies</title>
   <script src="js/highlight.min.js"></script>
   <script src="js/gumshoe.min.js"></script>
   <script src="js/smooth-scroll.min.js"></script>
@@ -37,7 +37,7 @@
     <span>&nbsp;</span>
     <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
     <span>&nbsp;</span>
-    <a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="di.html">di.core</a><a class="sidebar-nav-item" href="docs.html"></a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="migrator.html">migrator.core</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item active" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="s3.html">s3.core</a><a class="sidebar-nav-item" href="storm.html">storm.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
+    <a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="di.html">di.core</a><a class="sidebar-nav-item" href="docs.html"></a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="migrator.html">migrator.core</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="s3.html">s3.core</a><a class="sidebar-nav-item active" href="storm.html">storm.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
     <span class="sidebar-nav-item">&nbsp;</span>
     <span class="sidebar-nav-item">&nbsp;</span>
   </nav>
@@ -51,8 +51,8 @@
         <div class="container">
 	  <a href="index.html"><img src="img/axiom-logo.png"></a>
           <h3 class="masthead-title">
-            <span>axiom//permacode.symbols</span>
-            <small>Extracting Symbols Used by Expressions</small>
+            <span>axiom//storm.core</span>
+            <small>Converting Cloudlog Rules to Apache Storm Topologies</small>
           </h3>
         </div>
       </div>
@@ -70,8 +70,8 @@
             <div class="toc">
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
-                  <a data-scroll class="top" href="#page-top">permacode.symbols</a>
-                  <li><a class="chapter" data-scroll="" href="#symbols-extract-symbols-from-expressions"><h4>1 &nbsp; symbols: Extract symbols from expressions</h4></a></li>
+                  <a data-scroll class="top" href="#page-top">storm.core</a>
+                  
                 </ul>
               </nav>
             </div>
@@ -80,26 +80,36 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#symbols-extract-symbols-from-expressions"><h4>1 &nbsp; symbols: Extract symbols from expressions</h4></a></li>
+                  
                 </ul>
               </nav>
           </div>
-          <div><span id="symbols-extract-symbols-from-expressions"></span><h2><b>1 &nbsp;&nbsp; symbols: Extract symbols from expressions</b></h2></div><div><p>The <code>symbols</code> function is the key in our static analysis.  It takes a s-expression, and returns a set of symbols defined by this s-expression.</p></div><div><p>For Constants, it returns an empty set.</p></div><div class="code"><pre><code class="clojure">(symbols 2) =&gt; #{}
- (symbols true) =&gt; #{}
- (symbols &quot;foo&quot;) =&gt; #{}
- (symbols :foo) =&gt; #{}
- (symbols nil) =&gt; #{}
- (symbols #&quot;foobar&quot;) =&gt; #{}
- (symbols *ns*) =&gt; #{}</code></pre></div><div><p>For a symbol, <code>symbols</code> returns a set with that symbol.</p></div><div class="code"><pre><code class="clojure">(symbols 'x) =&gt; #{'x}</code></pre></div><div><p><code>symbols</code> goes into Clojure structures and aggergates symbols from there.</p></div><div class="code"><pre><code class="clojure">(symbols '(+ a b)) =&gt; #{'+ 'a 'b}
- (symbols '[1 a 2 b]) =&gt; #{'a 'b}
- (symbols {'x 'y}) =&gt; #{'x 'y}
- (symbols #{'a 'b 3 4 5}) =&gt; #{'a 'b}</code></pre></div><div><p>In a <code>let&#42;</code> special form, the bindings are removed from the returned set.</p></div><div class="code"><pre><code class="clojure">(symbols '(let* [x 1 y 2] (+ x y))) =&gt; #{'+}
- (symbols '(let* [x a] x)) =&gt; #{'a}</code></pre></div><div><p><code>symbols</code> expands macros, so it also handles the more familiar <code>let</code> form</p></div><div class="code"><pre><code class="clojure">(symbols '(let [x a] x a)) =&gt; #{'a}</code></pre></div><div><p><code>loop</code> is supported similarly.</p></div><div class="code"><pre><code class="clojure">(symbols '(loop [x a y b] a x b y c)) =&gt; #{'a 'b 'c}</code></pre></div><div><p>In the <code>fn&#42;</code> special form (used by the <code>fn</code> macro) <code>symbols</code> removes the argument names from the set.</p></div><div class="code"><pre><code class="clojure">(symbols '(fn [x y] (+ x y a))) =&gt; #{'a '+}
- (symbols '(fn foo [x y]  (+ x (foo y a)))) =&gt; #{'a '+}</code></pre></div><div><p>The function name (in named functions) is also removed.</p></div><div class="code"><pre><code class="clojure">(symbols '(fn foo [x] (foo x))) =&gt; #{}</code></pre></div><div><p>Multi-arity functions are supported as well.</p></div><div class="code"><pre><code class="clojure">(symbols '(fn ([x] (+ a x))
-           ([x y] (+ b x y)))) =&gt; #{'a 'b '+}</code></pre></div><div><p><code>def</code> is not allowed inside an expression (it is allowed on the top-level, as described below).</p></div><div class="code"><pre><code class="clojure">(symbols '(def x 2)) =&gt; (throws &quot;def is not allowed&quot;)</code></pre></div><div><p>Similarly, reference to variables is not allowed.</p></div><div class="code"><pre><code class="clojure">(symbols '#'var) =&gt; (throws &quot;vars are not allowed&quot;)</code></pre></div><div><p>Quoted symbols are ignored.</p></div><div class="code"><pre><code class="clojure">(symbols ''(a b c)) =&gt; #{}</code></pre></div><div><p>In special forms such as <code>if</code> and <code>do</code>, the form's name is ignored.</p></div><div class="code"><pre><code class="clojure">(symbols '(if a b c)) =&gt; #{'a 'b 'c}
- (symbols '(do a b c)) =&gt; #{'a 'b 'c}
- (symbols '(recur a b)) =&gt; #{'a 'b}</code></pre></div><div><p>Exceptions are not supported because they use Java interop.</p></div><div class="code"><pre><code class="clojure">(symbols '(throw foo)) =&gt; (throws Exception &quot;throw is not allowed. Use error instead&quot;)
- (symbols '(try foo bar baz)) =&gt; (throws &quot;try/catch is not allowed&quot;)</code></pre></div><div><p>While <code>for</code> is a macro and not a special form, its definition makes use of Java interop, which we disallow. We therefore make <code>for</code> a special case.</p></div><div class="code"><pre><code class="clojure">(symbols '(for [x foo] (* x 2))) =&gt; #{'foo '*}</code></pre></div>
+          <div class="code"><pre><code class="clojure">[[:chapter &quot;Introduction&quot;]]</code></pre></div><div><p><a href='http://storm.apache.org'>Apache Storm</a> is an open-source distributed realtime computation system. With Storm, a computation is expressed in terms of a <em>topology</em>,  which consists of <em>spouts</em> &ndash; data sources, and <em>bolts</em> &ndash; data handlers. Spouts create <em>tuples</em> with data, and bolts process this data and provide output. Many Storm topologies can run on a single Storm cluster.</p></div><div><p>This module provides a service that subcribes to <code>:axiom/rule-ready</code> events and deploys topologies based on these rules to a Storm cluster. Each such topology is a chain of bolts representing the different links in the rule, fed by spouts which emit facts read from a queue. A last bolt writes the derived facts to a queue.</p></div><div class="code"><pre><code class="clojure">[[:chapter &quot;topology&quot;]]</code></pre></div><div><p>The <code>topology</code> function takes a <a href='permacode.html'>permacode</a>-prefixed symbol representing a rule as parameter and returns a Storm topology object.</p></div><div><p>For this discussion we will refer to the <code>timeline</code> rule described <a href='cloudlog.html#joins'>here</a>.</p></div><div class="code"><pre><code class="clojure">(clg/defrule timeline [user tweet]
+     [:test/follows user author] (clg/by-anyone)
+     [:test/tweeted author tweet] (clg/by-anyone))</code></pre></div><div><p>This rule has two <em>links</em>, one responding to <code>:test/follows</code> facts and the other &ndash; to <code>:test/tweeted</code> facts.</p></div><div><p>The corresponding topology will have <a href='http://storm.apache.org/releases/1.1.0/Concepts.html'>two spouts and three bolts</a>. The two spouts correspond to the two fact-streams (<code>:test/follows</code> and <code>:test/tweeted</code> respectively), two bolts correspond to the two links that process these facts, and a third link outputs <code>timeline</code> entries.</p></div><div class="code"><pre><code class="clojure">(topology 'perm.ABCD1234/timeline) =&gt; ..topology..
+ (provided
+;; We extract the actual function based on the symbol
+(perm/eval-symbol 'perm.ABCD1234/timeline) =&gt; timeline
+;; Then we define the two spouts based on the fact streams
+(fact-spout &quot;test/follows&quot;) =&gt; ..spout0..
+(s/spout-spec ..spout0..) =&gt; ..spoutspec0..
+(fact-spout &quot;test/tweeted&quot;) =&gt; ..spout1..
+(s/spout-spec ..spout1..) =&gt; ..spoutspec1..
+;; An initial link bolt based on the initial fact
+(initial-link-bolt 'perm.ABCD1234/timeline) =&gt; ..bolt0..
+(s/bolt-spec {&quot;f0&quot; [&quot;key&quot;]} ..bolt0..) =&gt; ..boltspec0..
+;; and a regular link based on both the second fact and the initial link.
+(link-bolt 'perm.ABCD1234/timeline 1) =&gt; ..bolt1..
+(s/bolt-spec {&quot;f1&quot; [&quot;key&quot;]
+              &quot;l0&quot; [&quot;key&quot;]} ..bolt1..) =&gt; ..boltspec1..
+;; Finally, we add the output bolt
+(s/bolt-spec {&quot;l1&quot; :shuffle} output-bolt) =&gt; ..outbolt..
+;; and create the complete topology
+(s/topology {&quot;f0&quot; ..spoutspec0..
+             &quot;f1&quot; ..spoutspec1..}
+            {&quot;l0&quot; ..boltspec0..
+             &quot;l1&quot; ..boltspec1..
+             &quot;out&quot; ..outbolt..}) =&gt; ..topology..)</code></pre></div>
         </div>
       </div>
     </div>

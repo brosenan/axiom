@@ -37,7 +37,7 @@
     <span>&nbsp;</span>
     <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
     <span>&nbsp;</span>
-    <a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="di.html">di.core</a><a class="sidebar-nav-item" href="docs.html"></a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="migrator.html">migrator.core</a><a class="sidebar-nav-item active" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="s3.html">s3.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
+    <a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="di.html">di.core</a><a class="sidebar-nav-item" href="docs.html"></a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="migrator.html">migrator.core</a><a class="sidebar-nav-item active" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="s3.html">s3.core</a><a class="sidebar-nav-item" href="storm.html">storm.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
     <span class="sidebar-nav-item">&nbsp;</span>
     <span class="sidebar-nav-item">&nbsp;</span>
   </nav>
@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 27 May 2017</h5>
+              <h5>Date: 30 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -132,7 +132,7 @@
              key (second target)
              params (vec (set/intersection symbols (symbols/symbols func)))
              missing (set/difference (symbols/symbols key) symbols)
-             meta {:continuation (with-meta `(fn [[~'$key$ ~@params]] ~func) meta)}]
+             meta {:continuation (with-meta `(fn [[key# ~@params]] ~func) meta)}]
          (when-not (empty? missing)
            (permacode.core/error &quot;variables &quot; missing &quot; are unbound in the key for &quot; (first target)))
          [`[[~key ~@params]] meta]))))
@@ -155,15 +155,15 @@
          [body meta] (process-conds conds (set/union symbols ext-symbols))
          meta (merge meta {:source-fact [(first source-fact) (count (rest source-fact))]})
          vars (vec symbols)
-         func `(fn [~'$input$]
+         func `(fn [input#]
                  ~(if (empty? vars)
                                         ; No unbound variables
-                    `(if (= ~'$input$ [~@(rest source-fact)])
+                    `(if (= input# [~@(rest source-fact)])
                        ~body
                        [])
                                         ; vars contains the unbound variables
-                    `(let [~'$poss$ ((unify/unify-fn ~vars [~@(rest source-fact)] ~vars) ~'$input$)]
-                       (apply concat (for [~vars ~'$poss$] 
+                    `(let [poss# ((unify/unify-fn ~vars [~@(rest source-fact)] ~vars) input#)]
+                       (apply concat (for [~vars poss#] 
                                        ~body)))))]
      [func meta]))
 
@@ -185,8 +185,8 @@
    (keyword (namespace keywd) (str (name keywd) suffix)))
 
  (defmacro defclause [clausename pred args-in args-out &amp; body]
-   (let [source-fact `[~(append-to-keyword pred &quot;?&quot;) ~'$unique$ ~@args-in]
-         conds (concat body [`[~(append-to-keyword pred &quot;!&quot;) ~'$unique$ ~@args-out]])
+   (let [source-fact `[~(append-to-keyword pred &quot;?&quot;) unique# ~@args-in]
+         conds (concat body [`[~(append-to-keyword pred &quot;!&quot;) unique# ~@args-out]])
          [func meta] (generate-rule-func source-fact conds #{})]
      `(def ~clausename (with-meta ~func ~(merge meta {:ns *ns* :name (str clausename)})))))
 
@@ -224,7 +224,7 @@
  (prefer-method fact-table clojure.lang.Named clojure.lang.IFn)
 
  (defmacro by [set body]
-   `(when (contains? (-&gt; ~'$input$ meta :writers) ~set)
+   `(when (contains? (-&gt; input# meta :writers) ~set)
       ~body))
 
  (defmacro by-anyone [body]
