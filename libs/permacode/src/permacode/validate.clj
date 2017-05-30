@@ -88,8 +88,8 @@
                'empty? 'contains? 'pos? 'neg? 'identical? 'some?
                'vector? 'seq? 'sequential? 'list? 'nil? 'string? 'keyword? 'symbol? 'map?
                'meta 'with-meta
-               'assoc 'assoc-in 'merge 'merge-with 'keys 'key 'vals 'val 'get
-               'identity 'partial 'constantly
+               'assoc 'assoc-in 'merge 'merge-with 'keys 'key 'vals 'val 'get 'update
+               'identity 'partial 'constantly 'fnil
                'unquote 'unquote-splicing
                '*ns*                            ; TBD
                } (set (map first (filter (fn [[x y]] (:macro (meta y))) (ns-publics 'clojure.core))))))

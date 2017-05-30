@@ -275,7 +275,8 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
 [[:chapter {:title "Usage Example"}]]
 "In this example we will migrate the rules provided in our [tweetlog example](https://github.com/brosenan/tweetlog-clj)."
 
-"First, we need to provide configuration to connect to Zookeeper, RabbitMQ and DynamoDB (local)."
+"First, we need to provide configuration to connect to Zookeeper, RabbitMQ, DynamoDB (local) and S3 
+(where we provide coordinates using environment variables)."
 (def config
   {:zookeeper-config {:url "127.0.0.1:2181"}
    :zk-plan-config {:num-threads 5

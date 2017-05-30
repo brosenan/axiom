@@ -87,4 +87,8 @@
                     "s3"
                     {:input "libs/s3/test/s3/core_test.clj"
                      :title "s3.core"
-                     :subtitle "An Amazon AWS-S3-based Hasher"}}})
+                     :subtitle "An Amazon AWS-S3-based Hasher"}
+                    "storm"
+                    {:input "libs/storm/test/storm/core_test.clj"
+                     :title "storm.core"
+                     :subtitle "Converting Cloudlog Rules to Apache Storm Topologies"}}})
