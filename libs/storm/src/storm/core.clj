@@ -1,5 +1,6 @@
 (ns storm.core
   (:require [permacode.core :as perm]
+            [cloudlog.core :as clg]
             [cloudlog-events.core :as ev]
             [org.apache.storm
              [clojure :as s]
@@ -27,6 +28,7 @@
     (doseq [res (em event)]
       (s/emit-bolt! collector res)))
   (s/ack! collector tuple))
+
 (s/defbolt link-bolt ["foo"]
   [args collector])
 
