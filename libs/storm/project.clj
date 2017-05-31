@@ -3,6 +3,7 @@
   :monolith/inherit true
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.apache.storm/storm-core "1.1.0"]
+                 [org.clojure/core.async "0.3.442"]
                  [di "MONOLITH-SNAPSHOT"]
                  [cloudlog "MONOLITH-SNAPSHOT"]
                  [cloudlog-events "MONOLITH-SNAPSHOT"]

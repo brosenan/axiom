@@ -7,9 +7,11 @@
              [clojure :as s]
              [config :as scfg]
              [testing :as st]]
-            [di.core :as di]))
+            [di.core :as di]
+            [clojure.core.async :as async]))
 
-[[:chapter "Introduction"]]
+
+[[:chapter {:title "Introduction"}]]
 "[Apache Storm](http://storm.apache.org) is an open-source distributed realtime computation system.
 With Storm, a computation is expressed in terms of a *topology*, 
 which consists of *spouts* -- data sources, and *bolts* -- data handlers.
@@ -21,7 +23,7 @@ to a Storm cluster.
 Each such topology is a chain of bolts representing the different links in the rule, fed by spouts which emit facts read from a queue.
 A last bolt writes the derived facts to a queue."
 
-[[:chapter "topology"]]
+[[:chapter {:title "topology"}]]
 "The `topology` function takes a [permacode](permacode.html)-prefixed symbol representing a rule as parameter and a `config` map,
 and returns a Storm topology object."
 
@@ -63,7 +65,7 @@ All bolts and spouts take the `config` parameter as their last parameter."
                "l1" ..boltspec1..
                "out" ..outboltspec..}) => ..topology..))
 
-[[:chapter "initial-link-bolt"]]
+[[:chapter {:title "initial-link-bolt"}]]
 "The `initial-link-bolt` is a stateless bolt that transforms facts provided by a `fact-spout` at the beginning of the rule to tuples with similar data
 placed in different order or form.
 The output of this bolt is input to the `link-bolt` number 1, which also takes input for another `fact-spout`.
@@ -76,15 +78,92 @@ The `initial-link-bolt` will in this case create a tuple for which the `:key` is
  (st/with-local-cluster [cluster]
    (let [config {}
          topology (s/topology {"f0" (s/spout-spec (fact-spout "test/follows" config))}
-                              {"l0" (s/bolt-spec {"f0" :shuffle} (initial-link-bolt 'storm.core-test/timeline config))})
+                              {"l0" (s/bolt-spec {"f0" :shuffle}
+                                                 (initial-link-bolt 'storm.core-test/timeline
+                                                                    config))})
          result (st/complete-topology cluster topology
                                       :mock-sources
-                                      {"f0" [[:fact "test/follows" "alice" ["bob"] 1000 1 #{} #{}]]})]
+                                      {"f0" [[:fact "test/follows" "alice" ["bob"]
+                                              1000 1 #{} #{}]]})]
      (set (st/read-tuples result "l0"))
-     => #{[:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"] 1000 1 #{"storm.core-test"} #{}]})))
+     => #{[:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
+           1000 1 #{"storm.core-test"} #{}]})))
 
-[[:chapter "Under the Hood"]]
-[[:section "injector"]]
+[[:chapter {:title "link-bolt"}]]
+"The `link-bolt` implements a single (non-initial) link in a rule.
+It can receive both `:fact` and `:rule` events, coming from fact spouts and previous link bolts, respectively."
+
+"When an event comes, `link-bolt` feeds it to a [matcher](cloudlog-events.html#matcher) which looks up any 
+matching rules or facts in the database.
+The matcher then applies the rule to the fact (regardless of which one of those came from the input and which one came from the database),
+and emits the results of this application."
+
+"To demonstrate this, we will mock the database using a function that when asked for a rule it returns tuples stating that
+both `charlie` and `dave` follow the user in question (regardless of the user),
+and when asked for a fact it provides two tweets made by the requested author
+We provide this mock in a module function we will provide in the bolt's config map.
+The interface we provide is the one required by the [matcher](cloudlog-events.html#matcher), 
+and is similar to the one provided for [DynamoDB](dynamo.html#database-chan)."
+(fact
+ (defn mock-db-module [$]
+   (di/provide $ database-chan []
+               (let [database-chan (async/chan)]
+                 (async/go
+                   (loop []
+                     (let [[part out-chan] (async/<! database-chan)]
+                       (when (= (:kind part) :rule)
+                         (async/>! out-chan (merge part {:data ["charlie" (:key part)]
+                                                         :ts 1001
+                                                         :change 1
+                                                         :writers #{"storm.core-test"}
+                                                         :readers #{}}))
+                         (async/>! out-chan (merge part {:data ["dave" (:key part)]
+                                                         :ts 1002
+                                                         :change 1
+                                                         :writers #{}
+                                                         :readers #{}})))
+                       (when (= (:kind part) :fact)
+                         (async/>! out-chan (merge part {:data [(str (:key part) "'s first tweet")]
+                                                         :ts 1003
+                                                         :change 1
+                                                         :writers #{"storm.core-test"}
+                                                         :readers #{}}))
+                         (async/>! out-chan (merge part {:data [(str (:key part) "'s second tweet")]
+                                                         :ts 1004
+                                                         :change 1
+                                                         :writers #{}
+                                                         :readers #{}})))
+                       (async/close! out-chan))
+                     (recur)))
+                 database-chan))))
+
+"The following topology mocks two spouts that feed a single `l1` bolt.
+The `l0` spout provides rule tuples simulating followers (typically provided by [initial-link-bolt](#initial-link-bolt)),
+and the `f1` spout providing tweets."
+(fact
+   (st/with-local-cluster [cluster]
+     (let [config {:link-bolt {:include []}
+                   :modules ['storm.core-test/mock-db-module]}
+           topology (s/topology {"l0" (s/spout-spec (fact-spout "mocked..." config))
+                                 "f1" (s/spout-spec (fact-spout "mocked..." config))}
+                                {"l1" (s/bolt-spec {"l0" ["key"]
+                                                    "f1" ["key"]} (link-bolt 'storm.core-test/timeline 1 config))})
+           result (st/complete-topology cluster topology
+                                        :mock-sources
+                                        {"l0" [[:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
+                                                1000 1 #{"storm.core-test"} #{}]]
+                                         "f1" [[:fact "test/tweeted" "foo" ["hello, world"]
+                                                1001 1 #{} #{}]]})]
+       (->> (st/read-tuples result "l1")
+            (map (fn [[kind name user [tweet] ts change writers readers]]
+                   [user tweet ts]))
+            set) => #{["alice" "bob's first tweet" 1003]
+                      ["alice" "bob's second tweet" 1004]
+                      ["charlie" "hello, world" 1001]
+                      ["dave" "hello, world" 1001]})))
+
+[[:chapter {:title "Under the Hood"}]]
+[[:section {:title "injector"}]]
 "We use our [dependency inejection mechanism](di.html) to inject external dependencies to topologies.
 Since each bolt and spout has its own lifecycle, it makes sense to give each of them its own injector.
 The `injector` function takes the `config` parameter each bolt and spout receives and a [keyword representing the bolt or spout](#task-config), 
@@ -128,7 +207,8 @@ If `:foo` is not included, `:bar` will not be computed."
                :modules ['storm.core-test/my-module]}
        $ (injector config :spout-x)]
    (di/do-with! $ [bar]) => (throws)))
-[[:section "task-config"]]
+
+[[:section {:title "task-config"}]]
 "The config map given to [topology](#topology) typically contains all the configuration needed to create all possible resources in Axiom.
 While this is fine for injectors that are initalized at startup and shut-down at system shutdown,
 this is less than ideal for bolts and spouts, since we wish their startup and shutdown to be as fast as possible."

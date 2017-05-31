@@ -5,7 +5,8 @@
             [org.apache.storm
              [clojure :as s]
              [config :as scfg]]
-            [di.core :as di]))
+            [di.core :as di]
+            [clojure.core.async :as async]))
 
 (def event-fields
   ["kind" "name" "key" "data" "ts" "change" "writers" "readers"])
@@ -42,11 +43,30 @@
         {:as event} tuple
         event (keyword-keys event)]
     (doseq [res (em event)]
-      (s/emit-bolt! collector res)))
+      (s/emit-bolt! collector res :anchor tuple)))
   (s/ack! collector tuple))
 
-(s/defbolt link-bolt ["foo"]
-  [args collector])
+(s/defbolt link-bolt event-fields
+  {:params [rulesym link config]
+   :prepare true}
+  [conf context collector]
+  (let [$ (injector config :link-bolt)
+        rulefunc (perm/eval-symbol rulesym)]
+    (di/do-with! $ [database-chan]
+                 (let [matcher (ev/matcher rulefunc link database-chan)]
+                   (s/bolt
+                    (execute [tuple]
+                             (let [{:as event} tuple
+                                   event (keyword-keys event)
+                                   resp-chan (async/chan)]
+                               (matcher event resp-chan)
+                               (async/go
+                                 (loop []
+                                   (let [out-ev (async/<! resp-chan)]
+                                     (when out-ev
+                                       (s/emit-bolt! collector out-ev :anchor tuple)
+                                       (recur))))
+                                 (s/ack! collector tuple)))))))))
 
 (s/defbolt output-bolt ["foo"]
   [args collector])

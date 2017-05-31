@@ -49,9 +49,7 @@
   (let [mult (multiplier rulefunc link)]
     (fn [ev out-chan]
       (async/go
-        (let [db-reply-chan (async/chan)
-              match-event (fn [kind name multiply]
-                            )]
+        (let [db-reply-chan (async/chan)]
           (if (= (:kind ev) :fact)
             (do
               (async/>! db-chan [{:kind :rule
@@ -64,7 +62,7 @@
                     (async/>! out-chan out-ev))
                   (recur (async/<! db-reply-chan))))
               (async/close! out-chan))
-            ; else
+            ;; else
             (do
               (async/>! db-chan [{:kind :fact
                                   :name (source-fact-table rulefunc link)
