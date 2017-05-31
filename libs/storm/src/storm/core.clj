@@ -4,10 +4,26 @@
             [cloudlog-events.core :as ev]
             [org.apache.storm
              [clojure :as s]
-             [config :as scfg]]))
+             [config :as scfg]]
+            [di.core :as di]))
 
 (def event-fields
   ["kind" "name" "key" "data" "ts" "change" "writers" "readers"])
+
+(defn task-config [config name]
+  (merge (->> (config name)
+              :include
+              (map (fn [key] [key (config key)]))
+              (into {}))
+         (:overrides (config name))))
+
+(defn injector [config name]
+  (let [$ (di/injector (task-config config name))
+        modules (:modules config)]
+    (doseq [module modules]
+      ((eval module) $))
+    (di/startup $)
+    $))
 
 (s/defspout fact-spout event-fields
   {:params [name config]}

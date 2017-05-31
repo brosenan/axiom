@@ -6,7 +6,8 @@
             [org.apache.storm
              [clojure :as s]
              [config :as scfg]
-             [testing :as st]]))
+             [testing :as st]]
+            [di.core :as di]))
 
 [[:chapter "Introduction"]]
 "[Apache Storm](http://storm.apache.org) is an open-source distributed realtime computation system.
@@ -82,3 +83,78 @@ The `initial-link-bolt` will in this case create a tuple for which the `:key` is
      (set (st/read-tuples result "l0"))
      => #{[:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"] 1000 1 #{"storm.core-test"} #{}]})))
 
+[[:chapter "Under the Hood"]]
+[[:section "injector"]]
+"We use our [dependency inejection mechanism](di.html) to inject external dependencies to topologies.
+Since each bolt and spout has its own lifecycle, it makes sense to give each of them its own injector.
+The `injector` function takes the `config` parameter each bolt and spout receives and a [keyword representing the bolt or spout](#task-config), 
+and returns an initialized injector."
+
+"One challenge to address here is the desire to keep the bolt and spout code independent of the implementations of the different resources.
+Generally, this is exactly what DI is supposed to provide.
+In the typical case, all libraries are independent of one another, but the *main program* knows about everything, 
+and it initializes the injector that spreads all the resources around by calling the `module` functions of the different libraries.
+[The migrator integration test](migrator.html#usage-example) is a good example for this pattern."
+
+"Unfortunately, this does not work as well here.
+Since each bolt or spout has its own injector, each of them needs to initialize it."
+
+"To address this, the configuration includes a `:modules` entry, consisting of a list of symbols representing different `module`
+functions from around the code base.
+`injector` evaluates these symbols and calls these functions on the injector it created."
+
+"To demonstrate this we will create our own module function here.
+This function defines resource `:bar` that depends on `:foo`"
+(fact
+ (defn my-module [$]
+   (di/provide $ bar [foo]
+               (inc foo))))
+
+"Now when we call `injector` with a config for which the `:modules` entry contains our function
+and the config for the specific spout we initialize contains `:foo`, we will get `:bar` initialized."
+(fact
+ (let [config {:spout-x {:include [:foo]}
+               :foo 1
+               :modules ['storm.core-test/my-module]}
+       $ (injector config :spout-x)]
+   (di/do-with! $ [bar]
+                bar => 2)))
+
+"It only initializes resources based on what is included for *that particular* spout or bolt.
+If `:foo` is not included, `:bar` will not be computed."
+(fact
+ (let [config {:spout-x {:include []}
+               :foo 1
+               :modules ['storm.core-test/my-module]}
+       $ (injector config :spout-x)]
+   (di/do-with! $ [bar]) => (throws)))
+[[:section "task-config"]]
+"The config map given to [topology](#topology) typically contains all the configuration needed to create all possible resources in Axiom.
+While this is fine for injectors that are initalized at startup and shut-down at system shutdown,
+this is less than ideal for bolts and spouts, since we wish their startup and shutdown to be as fast as possible."
+
+"`task-config` helps acheive that by creating a config map that is dedicated to a specific bolt or spout.
+It takes the original config and a keyword representing the bolt or spout, and returns the targetted config."
+
+"An entry with the name of the bolt or spout is expected to exist in the config map.
+It is expected to have an `:include` entry, containing a sequence of keys.
+The output map will include these keys (only) with their values in the original config map."
+(fact
+ (let [config {:foo 1
+               :bar 2
+               :baz 3
+               :bolt-x {:include [:foo :baz]}}]
+   (task-config config :bolt-x) => {:foo 1
+                                    :baz 3}))
+
+"An optional `:overrides` map will be used to override any values in the config, as well as add new ones."
+(fact
+ (let [config {:foo 1
+               :bar 2
+               :baz 3
+               :bolt-x {:include [:foo :baz]
+                        :overrides {:bar "2"
+                                    :baz "3"}}}]
+   (task-config config :bolt-x) => {:foo 1
+                                    :bar "2"
+                                    :baz "3"}))
