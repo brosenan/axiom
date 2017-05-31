@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 30 May 2017</h5>
+              <h5>Date: 31 May 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -110,7 +110,15 @@
              &quot;f1&quot; ..spoutspec1..}
             {&quot;l0&quot; ..boltspec0..
              &quot;l1&quot; ..boltspec1..
-             &quot;out&quot; ..outboltspec..}) =&gt; ..topology..)</code></pre></div>
+             &quot;out&quot; ..outboltspec..}) =&gt; ..topology..)</code></pre></div><div class="code"><pre><code class="clojure">[[:chapter &quot;initial-link-bolt&quot;]]</code></pre></div><div><p>The <code>initial-link-bolt</code> is a stateless bolt that transforms facts provided by a <code>fact-spout</code> at the beginning of the rule to tuples with similar data placed in different order or form. The output of this bolt is input to the <code>link-bolt</code> number 1, which also takes input for another <code>fact-spout</code>. The idea is to re-order the data in the tuple so that the key in the output of the <code>initial-link-bolt</code> matches the key in <code>fact-spout</code> 1 according to the logic of the rule. For example, in <code>timeline</code> the first fact mentioned in the rule is <code>:test/follows</code>, which takes arguments <code>user</code> and <code>author</code>. The second fact mentioned is <code>:test/tweeted</code>, which takes <code>author</code> as its first argument (its <em>key</em>). The <code>initial-link-bolt</code> will in this case create a tuple for which the <code>:key</code> is the second element in the input tuple (<code>author</code>).</p></div><div class="code"><pre><code class="clojure">(st/with-local-cluster [cluster]
+ (let [config {}
+       topology (s/topology {&quot;f0&quot; (s/spout-spec (fact-spout &quot;test/follows&quot; config))}
+                            {&quot;l0&quot; (s/bolt-spec {&quot;f0&quot; :shuffle} (initial-link-bolt 'storm.core-test/timeline config))})
+       result (st/complete-topology cluster topology
+                                    :mock-sources
+                                    {&quot;f0&quot; [[:fact &quot;test/follows&quot; &quot;alice&quot; [&quot;bob&quot;] 1000 1 #{} #{}]]})]
+   (set (st/read-tuples result &quot;l0&quot;))
+   =&gt; #{[:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;] 1000 1 #{&quot;storm.core-test&quot;} #{}]}))</code></pre></div>
         </div>
       </div>
     </div>
