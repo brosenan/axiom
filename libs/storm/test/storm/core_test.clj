@@ -5,7 +5,8 @@
             [permacode.core :as perm]
             [org.apache.storm
              [clojure :as s]
-             [config :as scfg]]))
+             [config :as scfg]
+             [testing :as st]]))
 
 [[:chapter "Introduction"]]
 "[Apache Storm](http://storm.apache.org) is an open-source distributed realtime computation system.
@@ -61,5 +62,23 @@ All bolts and spouts take the `config` parameter as their last parameter."
                "l1" ..boltspec1..
                "out" ..outboltspec..}) => ..topology..))
 
-
+[[:chapter "initial-link-bolt"]]
+"The `initial-link-bolt` is a stateless bolt that transforms facts provided by a `fact-spout` at the beginning of the rule to tuples with similar data
+placed in different order or form.
+The output of this bolt is input to the `link-bolt` number 1, which also takes input for another `fact-spout`.
+The idea is to re-order the data in the tuple so that the key in the output of the `initial-link-bolt` matches the
+key in `fact-spout` 1 according to the logic of the rule.
+For example, in `timeline` the first fact mentioned in the rule is `:test/follows`, which takes arguments `user` and `author`.
+The second fact mentioned is `:test/tweeted`, which takes `author` as its first argument (its *key*).
+The `initial-link-bolt` will in this case create a tuple for which the `:key` is the second element in the input tuple (`author`)."
+(fact
+ (st/with-local-cluster [cluster]
+   (let [config {}
+         topology (s/topology {"f0" (s/spout-spec (fact-spout "test/follows" config))}
+                              {"l0" (s/bolt-spec {"f0" :shuffle} (initial-link-bolt 'storm.core-test/timeline config))})
+         result (st/complete-topology cluster topology
+                                      :mock-sources
+                                      {"f0" [[:fact "test/follows" "alice" ["bob"] 1000 1 #{} #{}]]})]
+     (set (st/read-tuples result "l0"))
+     => #{[:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"] 1000 1 #{"storm.core-test"} #{}]})))
 

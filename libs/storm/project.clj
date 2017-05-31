@@ -5,6 +5,7 @@
                  [org.apache.storm/storm-core "1.1.0"]
                  [di "MONOLITH-SNAPSHOT"]
                  [cloudlog "MONOLITH-SNAPSHOT"]
+                 [cloudlog-events "MONOLITH-SNAPSHOT"]
                  [permacode "MONOLITH-SNAPSHOT"]]
   :profiles {:dev {:dependencies [[midje "1.7.0"]]}
              ;; You can add dependencies that apply to `lein midje` below.

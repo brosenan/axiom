@@ -1,15 +1,32 @@
 (ns storm.core
   (:require [permacode.core :as perm]
-            [cloudlog.core :as clg]
+            [cloudlog-events.core :as ev]
             [org.apache.storm
              [clojure :as s]
              [config :as scfg]]))
 
-(s/defspout fact-spout ["foo"]
+(def event-fields
+  ["kind" "name" "key" "data" "ts" "change" "writers" "readers"])
+
+(s/defspout fact-spout event-fields
+  {:params [name config]}
   [conf context collector])
 
-(s/defbolt initial-link-bolt ["foo"]
-  [args collector])
+(defn keyword-keys [event]
+  (->> event
+       (map (fn [[k v]] [(keyword k) v]))
+       (into {})))
+
+(s/defbolt initial-link-bolt event-fields
+  {:params [rulesym config]}
+  [tuple collector]
+  (let [rule (perm/eval-symbol rulesym)
+        em (ev/emitter rule)
+        {:as event} tuple
+        event (keyword-keys event)]
+    (doseq [res (em event)]
+      (s/emit-bolt! collector res)))
+  (s/ack! collector tuple))
 (s/defbolt link-bolt ["foo"]
   [args collector])
 
