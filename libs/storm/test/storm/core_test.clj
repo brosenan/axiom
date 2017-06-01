@@ -141,26 +141,71 @@ and is similar to the one provided for [DynamoDB](dynamo.html#database-chan)."
 The `l0` spout provides rule tuples simulating followers (typically provided by [initial-link-bolt](#initial-link-bolt)),
 and the `f1` spout providing tweets."
 (fact
-   (st/with-local-cluster [cluster]
-     (let [config {:link-bolt {:include []}
-                   :modules ['storm.core-test/mock-db-module]}
-           topology (s/topology {"l0" (s/spout-spec (fact-spout "mocked..." config))
-                                 "f1" (s/spout-spec (fact-spout "mocked..." config))}
-                                {"l1" (s/bolt-spec {"l0" ["key"]
-                                                    "f1" ["key"]} (link-bolt 'storm.core-test/timeline 1 config))})
-           result (st/complete-topology cluster topology
-                                        :mock-sources
-                                        {"l0" [[:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
-                                                1000 1 #{"storm.core-test"} #{}]]
-                                         "f1" [[:fact "test/tweeted" "foo" ["hello, world"]
-                                                1001 1 #{} #{}]]})]
-       (->> (st/read-tuples result "l1")
-            (map (fn [[kind name user [tweet] ts change writers readers]]
-                   [user tweet ts]))
-            set) => #{["alice" "bob's first tweet" 1003]
-                      ["alice" "bob's second tweet" 1004]
-                      ["charlie" "hello, world" 1001]
-                      ["dave" "hello, world" 1001]})))
+ (st/with-local-cluster [cluster]
+   (let [config {:link-bolt {:include []}
+                 :modules ['storm.core-test/mock-db-module]}
+         topology (s/topology {"l0" (s/spout-spec (fact-spout "mocked..." config))
+                               "f1" (s/spout-spec (fact-spout "mocked..." config))}
+                              {"l1" (s/bolt-spec {"l0" ["key"]
+                                                  "f1" ["key"]} (link-bolt 'storm.core-test/timeline 1 config))})
+         result (st/complete-topology cluster topology
+                                      :mock-sources
+                                      {"l0" [[:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
+                                              1000 1 #{"storm.core-test"} #{}]]
+                                       "f1" [[:fact "test/tweeted" "foo" ["hello, world"]
+                                              1001 1 #{} #{}]]})]
+     (->> (st/read-tuples result "l1")
+          (map (fn [[kind name user [tweet] ts change writers readers]]
+                 [user tweet ts]))
+          set) => #{["alice" "bob's first tweet" 1003]
+                    ["alice" "bob's second tweet" 1004]
+                    ["charlie" "hello, world" 1001]
+                    ["dave" "hello, world" 1001]})))
+
+[[:chapter {:title "output-bolt"}]]
+"The `output-bolt` uses a `database-event-storage-chan` (e.g., [the one for DynamoDB](dynamo.html#database-event-storage-chan))
+to store each event it receives to a database."
+
+"To demonstrate how it works we will mock a database that stores all the received events into into an `atom`."
+(fact
+ (def stored-events (atom [])))
+
+"We mock a module function to provide our mock `database-event-storage-chan`.
+It takes tuples `[event ack]`, where `event` is an event (map) to be stored 
+and `ack` is a channel to be closed once the event is stored."
+(fact
+ (defn mock-db-storage-module [$]
+   (di/provide $ database-event-storage-chan []
+               (let [database-event-storage-chan (async/chan)]
+                 (async/go
+                   (loop []
+                     (let [[event ack] (async/<! database-event-storage-chan)]
+                       (swap! stored-events #(conj % event))
+                       (async/close! ack))
+                     (recur)))
+                 database-event-storage-chan))))
+
+"We now build a topology consisting of a spout that emits events and this bolt, and expect that all events that were emitted
+be stored in the sequence mocking the database once the topology completes."
+(fact
+ (st/with-local-cluster [cluster]
+   (let [config {:output-bolt {:include []}
+                 :modules ['storm.core-test/mock-db-storage-module]}
+         topology (s/topology {"src" (s/spout-spec (fact-spout "mocked..." config))}
+                              {"out" (s/bolt-spec {"src" :shuffle} (output-bolt config))})
+         result (st/complete-topology cluster topology
+                                      :mock-sources
+                                      {"src" [[:fact "test/tweeted" "foo" ["hello, world"]
+                                               1001 1 #{} #{}]
+                                              [:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
+                                               1000 1 #{"storm.core-test"} #{}]]})]))
+ (set @stored-events) => #{{:kind :fact :name "test/tweeted" :key "foo" :data ["hello, world"]
+                             :ts 1001 :change 1
+                            :writers #{} :readers #{}}
+                           {:kind :rule :name "storm.core-test/timeline!0"
+                            :key "bob" :data ["alice" "bob"]
+                            :ts 1000 :change 1
+                            :writers #{"storm.core-test"} :readers #{}}})
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "injector"}]]

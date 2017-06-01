@@ -68,8 +68,21 @@
                                        (recur))))
                                  (s/ack! collector tuple)))))))))
 
-(s/defbolt output-bolt ["foo"]
-  [args collector])
+(s/defbolt output-bolt []
+  {:params [config]
+   :prepare true}
+  [conf context collector]
+  (let [$ (injector config :output-bolt)]
+    (di/do-with! $ [database-event-storage-chan]
+                 (s/bolt
+                  (execute [tuple]
+                           (let [{:as event} tuple
+                                 event (keyword-keys event)
+                                 ack (async/chan)]
+                             (async/go
+                               (async/>! database-event-storage-chan [event ack])
+                               (async/<! ack)
+                               (s/ack! collector tuple))))))))
 
 (defn topology [rulesym config]
   (let [rulefunc (perm/eval-symbol rulesym)]
