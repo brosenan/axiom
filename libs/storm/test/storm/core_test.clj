@@ -144,16 +144,18 @@ and the `f1` spout providing tweets."
  (st/with-local-cluster [cluster]
    (let [config {:link-bolt {:include []}
                  :modules ['storm.core-test/mock-db-module]}
-         topology (s/topology {"l0" (s/spout-spec (fact-spout "mocked..." config))
-                               "f1" (s/spout-spec (fact-spout "mocked..." config))}
-                              {"l1" (s/bolt-spec {"l0" ["key"]
-                                                  "f1" ["key"]} (link-bolt 'storm.core-test/timeline 1 config))})
-         result (st/complete-topology cluster topology
-                                      :mock-sources
-                                      {"l0" [[:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
-                                              1000 1 #{"storm.core-test"} #{}]]
-                                       "f1" [[:fact "test/tweeted" "foo" ["hello, world"]
-                                              1001 1 #{} #{}]]})]
+         topology (s/topology
+                   {"l0" (s/spout-spec (fact-spout "mocked..." config))
+                    "f1" (s/spout-spec (fact-spout "mocked..." config))}
+                   {"l1" (s/bolt-spec {"l0" ["key"]
+                                       "f1" ["key"]} (link-bolt 'storm.core-test/timeline 1 config))})
+         result (st/complete-topology
+                 cluster topology
+                 :mock-sources
+                 {"l0" [[:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
+                         1000 1 #{"storm.core-test"} #{}]]
+                  "f1" [[:fact "test/tweeted" "foo" ["hello, world"]
+                         1001 1 #{} #{}]]})]
      (->> (st/read-tuples result "l1")
           (map (fn [[kind name user [tweet] ts change writers readers]]
                  [user tweet ts]))
