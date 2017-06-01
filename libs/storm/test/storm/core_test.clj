@@ -34,9 +34,10 @@ and returns a Storm topology object."
 
 "This rule has two *links*, one responding to `:test/follows` facts and the other -- to `:test/tweeted` facts."
 
-"The corresponding topology will have [two spouts and three bolts](http://storm.apache.org/releases/1.1.0/Concepts.html).
+"The corresponding topology will have [two spouts and four bolts](http://storm.apache.org/releases/1.1.0/Concepts.html).
 The two spouts correspond to the two fact-streams (`:test/follows` and `:test/tweeted` respectively),
-two bolts correspond to the two links that process these facts, and a third link outputs `timeline` entries.
+two bolts correspond to the two links that process these facts,
+one more bolt stores intermediate tuples and a fourth bolt outputs `timeline` entries.
 All bolts and spouts take the `config` parameter as their last parameter."
 (fact
  (topology 'perm.ABCD1234/timeline ..config..) => ..topology..
@@ -51,19 +52,23 @@ All bolts and spouts take the `config` parameter as their last parameter."
   ;; An initial link bolt based on the initial fact
   (initial-link-bolt 'perm.ABCD1234/timeline ..config..) => ..bolt0..
   (s/bolt-spec {"f0" ["key"]} ..bolt0..) => ..boltspec0..
+  ;; A store-bolt that stores the tuples coming from the initial link
+  (store-bolt ..config..) => ..outbolt0..
+  (s/bolt-spec {"l0" :shuffle} ..outbolt0..) => ..outboltspec0..
   ;; and a regular link based on both the second fact and the initial link.
   (link-bolt 'perm.ABCD1234/timeline 1 ..config..) => ..bolt1..
   (s/bolt-spec {"f1" ["key"]
                 "l0" ["key"]} ..bolt1..) => ..boltspec1..
   ;; Finally, we add the output bolt
-  (output-bolt ..config..) => ..outbolt..
-  (s/bolt-spec {"l1" :shuffle} ..outbolt..) => ..outboltspec..
+  (output-bolt ..config..) => ..outbolt1..
+  (s/bolt-spec {"l1" :shuffle} ..outbolt1..) => ..outboltspec1..
   ;; and create the complete topology
   (s/topology {"f0" ..spoutspec0..
                "f1" ..spoutspec1..}
               {"l0" ..boltspec0..
+               "o0" ..outboltspec0..
                "l1" ..boltspec1..
-               "out" ..outboltspec..}) => ..topology..))
+               "o1" ..outboltspec1..}) => ..topology..))
 
 [[:chapter {:title "initial-link-bolt"}]]
 "The `initial-link-bolt` is a stateless bolt that transforms facts provided by a `fact-spout` at the beginning of the rule to tuples with similar data
@@ -164,8 +169,8 @@ and the `f1` spout providing tweets."
                     ["charlie" "hello, world" 1001]
                     ["dave" "hello, world" 1001]})))
 
-[[:chapter {:title "output-bolt"}]]
-"The `output-bolt` uses a `database-event-storage-chan` (e.g., [the one for DynamoDB](dynamo.html#database-event-storage-chan))
+[[:chapter {:title "store-bolt"}]]
+"The `store-bolt` uses a `database-event-storage-chan` (e.g., [the one for DynamoDB](dynamo.html#database-event-storage-chan))
 to store each event it receives to a database."
 
 "To demonstrate how it works we will mock a database that stores all the received events into into an `atom`."
@@ -191,11 +196,11 @@ and `ack` is a channel to be closed once the event is stored."
 be stored in the sequence mocking the database once the topology completes."
 (fact
  (st/with-local-cluster [cluster]
-   (let [config {:output-bolt {:include []}
+   (let [config {:store-bolt {:include []}
                  :modules ['storm.core-test/mock-db-storage-module]}
          topology (s/topology
                    {"src" (s/spout-spec (fact-spout "mocked..." config))}
-                   {"out" (s/bolt-spec {"src" :shuffle} (output-bolt config))})
+                   {"out" (s/bolt-spec {"src" :shuffle} (store-bolt config))})
          result (st/complete-topology
                  cluster topology
                  :mock-sources
@@ -205,12 +210,15 @@ be stored in the sequence mocking the database once the topology completes."
                           1000 1 #{"storm.core-test"} #{}]]})]))
  (set @stored-events) => #{{:kind :fact :name "test/tweeted"
                             :key "foo" :data ["hello, world"]
-                             :ts 1001 :change 1
+                            :ts 1001 :change 1
                             :writers #{} :readers #{}}
                            {:kind :rule :name "storm.core-test/timeline!0"
                             :key "bob" :data ["alice" "bob"]
                             :ts 1000 :change 1
                             :writers #{"storm.core-test"} :readers #{}}})
+
+[[:chapter {:title "fact-spout"}]]
+"The `fact-spout` registers to a certain fact feed, and emits all the events it receives from there."
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "injector"}]]

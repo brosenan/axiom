@@ -84,6 +84,22 @@
                                (async/<! ack)
                                (s/ack! collector tuple))))))))
 
+(s/defbolt store-bolt []
+  {:params [config]
+   :prepare true}
+  [conf context collector]
+  (let [$ (injector config :store-bolt)]
+    (di/do-with! $ [database-event-storage-chan]
+                 (s/bolt
+                  (execute [tuple]
+                           (let [{:as event} tuple
+                                 event (keyword-keys event)
+                                 ack (async/chan)]
+                             (async/go
+                               (async/>! database-event-storage-chan [event ack])
+                               (async/<! ack)
+                               (s/ack! collector tuple))))))))
+
 (defn topology [rulesym config]
   (let [rulefunc (perm/eval-symbol rulesym)]
     (loop [rulefunc rulefunc
@@ -97,10 +113,15 @@
                            :else
                            (s/bolt-spec {(str "f" index) ["key"]
                                          (str "l" (dec index)) ["key"]} (link-bolt rulesym index config)))
-            bolts (assoc bolts (str "l" index) boltspec)
-            next (-> rulefunc meta :continuation)]
+            next (-> rulefunc meta :continuation)
+            outbolt (cond next
+                          (s/bolt-spec {(str "l" index) :shuffle} (store-bolt config))
+                          :else
+                          (s/bolt-spec {(str "l" index) :shuffle} (output-bolt config)))
+            bolts (-> bolts
+                      (assoc (str "l" index) boltspec)
+                      (assoc (str "o" index) outbolt))]
         (cond next
               (recur next spouts bolts (inc index))
               :else
-              (let [bolts (assoc bolts "out" (s/bolt-spec {(str "l" index) :shuffle} (output-bolt config)))]
-                (s/topology spouts bolts)))))))
+              (s/topology spouts bolts))))))
