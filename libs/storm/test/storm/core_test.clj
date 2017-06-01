@@ -217,6 +217,46 @@ be stored in the sequence mocking the database once the topology completes."
                             :ts 1000 :change 1
                             :writers #{"storm.core-test"} :readers #{}}})
 
+[[:chapter {:title "output-bolt"}]]
+"The `output-bolt` `publish`es (e.g., [through AMQP](rabbit-microservices.html#publish)) each event it receives."
+
+"To demonstrate how it works we will mock the `publish` function.
+Our mock will add each published event to the `published-events` atom."
+(fact
+ (def published-events (atom [])))
+
+"The following mock module provides our mock `publish`."
+(fact
+ (defn mock-publish-module [$]
+   (di/provide $ publish []
+               (fn [ev]
+                 (swap! published-events #(conj % ev))))))
+
+"We now build a topology consisting of a spout that emits events and this bolt, and expect that all events that were emitted
+be stored in the sequence mocking the database once the topology completes."
+(fact
+ (st/with-local-cluster [cluster]
+   (let [config {:output-bolt {:include []}
+                 :modules ['storm.core-test/mock-publish-module]}
+         topology (s/topology
+                   {"src" (s/spout-spec (fact-spout "mocked..." config))}
+                   {"out" (s/bolt-spec {"src" :shuffle} (output-bolt config))})
+         result (st/complete-topology
+                 cluster topology
+                 :mock-sources
+                 {"src" [[:fact "test/tweeted" "foo" ["hello, world"]
+                          1001 1 #{} #{}]
+                         [:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
+                          1000 1 #{"storm.core-test"} #{}]]})]))
+ (set @published-events) => #{{:kind :fact :name "test/tweeted"
+                               :key "foo" :data ["hello, world"]
+                               :ts 1001 :change 1
+                               :writers #{} :readers #{}}
+                              {:kind :rule :name "storm.core-test/timeline!0"
+                               :key "bob" :data ["alice" "bob"]
+                               :ts 1000 :change 1
+                               :writers #{"storm.core-test"} :readers #{}}})
+
 [[:chapter {:title "fact-spout"}]]
 "The `fact-spout` registers to a certain fact feed, and emits all the events it receives from there."
 

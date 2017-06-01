@@ -73,16 +73,13 @@
    :prepare true}
   [conf context collector]
   (let [$ (injector config :output-bolt)]
-    (di/do-with! $ [database-event-storage-chan]
+    (di/do-with! $ [publish]
                  (s/bolt
                   (execute [tuple]
                            (let [{:as event} tuple
-                                 event (keyword-keys event)
-                                 ack (async/chan)]
-                             (async/go
-                               (async/>! database-event-storage-chan [event ack])
-                               (async/<! ack)
-                               (s/ack! collector tuple))))))))
+                                 event (keyword-keys event)]
+                             (publish event)
+                             (s/ack! collector tuple)))))))
 
 (s/defbolt store-bolt []
   {:params [config]
