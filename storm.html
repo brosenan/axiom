@@ -155,16 +155,18 @@
                database-chan)))</code></pre></div><div><p>The following topology mocks two spouts that feed a single <code>l1</code> bolt. The <code>l0</code> spout provides rule tuples simulating followers (typically provided by <a href='#initial-link-bolt'>initial-link-bolt</a>), and the <code>f1</code> spout providing tweets.</p></div><div class="code"><pre><code class="clojure">(st/with-local-cluster [cluster]
  (let [config {:link-bolt {:include []}
                :modules ['storm.core-test/mock-db-module]}
-       topology (s/topology {&quot;l0&quot; (s/spout-spec (fact-spout &quot;mocked...&quot; config))
-                             &quot;f1&quot; (s/spout-spec (fact-spout &quot;mocked...&quot; config))}
-                            {&quot;l1&quot; (s/bolt-spec {&quot;l0&quot; [&quot;key&quot;]
-                                                &quot;f1&quot; [&quot;key&quot;]} (link-bolt 'storm.core-test/timeline 1 config))})
-       result (st/complete-topology cluster topology
-                                    :mock-sources
-                                    {&quot;l0&quot; [[:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;]
-                                            1000 1 #{&quot;storm.core-test&quot;} #{}]]
-                                     &quot;f1&quot; [[:fact &quot;test/tweeted&quot; &quot;foo&quot; [&quot;hello, world&quot;]
-                                            1001 1 #{} #{}]]})]
+       topology (s/topology
+                 {&quot;l0&quot; (s/spout-spec (fact-spout &quot;mocked...&quot; config))
+                  &quot;f1&quot; (s/spout-spec (fact-spout &quot;mocked...&quot; config))}
+                 {&quot;l1&quot; (s/bolt-spec {&quot;l0&quot; [&quot;key&quot;]
+                                     &quot;f1&quot; [&quot;key&quot;]} (link-bolt 'storm.core-test/timeline 1 config))})
+       result (st/complete-topology
+               cluster topology
+               :mock-sources
+               {&quot;l0&quot; [[:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;]
+                       1000 1 #{&quot;storm.core-test&quot;} #{}]]
+                &quot;f1&quot; [[:fact &quot;test/tweeted&quot; &quot;foo&quot; [&quot;hello, world&quot;]
+                       1001 1 #{} #{}]]})]
    (-&gt;&gt; (st/read-tuples result &quot;l1&quot;)
         (map (fn [[kind name user [tweet] ts change writers readers]]
                [user tweet ts]))
