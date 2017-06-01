@@ -191,15 +191,18 @@ be stored in the sequence mocking the database once the topology completes."
  (st/with-local-cluster [cluster]
    (let [config {:output-bolt {:include []}
                  :modules ['storm.core-test/mock-db-storage-module]}
-         topology (s/topology {"src" (s/spout-spec (fact-spout "mocked..." config))}
-                              {"out" (s/bolt-spec {"src" :shuffle} (output-bolt config))})
-         result (st/complete-topology cluster topology
-                                      :mock-sources
-                                      {"src" [[:fact "test/tweeted" "foo" ["hello, world"]
-                                               1001 1 #{} #{}]
-                                              [:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
-                                               1000 1 #{"storm.core-test"} #{}]]})]))
- (set @stored-events) => #{{:kind :fact :name "test/tweeted" :key "foo" :data ["hello, world"]
+         topology (s/topology
+                   {"src" (s/spout-spec (fact-spout "mocked..." config))}
+                   {"out" (s/bolt-spec {"src" :shuffle} (output-bolt config))})
+         result (st/complete-topology
+                 cluster topology
+                 :mock-sources
+                 {"src" [[:fact "test/tweeted" "foo" ["hello, world"]
+                          1001 1 #{} #{}]
+                         [:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
+                          1000 1 #{"storm.core-test"} #{}]]})]))
+ (set @stored-events) => #{{:kind :fact :name "test/tweeted"
+                            :key "foo" :data ["hello, world"]
                              :ts 1001 :change 1
                             :writers #{} :readers #{}}
                            {:kind :rule :name "storm.core-test/timeline!0"
