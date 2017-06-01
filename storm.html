@@ -183,15 +183,18 @@
                database-event-storage-chan)))</code></pre></div><div><p>We now build a topology consisting of a spout that emits events and this bolt, and expect that all events that were emitted be stored in the sequence mocking the database once the topology completes.</p></div><div class="code"><pre><code class="clojure">(st/with-local-cluster [cluster]
  (let [config {:output-bolt {:include []}
                :modules ['storm.core-test/mock-db-storage-module]}
-       topology (s/topology {&quot;src&quot; (s/spout-spec (fact-spout &quot;mocked...&quot; config))}
-                            {&quot;out&quot; (s/bolt-spec {&quot;src&quot; :shuffle} (output-bolt config))})
-       result (st/complete-topology cluster topology
-                                    :mock-sources
-                                    {&quot;src&quot; [[:fact &quot;test/tweeted&quot; &quot;foo&quot; [&quot;hello, world&quot;]
-                                             1001 1 #{} #{}]
-                                            [:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;]
-                                             1000 1 #{&quot;storm.core-test&quot;} #{}]]})]))
- (set @stored-events) =&gt; #{{:kind :fact :name &quot;test/tweeted&quot; :key &quot;foo&quot; :data [&quot;hello, world&quot;]
+       topology (s/topology
+                 {&quot;src&quot; (s/spout-spec (fact-spout &quot;mocked...&quot; config))}
+                 {&quot;out&quot; (s/bolt-spec {&quot;src&quot; :shuffle} (output-bolt config))})
+       result (st/complete-topology
+               cluster topology
+               :mock-sources
+               {&quot;src&quot; [[:fact &quot;test/tweeted&quot; &quot;foo&quot; [&quot;hello, world&quot;]
+                        1001 1 #{} #{}]
+                       [:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;]
+                        1000 1 #{&quot;storm.core-test&quot;} #{}]]})]))
+ (set @stored-events) =&gt; #{{:kind :fact :name &quot;test/tweeted&quot;
+                          :key &quot;foo&quot; :data [&quot;hello, world&quot;]
                            :ts 1001 :change 1
                           :writers #{} :readers #{}}
                          {:kind :rule :name &quot;storm.core-test/timeline!0&quot;
