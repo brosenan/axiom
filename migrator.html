@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 01 June 2017</h5>
+              <h5>Date: 02 June 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -361,15 +361,17 @@
      $ (di/injector {:hasher :my-hasher
                      :declare-service (fn [key reg]
                                         (when-not (= permval/*hasher* :my-hasher)
-                                          (throw (Exception. &quot;A custom hasher needs to be bound&quot;)))
+                                          (throw (Exception.
+                                                  &quot;A custom hasher needs to be bound&quot;)))
                                         (async/&gt;!! calls [:declare-service key reg]))})]
  (decl-my-fact $ :some :args :that :are :ignored) =&gt; nil
  (provided
   (perm/eval-symbol 'perm.ABC123/my-rule) =&gt; timeline)
  ;; Assert the calls
  (async/alts!! [calls
-                (async/timeout 1000)]) =&gt; [[:declare-service &quot;fact-for-rule/perm.ABC123/my-rule!2&quot; {:kind :fact
-                                                                                        :name &quot;test/follows&quot;}] calls])</code></pre></div><div><span id="initial-migrator"></span><h3>6.3 &nbsp;&nbsp; initial-migrator</h3></div><div><p><code>initial-migrator</code> creates a migration function for link 0 of a rule. Link 0 is special in that it only depends on a fact, creates rule tuples based on fact tuples. Other links also depend on previous rule tuples.</p></div><div><p><code>initial-migrator</code> takes the following arguments:</p><ol><li><code>rule</code>: The name of a rule (as a symbol).</li><li><code>shard</code>: The shard number</li><li><code>shards</code>: The total number of shards being used.It returns a closure (function) that operates from within a <a href='zk-plan.html'>zk-plan</a>.</li></ol></div><div class="code"><pre><code class="clojure">(def my-migrator (initial-migrator 'perm.ABC/my-rule 2 6))</code></pre></div><div><p>The migration process requires a <code>database-scanner</code> (e.g., <a href='dynamo.html#database-scanner'>this</a>) to scan given shard of the given table (fact). We mock this function by providing <code>:test/follows</code> facts for Alice, who follows Bob, Charlie and Dave. </p></div><div class="code"><pre><code class="clojure">(defn mock-scanner [name shard shards chan]
+                (async/timeout 1000)])
+ =&gt; [[:declare-service &quot;fact-for-rule/perm.ABC123/my-rule!2&quot; {:kind :fact
+                                                              :name &quot;test/follows&quot;}] calls])</code></pre></div><div><span id="initial-migrator"></span><h3>6.3 &nbsp;&nbsp; initial-migrator</h3></div><div><p><code>initial-migrator</code> creates a migration function for link 0 of a rule. Link 0 is special in that it only depends on a fact, creates rule tuples based on fact tuples. Other links also depend on previous rule tuples.</p></div><div><p><code>initial-migrator</code> takes the following arguments:</p><ol><li><code>rule</code>: The name of a rule (as a symbol).</li><li><code>shard</code>: The shard number</li><li><code>shards</code>: The total number of shards being used.It returns a closure (function) that operates from within a <a href='zk-plan.html'>zk-plan</a>.</li></ol></div><div class="code"><pre><code class="clojure">(def my-migrator (initial-migrator 'perm.ABC/my-rule 2 6))</code></pre></div><div><p>The migration process requires a <code>database-scanner</code> (e.g., <a href='dynamo.html#database-scanner'>this</a>) to scan given shard of the given table (fact). We mock this function by providing <code>:test/follows</code> facts for Alice, who follows Bob, Charlie and Dave. </p></div><div class="code"><pre><code class="clojure">(defn mock-scanner [name shard shards chan]
   (when-not (= [name shard shards] [&quot;test/follows&quot; 2 6])
     (throw (Exception. (str &quot;Unexpected args in mock-scanner: &quot; [name shard shards]))))
   (when-not (= permval/*hasher* :my-hasher)

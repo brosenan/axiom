@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 01 June 2017</h5>
+              <h5>Date: 02 June 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -86,14 +86,14 @@
           </div>
           <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><a href='http://storm.apache.org'>Apache Storm</a> is an open-source distributed realtime computation system. With Storm, a computation is expressed in terms of a <em>topology</em>,  which consists of <em>spouts</em> &ndash; data sources, and <em>bolts</em> &ndash; data handlers. Spouts create <em>tuples</em> with data, and bolts process this data and provide output. Many Storm topologies can run on a single Storm cluster.</p></div><div><p>This module provides a service that subcribes to <code>:axiom/rule-ready</code> events and deploys topologies based on these rules to a Storm cluster. Each such topology is a chain of bolts representing the different links in the rule, fed by spouts which emit facts read from a queue. A last bolt writes the derived facts to a queue.</p></div><div><span id="topology"></span><h2><b>2 &nbsp;&nbsp; topology</b></h2></div><div><p>The <code>topology</code> function takes a <a href='permacode.html'>permacode</a>-prefixed symbol representing a rule as parameter and a <code>config</code> map, and returns a Storm topology object.</p></div><div><p>For this discussion we will refer to the <code>timeline</code> rule described <a href='cloudlog.html#joins'>here</a>.</p></div><div class="code"><pre><code class="clojure">(clg/defrule timeline [user tweet]
      [:test/follows user author] (clg/by-anyone)
-     [:test/tweeted author tweet] (clg/by-anyone))</code></pre></div><div><p>This rule has two <em>links</em>, one responding to <code>:test/follows</code> facts and the other &ndash; to <code>:test/tweeted</code> facts.</p></div><div><p>The corresponding topology will have <a href='http://storm.apache.org/releases/1.1.0/Concepts.html'>two spouts and four bolts</a>. The two spouts correspond to the two fact-streams (<code>:test/follows</code> and <code>:test/tweeted</code> respectively), two bolts correspond to the two links that process these facts, one more bolt stores intermediate tuples and a fourth bolt outputs <code>timeline</code> entries. All bolts and spouts take the <code>config</code> parameter as their last parameter.</p></div><div class="code"><pre><code class="clojure">(topology 'perm.ABCD1234/timeline ..config..) =&gt; ..topology..
+     [:test/tweeted author tweet] (clg/by-anyone))</code></pre></div><div><p>This rule has two <em>links</em>, one responding to <code>:test/follows</code> facts and the other &ndash; to <code>:test/tweeted</code> facts.</p></div><div><p>The corresponding topology will have <a href='http://storm.apache.org/releases/1.1.0/Concepts.html'>two spouts and four bolts</a>. The two <a href='#fact-spout'>fact-spout</a>s introduce new facts to this rule, two bolts &ndash; an <a href='#initial-link-bolt'>initial-link-bolt</a> and a <a href='#link-bolt'>link-bolt</a>  correspond to the two links that process these facts, and two output bolts &ndash; a <a href='#store-bolt'>store-bolt</a> stores intermediate tuples  and an <a href='#output-bolt'>output-bolt</a> outputs <code>timeline</code> entries. All bolts and spouts take the <code>config</code> parameter as their last parameter.</p></div><div class="code"><pre><code class="clojure">(topology 'perm.ABCD1234/timeline ..config..) =&gt; ..topology..
  (provided
 ;; We extract the actual function based on the symbol
 (perm/eval-symbol 'perm.ABCD1234/timeline) =&gt; timeline
 ;; Then we define the two spouts based on the fact streams
-(fact-spout &quot;test/follows&quot; ..config..) =&gt; ..spout0..
+(fact-spout &quot;fact-for-rule/perm.ABCD1234/timeline!0&quot; ..config..) =&gt; ..spout0..
 (s/spout-spec ..spout0..) =&gt; ..spoutspec0..
-(fact-spout &quot;test/tweeted&quot; ..config..) =&gt; ..spout1..
+(fact-spout &quot;fact-for-rule/perm.ABCD1234/timeline!1&quot; ..config..) =&gt; ..spout1..
 (s/spout-spec ..spout1..) =&gt; ..spoutspec1..
 ;; An initial link bolt based on the initial fact
 (initial-link-bolt 'perm.ABCD1234/timeline ..config..) =&gt; ..bolt0..
@@ -229,7 +229,52 @@
                             {:kind :rule :name &quot;storm.core-test/timeline!0&quot;
                              :key &quot;bob&quot; :data [&quot;alice&quot; &quot;bob&quot;]
                              :ts 1000 :change 1
-                             :writers #{&quot;storm.core-test&quot;} :readers #{}}}</code></pre></div><div><span id="fact-spout"></span><h2><b>7 &nbsp;&nbsp; fact-spout</b></h2></div><div><p>The <code>fact-spout</code> registers to a certain fact feed, and emits all the events it receives from there.</p></div><div><span id="under-the-hood"></span><h2><b>8 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="injector"></span><h3>8.1 &nbsp;&nbsp; injector</h3></div><div><p>We use our <a href='di.html'>dependency inejection mechanism</a> to inject external dependencies to topologies. Since each bolt and spout has its own lifecycle, it makes sense to give each of them its own injector. The <code>injector</code> function takes the <code>config</code> parameter each bolt and spout receives and a <a href='#task-config'>keyword representing the bolt or spout</a>,  and returns an initialized injector.</p></div><div><p>One challenge to address here is the desire to keep the bolt and spout code independent of the implementations of the different resources. Generally, this is exactly what DI is supposed to provide. In the typical case, all libraries are independent of one another, but the <em>main program</em> knows about everything,  and it initializes the injector that spreads all the resources around by calling the <code>module</code> functions of the different libraries. <a href='migrator.html#usage-example'>The migrator integration test</a> is a good example for this pattern.</p></div><div><p>Unfortunately, this does not work as well here. Since each bolt or spout has its own injector, each of them needs to initialize it.</p></div><div><p>To address this, the configuration includes a <code>:modules</code> entry, consisting of a list of symbols representing different <code>module</code> functions from around the code base. <code>injector</code> evaluates these symbols and calls these functions on the injector it created.</p></div><div><p>To demonstrate this we will create our own module function here. This function defines resource <code>:bar</code> that depends on <code>:foo</code></p></div><div class="code"><pre><code class="clojure">(defn my-module [$]
+                             :writers #{&quot;storm.core-test&quot;} :readers #{}}}</code></pre></div><div><span id="fact-spout"></span><h2><b>7 &nbsp;&nbsp; fact-spout</b></h2></div><div><p>The <code>fact-spout</code> registers to a certain fact feed, and emits all the events it receives from there. It acknowledges received facts once their processing is complete.</p></div><div><p>We will demonstrate how it operates by creating a topology consising of one <code>fact-spout</code> and one <a href='#output-bolt'>output-bolt</a>. We will mock the <code>assign-service</code> method used by the <code>fact-spout</code> to read events off an <code>async/chan</code>, and will mock the <code>output-bolt</code>'s <code>publish</code> method to write to another <code>async/chan</code>.  Then we will write events one by one to the first channel, and see them coming on the other end. We will provide the <code>fact-spout</code> an <code>ack</code> method to acknowledge incoming events, which counts the times it is being called in an atom.</p></div><div class="code"><pre><code class="clojure">(def ack-counter (atom 0))
+ (def to-chan (async/chan))
+ (def from-chan (async/chan))
+ (defn fact-spout-mock-module [$]
+ (di/provide $ publish []
+             (fn [ev]
+               (async/&gt;!! to-chan ev)))
+ (di/provide $ assign-service []
+             (fn [q func]
+               (when-not (= q &quot;the-queue-for-this-spout&quot;)
+                 (throw (Exception. (str &quot;Wrong queue: &quot; q))))
+               (async/go
+                 (loop []
+                   (let [ack (fn [] (swap! ack-counter inc))
+                         event (async/&lt;! from-chan)]
+                     (func event nil ack))
+                   (recur))))))</code></pre></div><div><p>We wish to see that after we post and consume all events (which need to be the same events), all events are acknowledged.</p></div><div class="code"><pre><code class="clojure">(let [event (fn [u1 u2] {:kind :fact
+                        :name &quot;test/follows&quot;
+                        :key u1
+                        :data [u2]
+                        :ts 1000
+                        :change 1
+                        :writers #{u1}
+                        :readers #{}})
+     events [(event &quot;alice&quot; &quot;bob&quot;)
+             (event &quot;alice&quot; &quot;charline&quot;)
+             (event &quot;bob&quot; &quot;dave&quot;)
+             (event &quot;charline&quot; &quot;dave&quot;)]
+     config {:modules ['storm.core-test/fact-spout-mock-module]
+             :fact-spout {:include []}
+             :output-bolt{:include []}}
+     topology (s/topology {&quot;src&quot; (s/spout-spec (fact-spout &quot;the-queue-for-this-spout&quot; config))}
+                          {&quot;out&quot; (s/bolt-spec {&quot;src&quot; :shuffle}
+                                              (output-bolt config))})]
+ (st/with-local-cluster [cluster]
+   (st/submit-local-topology (:nimbus cluster)
+                             &quot;test-topology&quot;
+                             {}
+                             topology)
+   (doseq [event events]
+     (async/&gt;!! from-chan event))
+   (let [result (transient [])]
+     (doseq [_ (range (count events))]
+       (conj! result (async/&lt;!! to-chan)))
+     (persistent! result) =&gt; events))
+ @ack-counter =&gt; (count events))</code></pre></div><div><span id="under-the-hood"></span><h2><b>8 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="injector"></span><h3>8.1 &nbsp;&nbsp; injector</h3></div><div><p>We use our <a href='di.html'>dependency inejection mechanism</a> to inject external dependencies to topologies. Since each bolt and spout has its own lifecycle, it makes sense to give each of them its own injector. The <code>injector</code> function takes the <code>config</code> parameter each bolt and spout receives and a <a href='#task-config'>keyword representing the bolt or spout</a>,  and returns an initialized injector.</p></div><div><p>One challenge to address here is the desire to keep the bolt and spout code independent of the implementations of the different resources. Generally, this is exactly what DI is supposed to provide. In the typical case, all libraries are independent of one another, but the <em>main program</em> knows about everything,  and it initializes the injector that spreads all the resources around by calling the <code>module</code> functions of the different libraries. <a href='migrator.html#usage-example'>The migrator integration test</a> is a good example for this pattern.</p></div><div><p>Unfortunately, this does not work as well here. Since each bolt or spout has its own injector, each of them needs to initialize it.</p></div><div><p>To address this, the configuration includes a <code>:modules</code> entry, consisting of a list of symbols representing different <code>module</code> functions from around the code base. <code>injector</code> evaluates these symbols and calls these functions on the injector it created.</p></div><div><p>To demonstrate this we will create our own module function here. This function defines resource <code>:bar</code> that depends on <code>:foo</code></p></div><div class="code"><pre><code class="clojure">(defn my-module [$]
  (di/provide $ bar [foo]
              (inc foo)))</code></pre></div><div><p>Now when we call <code>injector</code> with a config for which the <code>:modules</code> entry contains our function and the config for the specific spout we initialize contains <code>:foo</code>, we will get <code>:bar</code> initialized.</p></div><div class="code"><pre><code class="clojure">(let [config {:spout-x {:include [:foo]}
              :foo 1
