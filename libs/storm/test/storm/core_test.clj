@@ -83,7 +83,8 @@ The second fact mentioned is `:test/tweeted`, which takes `author` as its first 
 The `initial-link-bolt` will in this case create a tuple for which the `:key` is the second element in the input tuple (`author`)."
 (fact
  (st/with-local-cluster [cluster]
-   (let [config {}
+   (let [config {:initlal-link-bolt {:include [:hasher]}
+                 :hasher [nil nil]}
          topology (s/topology {"f0" (s/spout-spec (fact-spout "test/follows" config))}
                               {"l0" (s/bolt-spec {"f0" :shuffle}
                                                  (initial-link-bolt 'storm.core-test/timeline
@@ -113,7 +114,7 @@ The interface we provide is the one required by the [matcher](cloudlog-events.ht
 and is similar to the one provided for [DynamoDB](dynamo.html#database-chan)."
 (fact
  (defn mock-db-module [$]
-   (di/provide $ database-chan []
+   (di/provide $ database-chan [foo]
                (let [database-chan (async/chan)]
                  (async/go
                    (loop []
@@ -149,8 +150,10 @@ The `l0` spout provides rule tuples simulating followers (typically provided by 
 and the `f1` spout providing tweets."
 (fact
  (st/with-local-cluster [cluster]
-   (let [config {:link-bolt {:include []}
-                 :modules ['storm.core-test/mock-db-module]}
+   (let [config {:link-bolt {:include [:foo :hasher]}
+                 :modules ['storm.core-test/mock-db-module]
+                 :foo 1
+                 :hasher [nil nil]}
          topology (s/topology
                    {"l0" (s/spout-spec (fact-spout "mocked..." config))
                     "f1" (s/spout-spec (fact-spout "mocked..." config))}
@@ -184,7 +187,7 @@ It takes tuples `[event ack]`, where `event` is an event (map) to be stored
 and `ack` is a channel to be closed once the event is stored."
 (fact
  (defn mock-db-storage-module [$]
-   (di/provide $ database-event-storage-chan []
+   (di/provide $ database-event-storage-chan [foo]
                (let [database-event-storage-chan (async/chan)]
                  (async/go
                    (loop []
@@ -198,8 +201,9 @@ and `ack` is a channel to be closed once the event is stored."
 be stored in the sequence mocking the database once the topology completes."
 (fact
  (st/with-local-cluster [cluster]
-   (let [config {:store-bolt {:include []}
-                 :modules ['storm.core-test/mock-db-storage-module]}
+   (let [config {:store-bolt {:include [:foo]}
+                 :modules ['storm.core-test/mock-db-storage-module]
+                 :foo 1}
          topology (s/topology
                    {"src" (s/spout-spec (fact-spout "mocked..." config))}
                    {"out" (s/bolt-spec {"src" :shuffle} (store-bolt config))})
@@ -230,7 +234,7 @@ Our mock will add each published event to the `published-events` atom."
 "The following mock module provides our mock `publish`."
 (fact
  (defn mock-publish-module [$]
-   (di/provide $ publish []
+   (di/provide $ publish [foo]
                (fn [ev]
                  (swap! published-events #(conj % ev))))))
 
@@ -238,8 +242,9 @@ Our mock will add each published event to the `published-events` atom."
 be stored in the sequence mocking the database once the topology completes."
 (fact
  (st/with-local-cluster [cluster]
-   (let [config {:output-bolt {:include []}
-                 :modules ['storm.core-test/mock-publish-module]}
+   (let [config {:output-bolt {:include [:foo]}
+                 :modules ['storm.core-test/mock-publish-module]
+                 :foo 1}
          topology (s/topology
                    {"src" (s/spout-spec (fact-spout "mocked..." config))}
                    {"out" (s/bolt-spec {"src" :shuffle} (output-bolt config))})
@@ -276,7 +281,7 @@ We will provide the `fact-spout` an `ack` method to acknowledge incoming events,
    (di/provide $ publish []
                (fn [ev]
                  (async/>!! to-chan ev)))
-   (di/provide $ assign-service []
+   (di/provide $ assign-service [foo]
                (fn [q func]
                  (when-not (= q "the-queue-for-this-spout")
                    (throw (Exception. (str "Wrong queue: " q))))
@@ -302,8 +307,9 @@ We will provide the `fact-spout` an `ack` method to acknowledge incoming events,
                (event "bob" "dave")
                (event "charline" "dave")]
        config {:modules ['storm.core-test/fact-spout-mock-module]
-               :fact-spout {:include []}
-               :output-bolt{:include []}}
+               :fact-spout {:include [:foo]}
+               :output-bolt{:include []}
+               :foo 1}
        topology (s/topology {"src" (s/spout-spec (fact-spout "the-queue-for-this-spout" config))}
                             {"out" (s/bolt-spec {"src" :shuffle}
                                                 (output-bolt config))})]

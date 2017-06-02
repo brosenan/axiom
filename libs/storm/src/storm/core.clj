@@ -58,22 +58,30 @@
        (into {})))
 
 (s/defbolt initial-link-bolt event-fields
-  {:params [rulesym config]}
-  [tuple collector]
-  (let [rule (perm/eval-symbol rulesym)
-        em (ev/emitter rule)
-        {:as event} tuple
-        event (keyword-keys event)]
-    (doseq [res (em event)]
-      (s/emit-bolt! collector res :anchor tuple)))
-  (s/ack! collector tuple))
+  {:params [rulesym config]
+   :prepare true}
+  [conf context collector]
+  (let [$ (injector config :initlal-link-bolt)
+        rule (di/do-with! $ [hasher]
+                          (binding [permacode.validate/*hasher* hasher]
+                            (perm/eval-symbol rulesym)))
+        em (ev/emitter rule)]
+    (s/bolt
+     (execute [tuple]
+              (let [{:as event} tuple
+                    event (keyword-keys event)]
+                (doseq [res (em event)]
+                  (s/emit-bolt! collector res :anchor tuple))
+                (s/ack! collector tuple))))))
 
 (s/defbolt link-bolt event-fields
   {:params [rulesym link config]
    :prepare true}
   [conf context collector]
   (let [$ (injector config :link-bolt)
-        rulefunc (perm/eval-symbol rulesym)]
+        rulefunc (di/do-with! $ [hasher]
+                              (binding [permacode.validate/*hasher* hasher]
+                                (perm/eval-symbol rulesym)))]
     (di/do-with! $ [database-chan]
                  (let [matcher (ev/matcher rulefunc link database-chan)]
                    (s/bolt
