@@ -115,7 +115,8 @@
              &quot;o0&quot; ..outboltspec0..
              &quot;l1&quot; ..boltspec1..
              &quot;o1&quot; ..outboltspec1..}) =&gt; ..topology..)</code></pre></div><div><span id="initial-link-bolt"></span><h2><b>3 &nbsp;&nbsp; initial-link-bolt</b></h2></div><div><p>The <code>initial-link-bolt</code> is a stateless bolt that transforms facts provided by a <code>fact-spout</code> at the beginning of the rule to tuples with similar data placed in different order or form. The output of this bolt is input to the <code>link-bolt</code> number 1, which also takes input for another <code>fact-spout</code>. The idea is to re-order the data in the tuple so that the key in the output of the <code>initial-link-bolt</code> matches the key in <code>fact-spout</code> 1 according to the logic of the rule. For example, in <code>timeline</code> the first fact mentioned in the rule is <code>:test/follows</code>, which takes arguments <code>user</code> and <code>author</code>. The second fact mentioned is <code>:test/tweeted</code>, which takes <code>author</code> as its first argument (its <em>key</em>). The <code>initial-link-bolt</code> will in this case create a tuple for which the <code>:key</code> is the second element in the input tuple (<code>author</code>).</p></div><div class="code"><pre><code class="clojure">(st/with-local-cluster [cluster]
- (let [config {}
+ (let [config {:initlal-link-bolt {:include [:hasher]}
+               :hasher [nil nil]}
        topology (s/topology {&quot;f0&quot; (s/spout-spec (fact-spout &quot;test/follows&quot; config))}
                             {&quot;l0&quot; (s/bolt-spec {&quot;f0&quot; :shuffle}
                                                (initial-link-bolt 'storm.core-test/timeline
@@ -127,7 +128,7 @@
    (set (st/read-tuples result &quot;l0&quot;))
    =&gt; #{[:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;]
          1000 1 #{&quot;storm.core-test&quot;} #{}]}))</code></pre></div><div><span id="link-bolt"></span><h2><b>4 &nbsp;&nbsp; link-bolt</b></h2></div><div><p>The <code>link-bolt</code> implements a single (non-initial) link in a rule. It can receive both <code>:fact</code> and <code>:rule</code> events, coming from fact spouts and previous link bolts, respectively.</p></div><div><p>When an event comes, <code>link-bolt</code> feeds it to a <a href='cloudlog-events.html#matcher'>matcher</a> which looks up any  matching rules or facts in the database. The matcher then applies the rule to the fact (regardless of which one of those came from the input and which one came from the database), and emits the results of this application.</p></div><div><p>To demonstrate this, we will mock the database using a function that when asked for a rule it returns tuples stating that both <code>charlie</code> and <code>dave</code> follow the user in question (regardless of the user), and when asked for a fact it provides two tweets made by the requested author We provide this mock in a module function we will provide in the bolt's config map. The interface we provide is the one required by the <a href='cloudlog-events.html#matcher'>matcher</a>,  and is similar to the one provided for <a href='dynamo.html#database-chan'>DynamoDB</a>.</p></div><div class="code"><pre><code class="clojure">(defn mock-db-module [$]
- (di/provide $ database-chan []
+ (di/provide $ database-chan [foo]
              (let [database-chan (async/chan)]
                (async/go
                  (loop []
@@ -157,8 +158,10 @@
                      (async/close! out-chan))
                    (recur)))
                database-chan)))</code></pre></div><div><p>The following topology mocks two spouts that feed a single <code>l1</code> bolt. The <code>l0</code> spout provides rule tuples simulating followers (typically provided by <a href='#initial-link-bolt'>initial-link-bolt</a>), and the <code>f1</code> spout providing tweets.</p></div><div class="code"><pre><code class="clojure">(st/with-local-cluster [cluster]
- (let [config {:link-bolt {:include []}
-               :modules ['storm.core-test/mock-db-module]}
+ (let [config {:link-bolt {:include [:foo :hasher]}
+               :modules ['storm.core-test/mock-db-module]
+               :foo 1
+               :hasher [nil nil]}
        topology (s/topology
                  {&quot;l0&quot; (s/spout-spec (fact-spout &quot;mocked...&quot; config))
                   &quot;f1&quot; (s/spout-spec (fact-spout &quot;mocked...&quot; config))}
@@ -178,7 +181,7 @@
                   [&quot;alice&quot; &quot;bob's second tweet&quot; 1004]
                   [&quot;charlie&quot; &quot;hello, world&quot; 1001]
                   [&quot;dave&quot; &quot;hello, world&quot; 1001]}))</code></pre></div><div><span id="store-bolt"></span><h2><b>5 &nbsp;&nbsp; store-bolt</b></h2></div><div><p>The <code>store-bolt</code> uses a <code>database-event-storage-chan</code> (e.g., <a href='dynamo.html#database-event-storage-chan'>the one for DynamoDB</a>) to store each event it receives to a database.</p></div><div><p>To demonstrate how it works we will mock a database that stores all the received events into into an <code>atom</code>.</p></div><div class="code"><pre><code class="clojure">(def stored-events (atom []))</code></pre></div><div><p>We mock a module function to provide our mock <code>database-event-storage-chan</code>. It takes tuples <code>&#91;event ack&#93;</code>, where <code>event</code> is an event (map) to be stored  and <code>ack</code> is a channel to be closed once the event is stored.</p></div><div class="code"><pre><code class="clojure">(defn mock-db-storage-module [$]
- (di/provide $ database-event-storage-chan []
+ (di/provide $ database-event-storage-chan [foo]
              (let [database-event-storage-chan (async/chan)]
                (async/go
                  (loop []
@@ -187,8 +190,9 @@
                      (async/close! ack))
                    (recur)))
                database-event-storage-chan)))</code></pre></div><div><p>We now build a topology consisting of a spout that emits events and this bolt, and expect that all events that were emitted be stored in the sequence mocking the database once the topology completes.</p></div><div class="code"><pre><code class="clojure">(st/with-local-cluster [cluster]
- (let [config {:store-bolt {:include []}
-               :modules ['storm.core-test/mock-db-storage-module]}
+ (let [config {:store-bolt {:include [:foo]}
+               :modules ['storm.core-test/mock-db-storage-module]
+               :foo 1}
        topology (s/topology
                  {&quot;src&quot; (s/spout-spec (fact-spout &quot;mocked...&quot; config))}
                  {&quot;out&quot; (s/bolt-spec {&quot;src&quot; :shuffle} (store-bolt config))})
@@ -207,11 +211,12 @@
                           :key &quot;bob&quot; :data [&quot;alice&quot; &quot;bob&quot;]
                           :ts 1000 :change 1
                           :writers #{&quot;storm.core-test&quot;} :readers #{}}}</code></pre></div><div><span id="output-bolt"></span><h2><b>6 &nbsp;&nbsp; output-bolt</b></h2></div><div><p>The <code>output-bolt</code> <code>publish</code>es (e.g., <a href='rabbit-microservices.html#publish'>through AMQP</a>) each event it receives.</p></div><div><p>To demonstrate how it works we will mock the <code>publish</code> function. Our mock will add each published event to the <code>published-events</code> atom.</p></div><div class="code"><pre><code class="clojure">(def published-events (atom []))</code></pre></div><div><p>The following mock module provides our mock <code>publish</code>.</p></div><div class="code"><pre><code class="clojure">(defn mock-publish-module [$]
- (di/provide $ publish []
+ (di/provide $ publish [foo]
              (fn [ev]
                (swap! published-events #(conj % ev)))))</code></pre></div><div><p>We now build a topology consisting of a spout that emits events and this bolt, and expect that all events that were emitted be stored in the sequence mocking the database once the topology completes.</p></div><div class="code"><pre><code class="clojure">(st/with-local-cluster [cluster]
- (let [config {:output-bolt {:include []}
-               :modules ['storm.core-test/mock-publish-module]}
+ (let [config {:output-bolt {:include [:foo]}
+               :modules ['storm.core-test/mock-publish-module]
+               :foo 1}
        topology (s/topology
                  {&quot;src&quot; (s/spout-spec (fact-spout &quot;mocked...&quot; config))}
                  {&quot;out&quot; (s/bolt-spec {&quot;src&quot; :shuffle} (output-bolt config))})
@@ -236,7 +241,7 @@
  (di/provide $ publish []
              (fn [ev]
                (async/&gt;!! to-chan ev)))
- (di/provide $ assign-service []
+ (di/provide $ assign-service [foo]
              (fn [q func]
                (when-not (= q &quot;the-queue-for-this-spout&quot;)
                  (throw (Exception. (str &quot;Wrong queue: &quot; q))))
@@ -258,8 +263,9 @@
              (event &quot;bob&quot; &quot;dave&quot;)
              (event &quot;charline&quot; &quot;dave&quot;)]
      config {:modules ['storm.core-test/fact-spout-mock-module]
-             :fact-spout {:include []}
-             :output-bolt{:include []}}
+             :fact-spout {:include [:foo]}
+             :output-bolt{:include []}
+             :foo 1}
      topology (s/topology {&quot;src&quot; (s/spout-spec (fact-spout &quot;the-queue-for-this-spout&quot; config))}
                           {&quot;out&quot; (s/bolt-spec {&quot;src&quot; :shuffle}
                                               (output-bolt config))})]
