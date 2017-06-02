@@ -497,15 +497,17 @@ We will mock them here."
        $ (di/injector {:hasher :my-hasher
                        :declare-service (fn [key reg]
                                           (when-not (= permval/*hasher* :my-hasher)
-                                            (throw (Exception. "A custom hasher needs to be bound")))
+                                            (throw (Exception.
+                                                    "A custom hasher needs to be bound")))
                                           (async/>!! calls [:declare-service key reg]))})]
    (decl-my-fact $ :some :args :that :are :ignored) => nil
    (provided
     (perm/eval-symbol 'perm.ABC123/my-rule) => timeline)
    ;; Assert the calls
    (async/alts!! [calls
-                  (async/timeout 1000)]) => [[:declare-service "fact-for-rule/perm.ABC123/my-rule!2" {:kind :fact
-                                                                                          :name "test/follows"}] calls]))
+                  (async/timeout 1000)])
+   => [[:declare-service "fact-for-rule/perm.ABC123/my-rule!2" {:kind :fact
+                                                                :name "test/follows"}] calls]))
 
 [[:section {:title "initial-migrator"}]]
 "`initial-migrator` creates a migration function for link 0 of a rule.

@@ -35,9 +35,11 @@ and returns a Storm topology object."
 "This rule has two *links*, one responding to `:test/follows` facts and the other -- to `:test/tweeted` facts."
 
 "The corresponding topology will have [two spouts and four bolts](http://storm.apache.org/releases/1.1.0/Concepts.html).
-The two spouts correspond to the two fact-streams (`:test/follows` and `:test/tweeted` respectively),
-two bolts correspond to the two links that process these facts,
-one more bolt stores intermediate tuples and a fourth bolt outputs `timeline` entries.
+The two [fact-spout](#fact-spout)s introduce new facts to this rule,
+two bolts -- an [initial-link-bolt](#initial-link-bolt) and a [link-bolt](#link-bolt) 
+correspond to the two links that process these facts,
+and two output bolts -- a [store-bolt](#store-bolt) stores intermediate tuples 
+and an [output-bolt](#output-bolt) outputs `timeline` entries.
 All bolts and spouts take the `config` parameter as their last parameter."
 (fact
  (topology 'perm.ABCD1234/timeline ..config..) => ..topology..
@@ -45,9 +47,9 @@ All bolts and spouts take the `config` parameter as their last parameter."
   ;; We extract the actual function based on the symbol
   (perm/eval-symbol 'perm.ABCD1234/timeline) => timeline
   ;; Then we define the two spouts based on the fact streams
-  (fact-spout "test/follows" ..config..) => ..spout0..
+  (fact-spout "fact-for-rule/perm.ABCD1234/timeline!0" ..config..) => ..spout0..
   (s/spout-spec ..spout0..) => ..spoutspec0..
-  (fact-spout "test/tweeted" ..config..) => ..spout1..
+  (fact-spout "fact-for-rule/perm.ABCD1234/timeline!1" ..config..) => ..spout1..
   (s/spout-spec ..spout1..) => ..spoutspec1..
   ;; An initial link bolt based on the initial fact
   (initial-link-bolt 'perm.ABCD1234/timeline ..config..) => ..bolt0..
@@ -258,7 +260,65 @@ be stored in the sequence mocking the database once the topology completes."
                                :writers #{"storm.core-test"} :readers #{}}})
 
 [[:chapter {:title "fact-spout"}]]
-"The `fact-spout` registers to a certain fact feed, and emits all the events it receives from there."
+"The `fact-spout` registers to a certain fact feed, and emits all the events it receives from there.
+It acknowledges received facts once their processing is complete."
+
+"We will demonstrate how it operates by creating a topology consising of one `fact-spout` and one [output-bolt](#output-bolt).
+We will mock the `assign-service` method used by the `fact-spout` to read events off an `async/chan`,
+and will mock the `output-bolt`'s `publish` method to write to another `async/chan`. 
+Then we will write events one by one to the first channel, and see them coming on the other end.
+We will provide the `fact-spout` an `ack` method to acknowledge incoming events, which counts the times it is being called in an atom."
+(fact
+ (def ack-counter (atom 0))
+ (def to-chan (async/chan))
+ (def from-chan (async/chan))
+ (defn fact-spout-mock-module [$]
+   (di/provide $ publish []
+               (fn [ev]
+                 (async/>!! to-chan ev)))
+   (di/provide $ assign-service []
+               (fn [q func]
+                 (when-not (= q "the-queue-for-this-spout")
+                   (throw (Exception. (str "Wrong queue: " q))))
+                 (async/go
+                   (loop []
+                     (let [ack (fn [] (swap! ack-counter inc))
+                           event (async/<! from-chan)]
+                       (func event nil ack))
+                     (recur)))))))
+
+"We wish to see that after we post and consume all events (which need to be the same events), all events are acknowledged."
+(fact
+ (let [event (fn [u1 u2] {:kind :fact
+                          :name "test/follows"
+                          :key u1
+                          :data [u2]
+                          :ts 1000
+                          :change 1
+                          :writers #{u1}
+                          :readers #{}})
+       events [(event "alice" "bob")
+               (event "alice" "charline")
+               (event "bob" "dave")
+               (event "charline" "dave")]
+       config {:modules ['storm.core-test/fact-spout-mock-module]
+               :fact-spout {:include []}
+               :output-bolt{:include []}}
+       topology (s/topology {"src" (s/spout-spec (fact-spout "the-queue-for-this-spout" config))}
+                            {"out" (s/bolt-spec {"src" :shuffle}
+                                                (output-bolt config))})]
+   (st/with-local-cluster [cluster]
+     (st/submit-local-topology (:nimbus cluster)
+                               "test-topology"
+                               {}
+                               topology)
+     (doseq [event events]
+       (async/>!! from-chan event))
+     (let [result (transient [])]
+       (doseq [_ (range (count events))]
+         (conj! result (async/<!! to-chan)))
+       (persistent! result) => events))
+   @ack-counter => (count events)))
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "injector"}]]

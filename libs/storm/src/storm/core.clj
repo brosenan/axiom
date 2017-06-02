@@ -27,8 +27,30 @@
     $))
 
 (s/defspout fact-spout event-fields
-  {:params [name config]}
-  [conf context collector])
+  {:params [q config]}
+  [conf context collector]
+  (let [$ (injector config :fact-spout)
+        read-chan (async/chan)
+        acks (atom {})
+        next-id (atom 0)]
+    (di/do-with! $ [assign-service]
+                 (assign-service q (fn [ev pub ack]
+                                            (async/>!! read-chan [ev ack])))
+                 (s/spout
+                  (nextTuple []
+                             (let [[val chan] (async/alts!! [read-chan
+                                                             (async/timeout 1)])]
+                               (when (= chan read-chan)
+                                     (let [[ev ack] val
+                                           id @next-id]
+                                       (s/emit-spout! collector ev :id id)
+                                       (swap! acks #(assoc % id ack))
+                                       (swap! next-id inc)))))
+                  (ack [id]
+                       (let [ack (@acks id)]
+                         (ack)
+                         (swap! acks #(dissoc % id))))
+                  (fail [id])))))
 
 (defn keyword-keys [event]
   (->> event
@@ -103,7 +125,7 @@
            spouts {}
            bolts {}
            index 0]
-      (let [spoutspec (s/spout-spec (fact-spout (-> rulefunc meta :source-fact clg/fact-table) config))
+      (let [spoutspec (s/spout-spec (fact-spout (str "fact-for-rule/" rulesym "!" index) config))
             spouts (assoc spouts (str "f" index) spoutspec)
             boltspec (cond (= index 0)
                            (s/bolt-spec {(str "f" index) ["key"]} (initial-link-bolt rulesym config))
