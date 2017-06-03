@@ -82,6 +82,7 @@ For example, in `timeline` the first fact mentioned in the rule is `:test/follow
 The second fact mentioned is `:test/tweeted`, which takes `author` as its first argument (its *key*).
 The `initial-link-bolt` will in this case create a tuple for which the `:key` is the second element in the input tuple (`author`)."
 (fact
+ :integ
  (st/with-local-cluster [cluster]
    (let [config {:initlal-link-bolt {:include [:hasher]}
                  :hasher [nil nil]}
@@ -149,6 +150,7 @@ and is similar to the one provided for [DynamoDB](dynamo.html#database-chan)."
 The `l0` spout provides rule tuples simulating followers (typically provided by [initial-link-bolt](#initial-link-bolt)),
 and the `f1` spout providing tweets."
 (fact
+ :integ
  (st/with-local-cluster [cluster]
    (let [config {:link-bolt {:include [:foo :hasher]}
                  :modules ['storm.core-test/mock-db-module]
@@ -200,6 +202,7 @@ and `ack` is a channel to be closed once the event is stored."
 "We now build a topology consisting of a spout that emits events and this bolt, and expect that all events that were emitted
 be stored in the sequence mocking the database once the topology completes."
 (fact
+ :integ
  (st/with-local-cluster [cluster]
    (let [config {:store-bolt {:include [:foo]}
                  :modules ['storm.core-test/mock-db-storage-module]
@@ -241,6 +244,7 @@ Our mock will add each published event to the `published-events` atom."
 "We now build a topology consisting of a spout that emits events and this bolt, and expect that all events that were emitted
 be stored in the sequence mocking the database once the topology completes."
 (fact
+ :integ
  (st/with-local-cluster [cluster]
    (let [config {:output-bolt {:include [:foo]}
                  :modules ['storm.core-test/mock-publish-module]
@@ -294,6 +298,7 @@ We will provide the `fact-spout` an `ack` method to acknowledge incoming events,
 
 "We wish to see that after we post and consume all events (which need to be the same events), all events are acknowledged."
 (fact
+ :integ
  (let [event (fn [u1 u2] {:kind :fact
                           :name "test/follows"
                           :key u1
@@ -325,6 +330,67 @@ We will provide the `fact-spout` an `ack` method to acknowledge incoming events,
          (conj! result (async/<!! to-chan)))
        (persistent! result) => events))
    @ack-counter => (count events)))
+
+[[:chapter {:title "rule-topology"}]]
+"`rule-topology` is a [microservice](rabbit-microservices.html#serve) that subscribes to `axiom/rule-ready` events, and brings topologies up and down accordingly."
+
+"Unlike most `module` functions, the `storm.core/module` function takes an extra `config` parameter, intended to be the original configuration
+that was used to create original injector.
+It defines `rule-topology` based on these resources:
+- `declare-service` and `assign-service`, to register itself to `axiom/rule-ready` events,
+- `storm-cluster`, a storm cluster to load the topology on,
+- `hasher`, to resolve [permacode](permacode.html) symbols (the rule name is one such symbol)."
+(fact
+ (def running-topologies (atom {}))
+ (let [decl (transient {})
+       assign (transient {})
+       config {:declare-service (fn [name partial]
+                                  (assoc! decl name partial))
+               :assign-service (fn [name func]
+                                 (assoc! assign name func))
+               :storm-cluster {:run (fn [name top]
+                                      (swap! running-topologies assoc name top))
+                               :kill (fn [name]
+                                       (swap! running-topologies dissoc name))}
+               :hasher [:hash :unhash]}
+       $ (di/injector config)]
+   (def config config)
+   (module $ config)
+   (di/startup $)
+   ((persistent! decl) "storm.core/rule-topology") => {:kind :fact
+                                                       :name "axiom/rule-ready"}
+   (let [assign (persistent! assign)]
+     (assign "storm.core/rule-topology") => fn?
+     (def rule-topology (assign "storm.core/rule-topology")))))
+
+"When an `axiom/rule-ready` event with a positive `:change` (introduction of a rule) arrives, 
+`rule-topology` calls [topology](#topology) to create a topology for the rule, 
+and then assigns it to the `storm-cluster`."
+(fact
+ (rule-topology {:kind :fact
+                 :name "axiom/rule-ready"
+                 :key 'perm.ABCD1234/timeline
+                 :data []
+                 :ts 1000
+                 :change 1
+                 :writers #{}
+                 :readers #{}}) => nil
+ (provided
+  (topology 'perm.ABCD1234/timeline config) => ..topology..)
+ (@running-topologies "perm.ABCD1234/timeline") => ..topology..)
+
+"When an `axiom/rule-ready` event with a *negative* `:change` arrives,
+we kill the associated topology."
+(fact
+ (rule-topology {:kind :fact
+                 :name "axiom/rule-ready"
+                 :key 'perm.ABCD1234/timeline
+                 :data []
+                 :ts 1000
+                 :change -1
+                 :writers #{}
+                 :readers #{}}) => nil
+ (@running-topologies "perm.ABCD1234/timeline") => nil)
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "injector"}]]

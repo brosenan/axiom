@@ -152,3 +152,19 @@
               (recur next spouts bolts (inc index))
               :else
               (s/topology spouts bolts))))))
+
+(defn module [$ config]
+  (di/do-with $ [declare-service
+                 assign-service
+                 storm-cluster]
+              (declare-service "storm.core/rule-topology" {:kind :fact
+                                                           :name "axiom/rule-ready"})
+              (assign-service "storm.core/rule-topology"
+                              (fn [ev]
+                                (when (> (:change ev) 0)
+                                  (let [topology (topology (:key ev) config)]
+                                    ((:run storm-cluster) (-> ev :key str) topology)
+                                    nil))
+                                (when (< (:change ev) 0)
+                                  ((:kill storm-cluster) (-> ev :key str)))
+                                nil))))
