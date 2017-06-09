@@ -114,6 +114,7 @@ We provide this mock in a module function we will provide in the bolt's config m
 The interface we provide is the one required by the [matcher](cloudlog-events.html#matcher), 
 and is similar to the one provided for [DynamoDB](dynamo.html#database-chan)."
 (fact
+ :integ
  (defn mock-db-module [$]
    (di/provide $ database-chan [foo]
                (let [database-chan (async/chan)]
@@ -182,12 +183,14 @@ to store each event it receives to a database."
 
 "To demonstrate how it works we will mock a database that stores all the received events into into an `atom`."
 (fact
+ :integ
  (def stored-events (atom [])))
 
 "We mock a module function to provide our mock `database-event-storage-chan`.
 It takes tuples `[event ack]`, where `event` is an event (map) to be stored 
 and `ack` is a channel to be closed once the event is stored."
 (fact
+ :integ
  (defn mock-db-storage-module [$]
    (di/provide $ database-event-storage-chan [foo]
                (let [database-event-storage-chan (async/chan)]
@@ -232,10 +235,12 @@ be stored in the sequence mocking the database once the topology completes."
 "To demonstrate how it works we will mock the `publish` function.
 Our mock will add each published event to the `published-events` atom."
 (fact
+ :integ
  (def published-events (atom [])))
 
 "The following mock module provides our mock `publish`."
 (fact
+ :integ
  (defn mock-publish-module [$]
    (di/provide $ publish [foo]
                (fn [ev]
@@ -278,6 +283,7 @@ and will mock the `output-bolt`'s `publish` method to write to another `async/ch
 Then we will write events one by one to the first channel, and see them coming on the other end.
 We will provide the `fact-spout` an `ack` method to acknowledge incoming events, which counts the times it is being called in an atom."
 (fact
+ :integ
  (def ack-counter (atom 0))
  (def to-chan (async/chan))
  (def from-chan (atom (async/chan)))
@@ -309,6 +315,7 @@ We will provide the `fact-spout` an `ack` method to acknowledge incoming events,
 
 "We wish to see that after we post and consume all events (which need to be the same events), all events are acknowledged."
 (fact
+ :integ
  (let [event (fn [u1 u2] {:kind :fact
                           :name "test/follows"
                           :key u1
@@ -417,6 +424,7 @@ The value of `local-storm-cluster` does not matter because a local cluster has n
 "To demonstrate our local cluster we will create one, and then deploy a simple topology to it, 
 the same one we used for [fact-spou](t#fact-spout)."
 (fact
+ :integ
  (reset! from-chan (async/chan))
  (let [$ (di/injector {:local-storm-cluster true
                        :modules ['storm.core-test/fact-spout-mock-module]})]
