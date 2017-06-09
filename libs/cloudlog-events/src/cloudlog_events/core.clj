@@ -3,6 +3,43 @@
             [cloudlog.interset :as interset]
             [clojure.core.async :as async]))
 
+(defn split-atomic-update [ev]
+  (cond (:removed ev)
+        (let [new-ev (dissoc ev :removed)
+              old-ev (-> new-ev
+                         (assoc :data (:removed ev))
+                         (assoc :change (- (:change ev))))]
+          [new-ev old-ev])
+        :else [ev]))
+
+(defn matching? [ev1 ev2]
+  (and (= (+ (:change ev1) (:change ev2)) 0)
+       (= (-> ev1
+              (dissoc :data)
+              (dissoc :change))
+          (-> ev2
+              (dissoc :data)
+              (dissoc :change)))))
+
+(defn find-atomic-update [ev coll]
+  (cond (empty? coll) [nil coll]
+        (matching? ev (first coll)) [(first coll) (rest coll)]
+        :else
+        (let [[match rst] (find-atomic-update ev (rest coll))]
+          [match (cons (first coll) rst)])))
+
+(defn join-atomic-updates [events]
+  (cond (empty? events)
+        events
+        :else
+        (let [[match rst] (find-atomic-update (first events) (rest events))]
+          (cond match
+                (let [joined (-> (first events)
+                                 (assoc :removed (:data match)))]
+                  (cons joined (join-atomic-updates rst)))
+                :else
+                (cons (first events) (join-atomic-updates (rest events)))))))
+
 (defn emitter [rulefunc & {:keys [link mult readers rule-writers] :or {link 0
                                                                        mult 1
                                                                        readers interset/universe

@@ -21,22 +21,20 @@ on the internal state of a rule. Each event contains the following fields:
 - `:data`: The data tuple representing a fact, or the state of a rule, excluding the key.
 - `:change`: A number representing the change.  Typically, `1` represents addition, and `-1` represents removal.
 - `:writers`: The event's *writer-set*, represented as an [interset](cloudlog.interset.html).
-- `:readers`: The event's *reader-set*, represented as an [interset](cloudlog.interset.html)."
+- `:readers`: The event's *reader-set*, represented as an [interset](cloudlog.interset.html).
+- `:removed` (optional): If exists, account for an additional event that is identical to the original one, but with `:data` = `:removed`, and `:change` = -`:change`."
 
 "For the examples of this package we will use the following convenience function:"
 
-(defn event [kind name key data & {:keys [ts change writers readers] :or {ts 1000
-                                                                          change 1
-                                                                          writers #{}
-                                                                          readers #{}}}]
-  {:kind kind
-   :name name
-   :key key
-   :data data
-   :ts ts
-   :change change
-   :writers writers
-   :readers readers})
+(defn event [kind name key data & {:as ev}]
+  (merge {:kind kind
+          :name name
+          :key key
+          :data data
+          :ts 1000
+          :change 1
+          :writers #{}
+          :readers #{}} ev))
 
 (fact
  (event :fact "foo" 13 ["a" "b"] :ts 2000) => {:kind :fact
@@ -46,7 +44,17 @@ on the internal state of a rule. Each event contains the following fields:
                                                :ts 2000
                                                :change 1
                                                :writers #{}
-                                               :readers #{}})
+                                               :readers #{}}
+ (event :fact "foo" 13 ["a" "b"] :ts 2000
+        :removed ["b" "a"]) => {:kind :fact
+                                :name "foo"
+                                :key 13
+                                :data ["a" "b"]
+                                :ts 2000
+                                :change 1
+                                :writers #{}
+                                :readers #{}
+                                :removed ["b" "a"]})
 
 [[:section {:title "Rules"}]]
 "In this module we base our examples on the following rules defined [here](cloudlog.html):"
@@ -123,6 +131,22 @@ To support this, we pass them as metadata on the data."
        em (emitter some-rule)]
    (em (event :fact "something" 1 [2 3] :writers #{:w} :readers #{:r}))
    => irrelevant))
+
+[[:section {:title "Atomic Updates"}]]
+"When an event contains a `:removed` key, it is considered an *atomic update*.
+The reason is that this is a single event that flows through the system, 
+and removes one piece of data and at the same time (`:ts`) also adds another piece or data."
+
+"By default, if the `:removed` field exists, two events will be emitted, one for `:data` and one for `:removed`."
+(comment (fact
+          (let [em (emitter foo-yx)]
+            (em (event :fact "test/foo" 2 [3]
+                       :removed [1]))
+            => [(event :fact "cloudlog-events.core_test/foo-yx" 3 [2]
+                       :writers #{"cloudlog-events.core_test"})
+                (event :fact "cloudlog-events.core_test/foo-yx" 3 [1]
+                       :change -1
+                       :writers #{"cloudlog-events.core_test"})])))
 
 [[:chapter {:title "multiplier: Create a Function Applying Rules to Facts" :tag "multiplier"}]]
 "The lowest level of event processing is taking two corresponding events 
@@ -300,8 +324,8 @@ of the two.  We don't care as long as we get what we need from the other side of
 
 "The matcher will emit a query to the `db-chan`, specifying what it is looking for"
 (def db-request
- (async/alts!! [db-chan
-                (async/timeout 1000)]))
+  (async/alts!! [db-chan
+                 (async/timeout 1000)]))
 
 (fact
  (-> db-request second) => db-chan)
@@ -338,8 +362,8 @@ of the two.  We don't care as long as we get what we need from the other side of
 
 "For a rule, the matcher will query the database for matching facts."
 (def db-request
- (async/alts!! [db-chan
-                (async/timeout 1000)]))
+  (async/alts!! [db-chan
+                 (async/timeout 1000)]))
 (fact
  (-> db-request second) => db-chan)
 (fact
@@ -363,3 +387,81 @@ of the two.  We don't care as long as we get what we need from the other side of
                 (async/timeout 1000)]) => [nil res-chan])
 
 
+[[:chapter {:title "Under the Hood"}]]
+[[:section {:title "split-atomic-update"}]]
+"The function `split-atomic-update` takes an event that may or may not have a `:changed` field (an atomic update),
+and returns a sequence of one or two events."
+
+"For events without a `:changed` field, `split-atomic-update` returns the event as-is."
+(fact
+ (split-atomic-update (event :fact "test/tweeted" "bob" ["hello"]))
+ => [(event :fact "test/tweeted" "bob" ["hello"])])
+
+"For events that do have a `:changed` field, `split-atomic-update` returns two events,
+one based on `:data` and the other based on `:removed`."
+(fact
+ (split-atomic-update (event :fact "test/tweeted" "bob" ["hello"]
+                             :removed ["hola"]))
+ => [(event :fact "test/tweeted" "bob" ["hello"])
+     (event :fact "test/tweeted" "bob" ["hola"]
+            :change -1)])
+
+[[:section {:title "join-atomic-updates"}]]
+"Given a collection of events, `join-atomic-updates` returns a possibly smaller collection of events
+where all events that [form atomic updates](#matches) are unified into single events."
+
+"If no events match, the function returns a collection with all original events"
+(fact
+ (join-atomic-updates [(event :fact "foo" "key1" [1 2 3])
+                       (event :fact "foo" "key2" [2 3 4])
+                       (event :fact "foo" "key3" [3 4 5])])
+ => [(event :fact "foo" "key1" [1 2 3])
+     (event :fact "foo" "key2" [2 3 4])
+     (event :fact "foo" "key3" [3 4 5])])
+
+"If some events match, `join-atomic-updates` joins them into a single event"
+(fact
+ (join-atomic-updates [(event :fact "foo" "key1" [2 3 4])
+                       (event :fact "foo" "key2" [1 2 3])
+                       (event :fact "foo" "key2" [2 3 4] :change -1)
+                       (event :fact "foo" "key3" [3 4 5] :change -1)])
+ => [(event :fact "foo" "key1" [2 3 4])
+     (event :fact "foo" "key2" [1 2 3]
+            :removed [2 3 4])
+     (event :fact "foo" "key3" [3 4 5] :change -1)])
+
+[[:section {:title "find-atomic-update"}]]
+"The key to implementing `join-atomic-updates` is being able to find, for a given event, a matching event within a given collection.
+`find-atomic-update` takes an event and a collection of other events, and returns a pair: `[match rest]`,
+where `match` is an event or `nil`, and `rest` is a collection of events."
+
+"If the collection of events does not contain a match for the given event,
+`nil` and the original collection are returned."
+(fact
+ (find-atomic-update (event :fact "foo" "key1" [1 2 3])
+                     [(event :fact "foo" "key1" [2 3 4])
+                      (event :fact "foo" "key2" [3 4 5] :change -1)])
+ => [nil [(event :fact "foo" "key1" [2 3 4])
+          (event :fact "foo" "key2" [3 4 5] :change -1)]])
+
+"If the collection of events contains a match, that match is returned, and the collection is returned with the match removed."
+(fact
+ (find-atomic-update (event :fact "foo" "key1" [1 2 3])
+                     [(event :fact "foo" "key1" [2 3 4])
+                      (event :fact "foo" "key1" [2 3 4] :change -1)
+                      (event :fact "foo" "key2" [3 4 5] :change -1)])
+ => [(event :fact "foo" "key1" [2 3 4] :change -1)
+     [(event :fact "foo" "key1" [2 3 4])
+      (event :fact "foo" "key2" [3 4 5] :change -1)]])
+
+[[:section {:title "matching?"}]]
+"`matching?` takes two events and returns whether they can be unified to a single atomic update.
+Two events are considered to match if they share all fields except `:data` and `:change`, and the values of `:change` are
+the negation of one another."
+(fact
+ (matching? (event :fact "foo" "key1" [1 2 3])
+            (event :fact "foo" "key1" [2 3 4] :change -1)) => true
+ (matching? (event :fact "foo" "key1" [1 2 3])
+            (event :fact "foo" "key1" [2 3 4])) => false
+ (matching? (event :fact "foo" "key1" [1 2 3])
+            (event :fact "foo" "key2" [2 3 4] :change -1)) => false)
