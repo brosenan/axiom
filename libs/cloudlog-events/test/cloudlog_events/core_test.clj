@@ -241,8 +241,8 @@ The `:ts` provides an additional key, so we can refer to specific events that sh
 "Some event processing systems like [Apache Storm](http://storm.apache.org/) guarantee [at least once](http://storm.apache.org/releases/1.0.0/Guaranteeing-message-processing.html) semantics.
 The advantage of this approach is that they guarantee that everything that needs to be processed gets processed, and do this at
 relatively low cost.  The disadvantage is that if we use such a mechanism we need to be able to cope with processing being done more than once.
-Cloudlog.clj copes with this in two ways:
-1. All computation in Cloudlog.clj is declarative, meaning that if you call a rule function twice with the same input you are guaranteed to get the same output.
+We cope with this in two ways:
+1. All computation is declarative, meaning that if you call a rule function twice with the same input you are guaranteed to get the same output.
 2. We use a consistent unique key for each result, so that if we get the same result a second time, the new result gets \"swallowed\" by the old result.
 
 The unique ID we use is the timestamp -- `:ts`.  Timestamps are given to *fact events* when they are created.

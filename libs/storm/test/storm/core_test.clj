@@ -280,25 +280,35 @@ We will provide the `fact-spout` an `ack` method to acknowledge incoming events,
 (fact
  (def ack-counter (atom 0))
  (def to-chan (async/chan))
- (def from-chan (async/chan))
+ (def from-chan (atom (async/chan)))
  (defn fact-spout-mock-module [$]
    (di/provide $ publish []
                (fn [ev]
                  (async/>!! to-chan ev)))
    (di/provide $ assign-service [foo]
-               (fn [q func]
-                 (when-not (= q "the-queue-for-this-spout")
-                   (throw (Exception. (str "Wrong queue: " q))))
-                 (async/go
-                   (loop []
-                     (let [ack (fn [] (swap! ack-counter inc))
-                           event (async/<! from-chan)]
-                       (func event nil ack))
-                     (recur)))))))
+               (let [threads (atom #{})]
+                 {:resource (fn [q func]
+                              (when-not (= q "the-queue-for-this-spout")
+                                (throw (Exception. (str "Wrong queue: " q))))
+                              (let [thread
+                                    (async/thread
+                                      (loop []
+                                        (println "######## waiting on event from " @from-chan)
+                                        (let [ack (fn [] (swap! ack-counter inc))
+                                              event (async/<!! @from-chan)]
+                                          (println "######## received " event)
+                                          (when event
+                                            (println "######## received event from " @from-chan)
+                                            (func event nil ack)
+                                            (recur)))))]
+                                (swap! threads conj thread)))
+                  :shutdown (fn []
+                              (async/close! @from-chan)
+                              (doseq [thread @threads]
+                                (async/<!! thread)))}))))
 
 "We wish to see that after we post and consume all events (which need to be the same events), all events are acknowledged."
 (fact
- :integ
  (let [event (fn [u1 u2] {:kind :fact
                           :name "test/follows"
                           :key u1
@@ -318,13 +328,15 @@ We will provide the `fact-spout` an `ack` method to acknowledge incoming events,
        topology (s/topology {"src" (s/spout-spec (fact-spout "the-queue-for-this-spout" config))}
                             {"out" (s/bolt-spec {"src" :shuffle}
                                                 (output-bolt config))})]
+   (def fact-spout-topology topology)
+   (def fact-spout-config config)
    (st/with-local-cluster [cluster]
      (st/submit-local-topology (:nimbus cluster)
                                "test-topology"
                                {}
                                topology)
      (doseq [event events]
-       (async/>!! from-chan event))
+       (async/>!! @from-chan event))
      (let [result (transient [])]
        (doseq [_ (range (count events))]
          (conj! result (async/<!! to-chan)))
@@ -391,6 +403,40 @@ we kill the associated topology."
                  :writers #{}
                  :readers #{}}) => nil
  (@running-topologies "perm.ABCD1234/timeline") => nil)
+
+[[:chapter {:title "storm-cluster"}]]
+"A `storm-cluster` resource represents an [Apache Storm](http://storm.apache.org) cluster.
+It is a map with two fields:
+- `:run` -- a function that takes a name and a topology, and deploys the topology on the cluster with the given name, and
+- `:kill` -- a function that stops a topology and removes it from the cluster."
+
+[[:section {:title "Local Cluster"}]]
+"A local cluster is created if a resource named `local-storm-cluster` exists.
+The value of `local-storm-cluster` does not matter because a local cluster has no configuration."
+
+"To demonstrate our local cluster we will create one, and then deploy a simple topology to it, 
+the same one we used for [fact-spou](t#fact-spout)."
+(fact
+ (reset! from-chan (async/chan))
+ (let [$ (di/injector {:local-storm-cluster true
+                       :modules ['storm.core-test/fact-spout-mock-module]})]
+   (module $ fact-spout-config)
+   (di/startup $)
+   (di/do-with! $ [storm-cluster]
+                (let [{:keys [run kill]} storm-cluster
+                      event {:kind :fact
+                              :name "test/follows"
+                              :key "alice"
+                              :data ["bob"]
+                              :ts 1000
+                              :change 1
+                              :writers #{"alice"}
+                              :readers #{}}]
+                  (run "my-topology" fact-spout-topology)
+                  (async/>!! @from-chan event)
+                  (async/alts!! [to-chan
+                                 (async/timeout 4000)]) => [event to-chan])
+                (di/shutdown $))))
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "injector"}]]

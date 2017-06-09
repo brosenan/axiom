@@ -35,22 +35,24 @@
         next-id (atom 0)]
     (di/do-with! $ [assign-service]
                  (assign-service q (fn [ev pub ack]
-                                            (async/>!! read-chan [ev ack])))
+                                     (async/>!! read-chan [ev ack])))
                  (s/spout
                   (nextTuple []
                              (let [[val chan] (async/alts!! [read-chan
-                                                             (async/timeout 1)])]
+                                                             (async/timeout 10)])]
                                (when (= chan read-chan)
-                                     (let [[ev ack] val
-                                           id @next-id]
-                                       (s/emit-spout! collector ev :id id)
-                                       (swap! acks #(assoc % id ack))
-                                       (swap! next-id inc)))))
+                                 (let [[ev ack] val
+                                       id @next-id]
+                                   (s/emit-spout! collector ev :id id)
+                                   (swap! acks #(assoc % id ack))
+                                   (swap! next-id inc)))))
                   (ack [id]
                        (let [ack (@acks id)]
                          (ack)
                          (swap! acks #(dissoc % id))))
-                  (fail [id])))))
+                  (fail [id])
+                  (close []
+                         (di/shutdown $))))))
 
 (defn keyword-keys [event]
   (->> event
@@ -167,4 +169,12 @@
                                     nil))
                                 (when (< (:change ev) 0)
                                   ((:kill storm-cluster) (-> ev :key str)))
-                                nil))))
+                                nil)))
+  (di/provide $ storm-cluster [local-storm-cluster]
+              (let [cluster (org.apache.storm.LocalCluster.)]
+                {:resource {:run (fn [name top]
+                                   (.submitTopology cluster name {org.apache.storm.config/TOPOLOGY-DEBUG true} top))
+                            :kill (fn [name]
+                                    (.killTopology cluster name))}
+                 :shutdown (fn []
+                             (.shutdown cluster))})))
