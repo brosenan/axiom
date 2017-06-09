@@ -138,15 +138,15 @@ The reason is that this is a single event that flows through the system,
 and removes one piece of data and at the same time (`:ts`) also adds another piece or data."
 
 "By default, if the `:removed` field exists, two events will be emitted, one for `:data` and one for `:removed`."
-(comment (fact
-          (let [em (emitter foo-yx)]
-            (em (event :fact "test/foo" 2 [3]
-                       :removed [1]))
-            => [(event :fact "cloudlog-events.core_test/foo-yx" 3 [2]
-                       :writers #{"cloudlog-events.core_test"})
-                (event :fact "cloudlog-events.core_test/foo-yx" 3 [1]
-                       :change -1
-                       :writers #{"cloudlog-events.core_test"})])))
+(fact
+ (let [em (emitter foo-yx)]
+   (em (event :fact "test/foo" 2 [3]
+              :removed [1]))
+   => [(event :fact "cloudlog-events.core_test/foo-yx" 3 [2]
+              :writers #{"cloudlog-events.core_test"})
+       (event :fact "cloudlog-events.core_test/foo-yx" 1 [2]
+              :change -1
+              :writers #{"cloudlog-events.core_test"})]))
 
 [[:chapter {:title "multiplier: Create a Function Applying Rules to Facts" :tag "multiplier"}]]
 "The lowest level of event processing is taking two corresponding events 

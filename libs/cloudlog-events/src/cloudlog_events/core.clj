@@ -44,21 +44,24 @@
                                                                        mult 1
                                                                        readers interset/universe
                                                                        rule-writers #{(-> rulefunc meta :ns str)}}}]
-  (fn [event]
-    (for [data (rulefunc (with-meta (vec (cons (:key event) (:data event)))
-                           {:writers (:writers event)
-                            :readers (:readers event)}))]
-      (merge
-       (merge event (if (-> rulefunc meta :target-fact)
-                      {:name (-> rulefunc meta :target-fact cloudlog/fact-table)}
+  (let [single-event-emitter (fn [event]
+                               (for [data (rulefunc (with-meta (vec (cons (:key event) (:data event)))
+                                                      {:writers (:writers event)
+                                                       :readers (:readers event)}))]
+                                 (merge
+                                  (merge event (if (-> rulefunc meta :target-fact)
+                                                 {:name (-> rulefunc meta :target-fact cloudlog/fact-table)}
                                         ; else
-                      {:kind :rule
-                       :name (str (cloudlog/fact-table [rulefunc]) "!" link)}))
-       {:key (first data)
-        :data (rest data)
-        :writers rule-writers
-        :change (* (:change event) mult)
-        :readers (interset/intersection (:readers event) readers)}))))
+                                                 {:kind :rule
+                                                  :name (str (cloudlog/fact-table [rulefunc]) "!" link)}))
+                                  {:key (first data)
+                                   :data (rest data)
+                                   :writers rule-writers
+                                   :change (* (:change event) mult)
+                                   :readers (interset/intersection (:readers event) readers)})))]
+    (fn [event]
+      (let [input-events (split-atomic-update event)]
+        (join-atomic-updates (mapcat single-event-emitter input-events))))))
 
 (defn multiplier [rulefunc index]
   (let [cont (loop [i index
