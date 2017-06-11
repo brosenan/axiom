@@ -358,9 +358,13 @@ of the two.  We don't care as long as we get what we need from the other side of
 (def reply-chan (-> db-request first second))
 
 "Next, the database emits matching rules on the reply channel, and closes it."
-(async/>!! reply-chan (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"]))
-(async/>!! reply-chan (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["eve" "bob"]))
-(async/close! reply-chan)
+(fact
+ (async/>!! reply-chan (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"]))
+ (async/>!! reply-chan (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["eve" "bob"]))
+ ;; The following two events should cancel one another
+ (async/>!! reply-chan (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["fred" "bob"]))
+ (async/>!! reply-chan (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["fred" "bob"] :change -1))
+ (async/close! reply-chan))
 
 "For each such event the matcher will emit the events obtained by multiplying the fact and the rules."
 (fact
@@ -388,13 +392,14 @@ of the two.  We don't care as long as we get what we need from the other side of
 (fact
  (-> db-request first first) => {:kind :fact
                                  :name "test/tweeted"
-                                 :key "bob"})
-(def reply-chan (-> db-request first second))
+                                 :key "bob"}
+ (def reply-chan (-> db-request first second)))
 
 "Now the database replies fact events."
-(async/>!! reply-chan (event :fact "test/tweeted" "bob" ["hello"]))
-(async/>!! reply-chan (event :fact "test/tweeted" "bob" ["world"]))
-(async/close! reply-chan)
+(fact
+ (async/>!! reply-chan (event :fact "test/tweeted" "bob" ["hello"]))
+ (async/>!! reply-chan (event :fact "test/tweeted" "bob" ["world"]))
+ (async/close! reply-chan))
 
 "The results are emitted on the `res-chan`:"
 (fact

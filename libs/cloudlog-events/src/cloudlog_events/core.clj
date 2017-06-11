@@ -119,7 +119,8 @@
     (-> rulefunc meta :source-fact cloudlog/fact-table)))
 
 (defn matcher [rulefunc link db-chan]
-  (let [mult (multiplier rulefunc link)]
+  (let [mult (multiplier rulefunc link)
+        db-chan (accumulate-db-chan db-chan)]
     (fn [ev out-chan]
       (async/go
         (let [db-reply-chan (async/chan)]
