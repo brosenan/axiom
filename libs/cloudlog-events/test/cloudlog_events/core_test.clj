@@ -137,7 +137,7 @@ To support this, we pass them as metadata on the data."
 The reason is that this is a single event that flows through the system, 
 and removes one piece of data and at the same time (`:ts`) also adds another piece or data."
 
-"By default, if the `:removed` field exists, two events will be emitted, one for `:data` and one for `:removed`."
+"If the `:removed` field exists, two events will be emitted, one for `:data` and one for `:removed`."
 (fact
  (let [em (emitter foo-yx)]
    (em (event :fact "test/foo" 2 [3]
@@ -159,9 +159,11 @@ that are produced from this combination."
 "The returned function takes two arguments: a *rule event* and a matching *fact event*.
 It returns a sequence of events created by this combination."
 (fact
- (mult1 (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"] :writers #{"cloudlog-events.core_test"})
+ (mult1 (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"]
+               :writers #{"cloudlog-events.core_test"})
         (event :fact "test/tweeted" "bob" ["something"]))
- => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["something"] :writers #{"cloudlog-events.core_test"})])
+ => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["something"]
+            :writers #{"cloudlog-events.core_test"})])
 
 "We call this unit a *multiplier*, because it multiplies the `:change` field of the rule and the fact event.
 Imagine we have `n` facts and `m` rules with a certain key.  In order to have all possible derived events
@@ -176,6 +178,23 @@ that is, applying the rule to the fact `n*m` times.  To achieve this, the multip
  (mult1 (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"] :change 2)
         (event :fact "test/tweeted" "bob" ["something"] :change 3))
  => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["something"] :change 6)])
+
+"Multiplies can handle atomic updates given in the fact:"
+(fact
+ (mult1 (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"])
+        (event :fact "test/tweeted" "bob" ["something else"]
+               :removed ["something"]))
+ => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["something else"]
+            :removed ["something"])])
+
+"... or in the rule."
+(fact
+ (mult1 (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["eve" "bob"]
+               :removed ["alice" "bob"])
+        (event :fact "test/tweeted" "bob" ["something"]))
+ => [(event :fact "cloudlog-events.core_test/timeline" "eve" ["something"])
+     (event :fact "cloudlog-events.core_test/timeline" "alice" ["something"]
+            :change -1)])
 
 [[:section {:title "Confidentiality"}]]
 "A multiplier is a meeting place of facts with rules, which in turn are derived from other facts.
@@ -386,6 +405,96 @@ of the two.  We don't care as long as we get what we need from the other side of
  (async/alts!! [res-chan
                 (async/timeout 1000)]) => [nil res-chan])
 
+
+[[:chapter {:titile "Accumulating Events"}]]
+"[emitters](#emitter) [multipliers](#multiplier) and [matchers](#matcher) treat each event individually.
+This approach is consistent with the practice of [Event Sourcing](https://martinfowler.com/eaaDev/EventSourcing.html).
+However, sometimes we wish to see the complete picture and accumulate events.
+The following functions support event accumulation."
+
+[[:section {:title "accumulate"}]]
+"`accumulate` is a *reducing function* that accumulates events into a map for which the keys are the events themselves, excluding their `:change` fields,
+and the values are the sums of the `:change` for one particular event."
+
+"With arity 0, `accumulate` returns and empty map."
+(fact
+ (accumulate) => {})
+
+"With arity 2, it will take a map and an event, and if the event is not already a key in the map, it will be added
+so that the `:change` is the value"
+(fact
+ (accumulate {} (event :fact "foo/bar" "k1" [1 2]))
+ => {(-> (event :fact "foo/bar" "k1" [1 2])
+         (dissoc :change)) 1})
+
+"If the event exists as a key in the map (possibly with a different `:change` value),
+the entry is updated to include the sum of the existing value and the event's `:change`."
+(fact
+ (accumulate {(-> (event :fact "foo/bar" "k1" [1 2])
+                  (dissoc :change)) 1}
+             (event :fact "foo/bar" "k1" [1 2]))
+ => {(-> (event :fact "foo/bar" "k1" [1 2])
+         (dissoc :change)) 2})
+
+[[:section {:title "accumulated-events"}]]
+"With an accumulated map we can get a sequence of the underlying accumulated events by calling `accumulated-events`."
+(fact
+ (set (accumulated-events {(-> (event :fact "foo/bar" "k1" [1 2])
+                               (dissoc :change)) 1
+                           (-> (event :fact "foo/bar" "k2" [3 4])
+                               (dissoc :change)) 2}))
+ => #{(event :fact "foo/bar" "k1" [1 2])
+      (event :fact "foo/bar" "k2" [3 4] :change 2)})
+
+"Events for which the accumulated `:change` value is zero or negative are ignored."
+(fact
+ (accumulated-events {(-> (event :fact "foo/bar" "k1" [1 2])
+                          (dissoc :change)) 0
+                      (-> (event :fact "foo/bar" "k2" [3 4])
+                          (dissoc :change)) -1})
+ => [])
+
+[[:section {:title "accumulate-db-chan"}]]
+"Given a `database-chan`, such as [the one provided for DynamoDB](dynamo.html#database-chan), and the one consumed by [matchers](#matcher),
+`accumulate-db-chan` returns a new channel which implements the same protocol but accumulates the events coming from the given database interface."
+
+"Consider for example the following mock database, which will answer each request with the same three events:"
+(fact
+ (def mock-db-chan (async/chan))
+ (async/go
+   (loop []
+     (let [[req resp-chan] (async/<! mock-db-chan)]
+       (async/>! resp-chan (event :fact "foo/bar" "k1" [1 2]))
+       (async/>! resp-chan (event :fact "foo/bar" "k2" [3 4]))
+       (async/>! resp-chan (event :fact "foo/bar" "k1" [1 2] :change -1))
+       (async/close! resp-chan))
+     (recur))))
+
+"Please note that the first and third events cancel each other.
+Now we use `accumulate-db-chan` to create a new channel."
+(fact
+ (def my-db-chan (accumulate-db-chan mock-db-chan)))
+
+"When sending a request to `my-db-chan`, we should get the events provided on `mock-db-chan`, but accumulated."
+(fact
+ ;; Read everything from the response channel
+ (defn slurp-response [resp-chan]
+   (loop [res #{}]
+     (let [ev (async/<!! resp-chan)]
+       (cond ev
+             (recur (conj res ev))
+             :else
+             res))))
+
+ (let [resp-chan (async/chan)]
+   (async/>!! my-db-chan [{:some :request} resp-chan])
+   (slurp-response resp-chan) => #{(event :fact "foo/bar" "k2" [3 4])}))
+
+"This should work multiple times..."
+(fact
+ (let [resp-chan (async/chan)]
+   (async/>!! my-db-chan [{:some :request} resp-chan])
+   (slurp-response resp-chan) => #{(event :fact "foo/bar" "k2" [3 4])}))
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "split-atomic-update"}]]

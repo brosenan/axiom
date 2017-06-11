@@ -69,20 +69,53 @@
                (if (> i 0)
                  (recur (dec i) (-> func meta :continuation))
                  ;; else
-                 func))]
+                 func))
+        single-event-mult (fn [rule-ev fact-ev]
+                            (let [rulefunc' (cont (cons (:key rule-ev) (:data rule-ev)))
+                                  em (emitter (with-meta rulefunc' (meta cont))
+                                              :link index
+                                              :mult (:change rule-ev)
+                                              :readers (:readers rule-ev)
+                                              :rule-writers (:writers rule-ev))]
+                              (em fact-ev)))]
     (fn [rule-ev fact-ev]
-      (let [rulefunc' (cont (cons (:key rule-ev) (:data rule-ev)))
-            em (emitter (with-meta rulefunc' (meta cont))
-                        :link index
-                        :mult (:change rule-ev)
-                        :readers (:readers rule-ev)
-                        :rule-writers (:writers rule-ev))]
-        (em fact-ev)))))
+      (let [rule-evs (split-atomic-update rule-ev)]
+        (join-atomic-updates (mapcat #(single-event-mult % fact-ev) rule-evs))))))
+
+
+(defn accumulate
+  ([] {})
+  ([accum ev]
+   (merge-with + accum {(dissoc ev :change) (:change ev)})))
+
+(defn accumulated-events [accum]
+  (->> (for [[ev ch] accum]
+         (assoc ev :change ch))
+       (filter #(> (:change %) 0))))
+
+(defn accumulate-db-chan [db-chan]
+  (let [my-chan (async/chan)]
+    (async/go
+      (loop []
+        (let [my-resp-chan (async/chan)
+              [req resp-chan] (async/<! my-chan)]
+          (async/>! db-chan [req my-resp-chan])
+          (let [accum (async/reduce accumulate (accumulate) my-resp-chan)
+                accum (async/map accumulated-events [accum])
+                accum (async/<! accum)]
+            (loop [accum accum]
+              (when-not (empty? accum)
+                (async/>! resp-chan (first accum))
+                (recur (rest accum))))
+            (async/close! resp-chan)))
+        (recur)))
+    my-chan))
+
 
 (defn source-fact-table [rulefunc link]
   (if (> link 0)
     (recur (-> rulefunc meta :continuation) (dec link))
-    ; else
+    ;; else
     (-> rulefunc meta :source-fact cloudlog/fact-table)))
 
 (defn matcher [rulefunc link db-chan]
