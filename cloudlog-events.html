@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 11 June 2017</h5>
+              <h5>Date: 12 June 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -210,7 +210,14 @@
                 (dissoc :change)) 1}
            (event :fact &quot;foo/bar&quot; &quot;k1&quot; [1 2]))
  =&gt; {(-&gt; (event :fact &quot;foo/bar&quot; &quot;k1&quot; [1 2])
-       (dissoc :change)) 2}</code></pre></div><div><span id="accumulated-events"></span><h3>5.2 &nbsp;&nbsp; accumulated-events</h3></div><div><p>With an accumulated map we can get a sequence of the underlying accumulated events by calling <code>accumulated-events</code>.</p></div><div class="code"><pre><code class="clojure">(set (accumulated-events {(-&gt; (event :fact &quot;foo/bar&quot; &quot;k1&quot; [1 2])
+       (dissoc :change)) 2}</code></pre></div><div><p><a href='cloudlog-events.html#atomic-updates'>Atomic update events</a> are accumulated as two different events. In the following example the first event sets the value of <code>k1</code> to <code>&#91;1 2&#93;</code>, and the second event is an atomic update, updating its value to <code>&#91;2 3&#93;</code>. The accumulation shows only a single event with the updated value. (The old value is still present, but with value of 0).</p></div><div class="code"><pre><code class="clojure">(reduce accumulate {}
+       [(event :fact &quot;foo/bar&quot; &quot;k1&quot; [1 2])
+        (event :fact &quot;foo/bar&quot; &quot;k1&quot; [2 3]
+               :removed [1 2])])
+ =&gt; {(-&gt; (event :fact &quot;foo/bar&quot; &quot;k1&quot; [2 3])
+       (dissoc :change)) 1
+   (-&gt; (event :fact &quot;foo/bar&quot; &quot;k1&quot; [1 2])
+       (dissoc :change)) 0}</code></pre></div><div><span id="accumulated-events"></span><h3>5.2 &nbsp;&nbsp; accumulated-events</h3></div><div><p>With an accumulated map we can get a sequence of the underlying accumulated events by calling <code>accumulated-events</code>.</p></div><div class="code"><pre><code class="clojure">(set (accumulated-events {(-&gt; (event :fact &quot;foo/bar&quot; &quot;k1&quot; [1 2])
                              (dissoc :change)) 1
                          (-&gt; (event :fact &quot;foo/bar&quot; &quot;k2&quot; [3 4])
                              (dissoc :change)) 2}))
