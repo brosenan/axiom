@@ -441,6 +441,21 @@ the entry is updated to include the sum of the existing value and the event's `:
  => {(-> (event :fact "foo/bar" "k1" [1 2])
          (dissoc :change)) 2})
 
+"[Atomic update events](cloudlog-events.html#atomic-updates) are accumulated as two different events.
+In the following example the first event sets the value of `k1` to `[1 2]`,
+and the second event is an atomic update, updating its value to `[2 3]`.
+The accumulation shows only a single event with the updated value.
+(The old value is still present, but with value of 0)."
+(fact
+ (reduce accumulate {}
+         [(event :fact "foo/bar" "k1" [1 2])
+          (event :fact "foo/bar" "k1" [2 3]
+                 :removed [1 2])])
+ => {(-> (event :fact "foo/bar" "k1" [2 3])
+         (dissoc :change)) 1
+     (-> (event :fact "foo/bar" "k1" [1 2])
+         (dissoc :change)) 0})
+
 [[:section {:title "accumulated-events"}]]
 "With an accumulated map we can get a sequence of the underlying accumulated events by calling `accumulated-events`."
 (fact

@@ -86,7 +86,12 @@
 (defn accumulate
   ([] {})
   ([accum ev]
-   (merge-with + accum {(dissoc ev :change) (:change ev)})))
+   (let [single-event-accum (fn [accum ev]
+                              (merge-with + accum {(dissoc ev :change)
+                                                   (:change ev)}))]
+     (->> ev
+          split-atomic-update
+          (reduce single-event-accum accum)))))
 
 (defn accumulated-events [accum]
   (->> (for [[ev ch] accum]
