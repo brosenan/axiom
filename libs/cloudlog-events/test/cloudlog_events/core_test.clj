@@ -411,7 +411,7 @@ of the two.  We don't care as long as we get what we need from the other side of
                 (async/timeout 1000)]) => [nil res-chan])
 
 
-[[:chapter {:titile "Accumulating Events"}]]
+[[:chapter {:title "Accumulating Events"}]]
 "[emitters](#emitter) [multipliers](#multiplier) and [matchers](#matcher) treat each event individually.
 This approach is consistent with the practice of [Event Sourcing](https://martinfowler.com/eaaDev/EventSourcing.html).
 However, sometimes we wish to see the complete picture and accumulate events.
