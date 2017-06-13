@@ -98,6 +98,9 @@
          (assoc ev :change ch))
        (filter #(> (:change %) 0))))
 
+(defn mapchan [f chan]
+  (async/map f [chan]))
+
 (defn accumulate-db-chan [db-chan]
   (let [my-chan (async/chan)]
     (async/go
@@ -105,14 +108,11 @@
         (let [my-resp-chan (async/chan)
               [req resp-chan] (async/<! my-chan)]
           (async/>! db-chan [req my-resp-chan])
-          (let [accum (async/reduce accumulate (accumulate) my-resp-chan)
-                accum (async/map accumulated-events [accum])
-                accum (async/<! accum)]
-            (loop [accum accum]
-              (when-not (empty? accum)
-                (async/>! resp-chan (first accum))
-                (recur (rest accum))))
-            (async/close! resp-chan)))
+          (let [accum (->> (async/reduce accumulate (accumulate) my-resp-chan)
+                           (mapchan accumulated-events)
+                           async/<!
+                           async/to-chan)]
+            (async/pipe accum resp-chan)))
         (recur)))
     my-chan))
 
