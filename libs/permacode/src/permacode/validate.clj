@@ -82,6 +82,7 @@
                'take 'drop 'conj 'take-while 'drop-while 'split-with
                'count 'range 'apply 'concat 'reverse
                'first 'second 'nth 'rest 'next
+               'sort 'sort-by 'juxt
                'class 'name 'namespace
                'subs 're-find 're-matches 're-seq
                'list 'seq 'cons 'vector 'vec 'str 'set 'keyword 'symbol
