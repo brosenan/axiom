@@ -95,15 +95,20 @@
                   deps (-> func meta :deps)]
               (cond (and (every? (partial contains? resources) deps)
                          (not (contains? keys-to-skip res)))
-                    (let [val (func resources)
-                          [val shutdown-seq] (cond (and (map? val)
-                                                         (:resource val)
-                                                         (:shutdown val)
-                                                         (= (count val) 2))
-                                                    [(:resource val) (cons (:shutdown val) shutdown-seq)]
-                                                    :else
-                                                    [val shutdown-seq])]
-                      (recur (rest funcs) (assoc resources res val) shutdown-seq))
+                    (do
+                      (when (System/getenv "AXIOM_DI_DEBUG")
+                        (println "DI: Providing resource " res))
+                      (let [val (func resources)
+                            [val shutdown-seq] (cond (and (map? val)
+                                                          (:resource val)
+                                                          (:shutdown val)
+                                                          (= (count val) 2))
+                                                     [(:resource val) (cons (:shutdown val) shutdown-seq)]
+                                                     :else
+                                                     [val shutdown-seq])]
+                        (when (System/getenv "AXIOM_DI_DEBUG")
+                          (println "DI: Done"))
+                        (recur (rest funcs) (assoc resources res val) shutdown-seq)))
                     :else
                     (recur (rest funcs) resources shutdown-seq)))))
     nil))

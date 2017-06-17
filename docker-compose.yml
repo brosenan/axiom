@@ -4,6 +4,7 @@ services:
     image: rabbitmq
     ports:
     - "5672:5672"
+
   dynamodb:
     image: deangiberson/aws-dynamodb-local
     ports:
