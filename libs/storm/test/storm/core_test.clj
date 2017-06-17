@@ -384,7 +384,8 @@ It defines `rule-topology` based on these resources:
 
 "When an `axiom/rule-ready` event with a positive `:change` (introduction of a rule) arrives, 
 `rule-topology` calls [topology](#topology) to create a topology for the rule, 
-and then assigns it to the `storm-cluster`."
+and then assigns it to the `storm-cluster`.
+The topology name is converted to avoid names not allowed by Storm."
 (fact
  (rule-topology {:kind :fact
                  :name "axiom/rule-ready"
@@ -395,8 +396,9 @@ and then assigns it to the `storm-cluster`."
                  :writers #{}
                  :readers #{}}) => nil
  (provided
-  (topology 'perm.ABCD1234/timeline config) => ..topology..)
- (@running-topologies "perm.ABCD1234/timeline") => ..topology..)
+  (topology 'perm.ABCD1234/timeline config) => ..topology..
+  (convert-topology-name "perm.ABCD1234/timeline") => "some-name")
+ (@running-topologies "some-name") => ..topology..)
 
 "When an `axiom/rule-ready` event with a *negative* `:change` arrives,
 we kill the associated topology."
@@ -409,7 +411,9 @@ we kill the associated topology."
                  :change -1
                  :writers #{}
                  :readers #{}}) => nil
- (@running-topologies "perm.ABCD1234/timeline") => nil)
+ (provided
+  (convert-topology-name "perm.ABCD1234/timeline") => "some-name")
+ (@running-topologies "some-name") => nil)
 
 [[:chapter {:title "storm-cluster"}]]
 "A `storm-cluster` resource represents an [Apache Storm](http://storm.apache.org) cluster.
@@ -522,3 +526,16 @@ The output map will include these keys (only) with their values in the original 
    (task-config config :bolt-x) => {:foo 1
                                     :bar "2"
                                     :baz "3"}))
+
+[[:section {:title "convert-topology-name"}]]
+"Storm restricts topology names from containing '.', '/', '\\' or ':'.
+`convert-topology-name` replaces these characters with legal ones (namely, '-' and '_')."
+
+"Strings that do not contain these characters are returned unchanged."
+(fact
+ (convert-topology-name "this name is legal") => "this name is legal")
+
+"'.' is replaced with '-'.
+The other illegal characters are replaced with '_'."
+(fact
+ (convert-topology-name "./\\:") => "-___")

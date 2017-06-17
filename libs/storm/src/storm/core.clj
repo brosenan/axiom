@@ -6,7 +6,8 @@
              [clojure :as s]
              [config :as scfg]]
             [di.core :as di]
-            [clojure.core.async :as async]))
+            [clojure.core.async :as async]
+            [clojure.string :as str]))
 
 (def event-fields
   ["kind" "name" "key" "data" "ts" "change" "writers" "readers"])
@@ -155,6 +156,11 @@
               :else
               (s/topology spouts bolts))))))
 
+(defn convert-topology-name [name]
+  (-> name
+      (str/replace "." "-")
+      (str/replace #"[\\/:]" "_")))
+
 (defn module [$ config]
   (di/do-with $ [declare-service
                  assign-service
@@ -163,13 +169,15 @@
                                                            :name "axiom/rule-ready"})
               (assign-service "storm.core/rule-topology"
                               (fn [ev]
-                                (when (> (:change ev) 0)
-                                  (let [topology (topology (:key ev) config)]
-                                    ((:run storm-cluster) (-> ev :key str) topology)
-                                    nil))
-                                (when (< (:change ev) 0)
-                                  ((:kill storm-cluster) (-> ev :key str)))
+                                (let [topo-name (convert-topology-name (-> ev :key str))]
+                                  (when (> (:change ev) 0)
+                                    (let [topology (topology (:key ev) config)]
+                                      ((:run storm-cluster) topo-name topology)
+                                      nil))
+                                  (when (< (:change ev) 0)
+                                    ((:kill storm-cluster) topo-name)))
                                 nil)))
+  
   (di/provide $ storm-cluster [local-storm-cluster]
               (let [cluster (org.apache.storm.LocalCluster.)]
                 {:resource {:run (fn [name top]
