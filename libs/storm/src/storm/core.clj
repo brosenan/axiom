@@ -72,8 +72,9 @@
     (s/bolt
      (execute [tuple]
               (let [{:as event} tuple
-                    event (keyword-keys event)]
-                (doseq [res (em event)]
+                    event (keyword-keys event)
+                    events (em event)]
+                (doseq [res events]
                   (s/emit-bolt! collector res :anchor tuple))
                 (s/ack! collector tuple))))))
 

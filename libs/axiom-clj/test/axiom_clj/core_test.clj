@@ -57,7 +57,17 @@ and how data is not lost in the process."
    :s3-config {:bucket-name (System/getenv "PERMACODE_S3_BUCKET")
                :access-key (System/getenv "AWS_ACCESS_KEY")
                :secret-key (System/getenv "AWS_SECRET_KEY")}
-   :local-storm-cluster true})
+   :local-storm-cluster true
+   :fact-spout {:include [:amqp-config]}
+   :store-bolt {:include [:dynamodb-event-storage-num-threads
+                          :dynamodb-default-throughput
+                          :dynamodb-config]}
+   :output-bolt {:include [:amqp-config]}
+   :initlal-link-bolt {:include [:s3-config]}
+   :link-bolt {:include [:s3-config
+                         :dynamodb-config
+                         :dynamodb-default-throughput
+                         :num-database-retriever-threads]}})
 
 "The `injector` function creates an injector based on the given config,
 and calls all the `module` functions for all the dependencies."
@@ -89,7 +99,7 @@ so we clear the trees that store it."
 
 [[:section {:title "Input Data"}]]
 "For the purpose of this test we consider a Twitter-like app for numbers.
-Our \"users\" will therefore be the numbers between 0 and 100, exclusive.
+Our \"users\" will therefore be the numbers between 10 and 100, exclusive.
 Numbers follow other numbers if they literally *follow* them.
 Specifically, each number \"follows\" the ten numbers that precede it."
 
@@ -104,7 +114,7 @@ This is done in a thread that waits 100 milliseconds between each publication."
                 (async/thread
                   (let [ts (atom 1000000)
                         phase (fn [offs]
-                                (doseq [u1 (range 100)
+                                (doseq [u1 (range 10 100)
                                         u2 (range (- u1 5 offs) (- u1 offs))]
                                   (publish
                                    {:kind :fact
@@ -114,7 +124,7 @@ This is done in a thread that waits 100 milliseconds between each publication."
                                     :ts (swap! ts inc)
                                     :change 1
                                     :readers #{}
-                                    :writers #{u1}})
+                                    :writers #{(str u1)}})
                                   (Thread/sleep 300)))]
                     (phase 0)
                     (phase 5))))))
@@ -136,7 +146,7 @@ This is done in a thread that waits 100 milliseconds between each publication."
                         :ts (swap! ts inc)
                         :change 1
                         :readers #{}
-                        :writers #{u}})
+                        :writers #{(str u)}})
                       (Thread/sleep 200)))))))
 
 [[:section {:title "Introducing the App"}]]
@@ -156,6 +166,48 @@ We do this after a 30 second delay intended to allow some (but not all) of the f
                             :change 1
                             :writers #{}
                             :readers #{}})))))
+
+[[:section {:title "Testing the Output"}]]
+"We test `timeline` derived facts to see that all data was created.
+Based on how we created this experiment, every number from 10 onward should have exactly 20 tweets in their timeline
+(2 tweets times 10 followees)."
+
+"To track this, we will create an atom holding a map from the numbers 10 through 100 to the value 20."
+(def timeline-tracker (atom
+                       (->> (range 10 100)
+                            (map (fn [x] [x 20]))
+                            (into {}))))
+
+"We also hold an overall counter of 1800 (=(100-10)*20) that will indicate when we are done receiving all timeline entries."
+(def overall-counter (atom 1800))
+
+"To track timeline entries we create a service function that registers to `followee-tweets` events, and updates the counters."
+(fact
+ :integ
+ (defn track-timeline [ev]
+   (let [u1 (:key ev)]
+     (println)
+     (println "---- " u1)
+     (println)
+     (swap! timeline-tracker update-in [(read-string u1)] dec)
+     (swap! overall-counter dec)))
+ 
+ (di/do-with! $ [serve]
+              (serve
+               track-timeline
+               {:kind :fact
+                :name "perm.QmdLhmeiaJTMPdv7oT7mUsztdtjHq7f16Dw6nkR6JhxswP/followee-tweets"})))
+
+"Now we wait until the overall counter reaches 0"
+(fact
+ :integ
+ (loop []
+   (when (> @overall-counter 0)
+     (println "%%%%%%%%%%%%%%%%%%%%%%%%% " @overall-counter)
+     (Thread/sleep 1000)
+     (recur))))
+
+(println "$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
 
 (fact
  :integ

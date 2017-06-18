@@ -299,12 +299,9 @@ We will provide the `fact-spout` an `ack` method to acknowledge incoming events,
                               (let [thread
                                     (async/thread
                                       (loop []
-                                        (println "######## waiting on event from " @from-chan)
                                         (let [ack (fn [] (swap! ack-counter inc))
                                               event (async/<!! @from-chan)]
-                                          (println "######## received " event)
                                           (when event
-                                            (println "######## received event from " @from-chan)
                                             (func event nil ack)
                                             (recur)))))]
                                 (swap! threads conj thread)))
