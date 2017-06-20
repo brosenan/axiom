@@ -483,7 +483,7 @@ these events as well as new ones, so there will not be any data loss."
 
 "`fact-declarer` is a generator function that takes the name of the rule and the link number (as a unique identifier)"
 (fact
- (def decl-my-fact (fact-declarer 'perm.ABC123/my-rule 2)))
+ (def decl-my-fact (fact-declarer 'perm.ABC123/my-rule 1)))
 
 "The returned fact declarer is intended to be used in a [zk-plan](zk-plan.html), as a [task](zk-plan.html#add-task) function.
 As such, it needs to accept one or more arguments.
@@ -506,8 +506,8 @@ We will mock them here."
    ;; Assert the calls
    (async/alts!! [calls
                   (async/timeout 1000)])
-   => [[:declare-service "fact-for-rule/perm.ABC123/my-rule!2" {:kind :fact
-                                                                :name "test/follows"}] calls]))
+   => [[:declare-service "fact-for-rule/perm.ABC123/my-rule!1" {:kind :fact
+                                                                :name "test/tweeted"}] calls]))
 
 [[:section {:title "initial-migrator"}]]
 "`initial-migrator` creates a migration function for link 0 of a rule.

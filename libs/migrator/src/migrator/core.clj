@@ -18,8 +18,9 @@
     (di/do-with! $ [declare-service hasher]
                  (binding [permval/*hasher* hasher]
                    (let [rulefunc (perm/eval-symbol rule)]
-                     (declare-service (str "fact-for-rule/" rule "!" link) {:kind :fact
-                                                                            :name (clg/fact-table (-> rulefunc meta :source-fact))}))))
+                     (declare-service (str "fact-for-rule/" rule "!" link)
+                                      {:kind :fact
+                                       :name (ev/source-fact-table rulefunc link)}))))
     nil))
 
 (defn initial-migrator [rule-name shard shards]

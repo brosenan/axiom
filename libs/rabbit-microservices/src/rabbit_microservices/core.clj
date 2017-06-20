@@ -55,9 +55,11 @@
 (defn arg-count [func]
   (-> func class .getDeclaredMethods first .getParameterTypes alength))
 
-(defn publisher [srv ev]
+(defn publisher [srv info ev]
   (let [bin (nippy/freeze ev)
         rk (event-routing-key ev)]
+    (info {:source "rabbit"
+           :desc (str "Publishing " ev " on " rk)})
     (lb/publish (:chan srv) facts-exch rk bin {})
     nil))
 
@@ -96,11 +98,14 @@
                   (assign-service key func))
                 nil))
 
-  (di/provide $ declare-service [amqp-service]
+  (di/provide $ declare-service [amqp-service info]
               (fn [key reg]
-                (let [chan (:chan amqp-service)]
+                (let [chan (:chan amqp-service)
+                      routing-key (event-routing-key reg)]
+                  (info {:source "rabbit"
+                         :desc (str "Declaring queue " key " with routing key " routing-key)})
                   (lq/declare chan key)
-                  (lq/bind chan key facts-exch {:routing-key (event-routing-key reg)}))
+                  (lq/bind chan key facts-exch {:routing-key routing-key}))
                 nil))
 
   (di/provide $ assign-service [amqp-service]
@@ -108,6 +113,6 @@
                 (lc/subscribe (:chan amqp-service) key (partial handle-event func (:alive amqp-service)) {:auto-ack (< (arg-count func) 3)})
                 nil))
 
-  (di/provide $ publish [amqp-service]
-              (partial publisher amqp-service)))
+  (di/provide $ publish [amqp-service info]
+              (partial publisher amqp-service info)))
 

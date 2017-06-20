@@ -168,46 +168,30 @@ We do this after a 30 second delay intended to allow some (but not all) of the f
                             :readers #{}})))))
 
 [[:section {:title "Testing the Output"}]]
-"We test `timeline` derived facts to see that all data was created.
-Based on how we created this experiment, every number from 10 onward should have exactly 20 tweets in their timeline
-(2 tweets times 10 followees)."
-
-"To track this, we will create an atom holding a map from the numbers 10 through 100 to the value 20."
-(def timeline-tracker (atom
-                       (->> (range 10 100)
-                            (map (fn [x] [x 20]))
-                            (into {}))))
-
-"We also hold an overall counter of 1800 (=(100-10)*20) that will indicate when we are done receiving all timeline entries."
-(def overall-counter (atom 1800))
-
-"To track timeline entries we create a service function that registers to `followee-tweets` events, and updates the counters."
+"If all works as expected, each number in the range 10 to 100 (exclusive) should have exactly 20 (= 10 followees * 2 tweets) tweets in their timeline.
+To make sure this is the case we walk through all the numbers in this range and query their timeline.
+If we get a smaller number of tweets we sleep and try again to allow the processing to complete for this user.
+If the number exceeds 20 we fail."
 (fact
  :integ
- (defn track-timeline [ev]
-   (let [u1 (:key ev)]
-     (println)
-     (println "---- " u1)
-     (println)
-     (swap! timeline-tracker update-in [(read-string u1)] dec)
-     (swap! overall-counter dec)))
- 
- (di/do-with! $ [serve]
-              (serve
-               track-timeline
-               {:kind :fact
-                :name "perm.QmdLhmeiaJTMPdv7oT7mUsztdtjHq7f16Dw6nkR6JhxswP/followee-tweets"})))
-
-"Now we wait until the overall counter reaches 0"
-(fact
- :integ
- (loop []
-   (when (> @overall-counter 0)
-     (println "%%%%%%%%%%%%%%%%%%%%%%%%% " @overall-counter)
-     (Thread/sleep 1000)
-     (recur))))
-
-(println "$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+ (di/do-with! $ [database-chan]
+              (doseq [i (range 10 100)]
+                (loop []
+                  (let [chan (async/chan)
+                        ev {:kind :fact
+                            :name "perm.QmdLhmeiaJTMPdv7oT7mUsztdtjHq7f16Dw6nkR6JhxswP/followee-tweets"
+                            :key (str i)}]
+                    (async/>!! database-chan [ev chan])
+                    (let [timeline (->> chan
+                                        (async/reduce conj #{})
+                                        async/<!!)]
+                      (cond (< (count timeline) 20)
+                            (do
+                              (Thread/sleep 1000)
+                              (recur))
+                            :else
+                            (do
+                              (count timeline) => 20))))))))
 
 (fact
  :integ
