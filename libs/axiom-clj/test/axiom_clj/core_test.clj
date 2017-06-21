@@ -19,7 +19,9 @@ After calling [di/startup](di.html#startup) to start all services the `main` fun
 However, it uses `.addShutdownHook` on the JVM's `Runtime` to register [di/shutdown](di.html#shutdown) when the process is interrupted
 or killed from the outside."
 
-[[:chapter {:title "Integration Test"}]]
+"This document consists of integration tests for different parts of Axiom."
+
+[[:chapter {:title "Information Tier Integration Test"}]]
 "In this section we build an integration test that tests Axiom's entire data processing pipeline,
 including [data migration](migrator.html) and a [topology](storm.html)."
 
@@ -151,7 +153,7 @@ This is done in a thread that waits 100 milliseconds between each publication."
 
 [[:section {:title "Introducing the App"}]]
 "To start a migration and a subsequent topology we introduce a `axiom/app-version` fact with the version of our code.
-We do this after a 30 second delay intended to allow some (but not all) of the facts to already be stored when this rule is introduced."
+We do this after a 10 second delay intended to allow some (but not all) of the facts to already be stored when this rule is introduced."
 (fact
  :integ
  (def app-thread
@@ -192,6 +194,9 @@ If the number exceeds 20 we fail."
                             :else
                             (do
                               (count timeline) => 20))))))))
+
+[[:section {:title "Shutting Down"}]]
+"Eventually we wait for all threads to complete and shut down the system."
 
 (fact
  :integ

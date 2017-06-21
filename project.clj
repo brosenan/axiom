@@ -91,4 +91,8 @@
                     "storm"
                     {:input "libs/storm/test/storm/core_test.clj"
                      :title "storm.core"
-                     :subtitle "Converting Cloudlog Rules to Apache Storm Topologies"}}})
+                     :subtitle "Converting Cloudlog Rules to Apache Storm Topologies"}
+                    "axiom-clj"
+                    {:input "libs/axiom-clj/test/axiom_clj/core_test.clj"
+                     :title "axiom-clj.core"
+                     :subtitle "An Integration of All Dependencies"}}})
