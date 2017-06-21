@@ -1,0 +1,228 @@
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+
+  <!-- Enable responsiveness on mobile devices-->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <link rel="shortcut icon" href="favicon.ico">
+  <title>axiom//axiom-clj.core - An Integration of All Dependencies</title>
+  <script src="js/highlight.min.js"></script>
+  <script src="js/gumshoe.min.js"></script>
+  <script src="js/smooth-scroll.min.js"></script>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/poole.css">
+  <link rel="stylesheet" href="css/syntax.css">
+  <link rel="stylesheet" href="css/lanyon.css">
+  <link rel="stylesheet" href="css/bolton.css">
+  <link rel="stylesheet" href="css/bolton-api.css">
+  <link rel="stylesheet" href="css/bolton-highlight.css">
+  <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=PT+Serif:400,400italic,700|PT+Sans:400">
+  
+</head>
+
+  <body class="theme-base-08">
+    <span id="page-top"></span>
+
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+     styles, `#sidebar-checkbox` for behavior. -->
+<input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox">
+
+<!-- Toggleable sidebar -->
+<div class="sidebar" id="sidebar">
+  <nav class="sidebar-nav">
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item active" href="axiom-clj.html">axiom-clj.core</a><a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="di.html">di.core</a><a class="sidebar-nav-item" href="docs.html"></a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="migrator.html">migrator.core</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="s3.html">s3.core</a><a class="sidebar-nav-item" href="storm.html">storm.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
+    <span class="sidebar-nav-item">&nbsp;</span>
+    <span class="sidebar-nav-item">&nbsp;</span>
+  </nav>
+</div>
+
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+	  <a href="index.html"><img src="img/axiom-logo.png"></a>
+          <h3 class="masthead-title">
+            <span>axiom//axiom-clj.core</span>
+            <small>An Integration of All Dependencies</small>
+          </h3>
+        </div>
+      </div>
+
+      <div class="container content">
+        <div class="page">
+          <div class="heading">
+            <div>
+              <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
+              <h5>Date: 21 June 2017</h5>
+              <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
+              <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
+          <hr/>
+          <div class="outline">
+            <div class="toc">
+              <nav data-gumshoe-header>
+                <ul data-gumshoe>
+                  <a data-scroll class="top" href="#page-top">axiom-clj.core</a>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#integration-test"><h4>2 &nbsp; Integration Test</h4></a><a class="section" data-scroll="" href="#overview"><h5><i>2.1 &nbsp; Overview</i></h5></a><a class="section" data-scroll="" href="#initialization"><h5><i>2.2 &nbsp; Initialization</i></h5></a><a class="section" data-scroll="" href="#input-data"><h5><i>2.3 &nbsp; Input Data</i></h5></a><a class="section" data-scroll="" href="#introducing-the-app"><h5><i>2.4 &nbsp; Introducing the App</i></h5></a><a class="section" data-scroll="" href="#testing-the-output"><h5><i>2.5 &nbsp; Testing the Output</i></h5></a></li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+
+          <div class="toc">
+              <nav>
+                <ul>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#integration-test"><h4>2 &nbsp; Integration Test</h4></a><a class="section" data-scroll="" href="#overview"><h5><i>2.1 &nbsp; Overview</i></h5></a><a class="section" data-scroll="" href="#initialization"><h5><i>2.2 &nbsp; Initialization</i></h5></a><a class="section" data-scroll="" href="#input-data"><h5><i>2.3 &nbsp; Input Data</i></h5></a><a class="section" data-scroll="" href="#introducing-the-app"><h5><i>2.4 &nbsp; Introducing the App</i></h5></a><a class="section" data-scroll="" href="#testing-the-output"><h5><i>2.5 &nbsp; Testing the Output</i></h5></a></li>
+                </ul>
+              </nav>
+          </div>
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p>This library is the integration point between all the components that make up the Axiom application platform. With the help of our <a href='di.html'>dependency injection</a> library we manage to decouple most libraries from dependency on one another. This is especially important (and true) for libraries providing resources based on external dependencies, such as Zookeeper or DynamoDB. Decoupling them is important to replace these dependencies with others, without modifying other parts of the code.</p></div><div><p>However, at one point our choice of dependencies must be made concrete. This library provides this point. All it provides is a <code>main</code> function, that loads a configuration file and starts an injector based on it. The choice of module to be used when initializing the injector is made here. After calling <a href='di.html#startup'>di/startup</a> to start all services the <code>main</code> function enters an infinite <code>Thread/sleep</code> loop. However, it uses <code>.addShutdownHook</code> on the JVM's <code>Runtime</code> to register <a href='di.html#shutdown'>di/shutdown</a> when the process is interrupted or killed from the outside.</p></div><div><span id="integration-test"></span><h2><b>2 &nbsp;&nbsp; Integration Test</b></h2></div><div><p>In this section we build an integration test that tests Axiom's entire data processing pipeline, including <a href='migrator.html'>data migration</a> and a <a href='storm.html'>topology</a>.</p></div><div><span id="overview"></span><h3>2.1 &nbsp;&nbsp; Overview</h3></div><div><p>We base our test on the <a href='https://github.com/brosenan/tweetlog-clj'>tweetlog-clj</a> project, which introduces a simple Twitter-like application. We will stream a sequence of facts to it, and sometime during this stream we will introduce the tweetlog application, triggerring a migration. We will test that the derived facts created by the rule in the application take into account all facts, emitted both before and after introducing the app. This will demonstrate how the migration process complements the topology, and how data is not lost in the process.</p></div><div><span id="initialization"></span><h3>2.2 &nbsp;&nbsp; Initialization</h3></div><div><p>We use the following configuration:</p></div><div class="code"><pre><code class="clojure">(def config
+  {:zookeeper-config {:url &quot;127.0.0.1:2181&quot;}
+   :zk-plan-config {:num-threads 5
+                    :parent &quot;/my-plans&quot;}
+   :dynamodb-config {:access-key (str &quot;AXIOM&quot; (rand-int 1000000))
+                     :secret-key &quot;XXYY&quot;
+                     :endpoint &quot;http://localhost:8006&quot;}
+   :num-database-retriever-threads 1
+   :dynamodb-default-throughput {:read 1 :write 1}
+   :dynamodb-event-storage-num-threads 3
+   :amqp-config {:username &quot;guest&quot;
+                 :password &quot;guest&quot;
+                 :vhost &quot;/&quot;
+                 :host &quot;localhost&quot;
+                 :port 5672}
+   :migration-config {:number-of-shards 3
+                      :plan-prefix &quot;/my-plans&quot;
+                      :clone-location &quot;/tmp&quot;
+                      :clone-depth 10}
+   :s3-config {:bucket-name (System/getenv &quot;PERMACODE_S3_BUCKET&quot;)
+               :access-key (System/getenv &quot;AWS_ACCESS_KEY&quot;)
+               :secret-key (System/getenv &quot;AWS_SECRET_KEY&quot;)}
+   :local-storm-cluster true
+   :fact-spout {:include [:amqp-config]}
+   :store-bolt {:include [:dynamodb-event-storage-num-threads
+                          :dynamodb-default-throughput
+                          :dynamodb-config]}
+   :output-bolt {:include [:amqp-config]}
+   :initlal-link-bolt {:include [:s3-config]}
+   :link-bolt {:include [:s3-config
+                         :dynamodb-config
+                         :dynamodb-default-throughput
+                         :num-database-retriever-threads]}})</code></pre></div><div><p>The <code>injector</code> function creates an injector based on the given config, and calls all the <code>module</code> functions for all the dependencies.</p></div><div class="code"><pre><code class="clojure">(def $ (injector config))</code></pre></div><div><p>Now we can start-up the system.</p></div><div class="code"><pre><code class="clojure">:integ
+ (di/startup $)</code></pre></div><div><p>We need to make sure our state is not stored in Zookeeper, so we clear the trees that store it.</p></div><div class="code"><pre><code class="clojure">:integ
+ (println 0)
+ (di/do-with! $ [zookeeper]
+            (println 1)
+            (when (zk/exists zookeeper &quot;/perms&quot;)
+              (zk/delete-all zookeeper &quot;/perms&quot;))
+            (println 2)
+            (zk/create zookeeper &quot;/perms&quot; :persistent? true)
+            (println 3)
+            (when (zk/exists zookeeper &quot;/my-plans&quot;)
+              (zk/delete-all zookeeper &quot;/my-plans&quot;))
+            (println 4)
+            (zk/create zookeeper &quot;/my-plans&quot; :persistent? true)
+            (println 5))</code></pre></div><div><span id="input-data"></span><h3>2.3 &nbsp;&nbsp; Input Data</h3></div><div><p>For the purpose of this test we consider a Twitter-like app for numbers. Our "users" will therefore be the numbers between 10 and 100, exclusive. Numbers follow other numbers if they literally <em>follow</em> them. Specifically, each number "follows" the ten numbers that precede it.</p></div><div><p>We do this in two phases. In the first phase all numbers follow the five preceiding numbers, and in the second phase they follow the five preceding them. This is done in a thread that waits 100 milliseconds between each publication.</p></div><div class="code"><pre><code class="clojure">:integ
+ (def following-thread
+ (di/do-with! $ [publish]
+              (async/thread
+                (let [ts (atom 1000000)
+                      phase (fn [offs]
+                              (doseq [u1 (range 10 100)
+                                      u2 (range (- u1 5 offs) (- u1 offs))]
+                                (publish
+                                 {:kind :fact
+                                  :name &quot;tweetlog/follows&quot;
+                                  :key (str u1)
+                                  :data [(str u2)]
+                                  :ts (swap! ts inc)
+                                  :change 1
+                                  :readers #{}
+                                  :writers #{(str u1)}})
+                                (Thread/sleep 300)))]
+                  (phase 0)
+                  (phase 5)))))</code></pre></div><div><p>Each number makes two tweets: Hello and Goodbye.</p></div><div class="code"><pre><code class="clojure">:integ
+ (def tweet-thread
+ (di/do-with! $ [publish]
+              (async/thread
+                (let [ts (atom 1000000)]
+                  (doseq [u (range 100)
+                          msg [&quot;Hello&quot; &quot;Goodbye&quot;]]
+                    (publish
+                     {:kind :fact
+                      :name &quot;tweetlog/tweeted&quot;
+                      :key (str u)
+                      :data [(str msg &quot; from &quot; u)]
+                      :ts (swap! ts inc)
+                      :change 1
+                      :readers #{}
+                      :writers #{(str u)}})
+                    (Thread/sleep 200))))))</code></pre></div><div><span id="introducing-the-app"></span><h3>2.4 &nbsp;&nbsp; Introducing the App</h3></div><div><p>To start a migration and a subsequent topology we introduce a <code>axiom/app-version</code> fact with the version of our code. We do this after a 30 second delay intended to allow some (but not all) of the facts to already be stored when this rule is introduced.</p></div><div class="code"><pre><code class="clojure">:integ
+ (def app-thread
+ (di/do-with! $ [publish]
+              (async/thread
+                (Thread/sleep (* 10 1000))
+                (publish {:kind :fact
+                          :name &quot;axiom/app-version&quot;
+                          :key &quot;https://github.com/brosenan/tweetlog-clj.git&quot;
+                          :data [&quot;d3a8c6c5b946279186f857381e751801a657f70c&quot;]
+                          :ts 1000
+                          :change 1
+                          :writers #{}
+                          :readers #{}}))))</code></pre></div><div><span id="testing-the-output"></span><h3>2.5 &nbsp;&nbsp; Testing the Output</h3></div><div><p>If all works as expected, each number in the range 10 to 100 (exclusive) should have exactly 20 (= 10 followees * 2 tweets) tweets in their timeline. To make sure this is the case we walk through all the numbers in this range and query their timeline. If we get a smaller number of tweets we sleep and try again to allow the processing to complete for this user. If the number exceeds 20 we fail.</p></div><div class="code"><pre><code class="clojure">:integ
+ (di/do-with! $ [database-chan]
+            (doseq [i (range 10 100)]
+              (loop []
+                (let [chan (async/chan)
+                      ev {:kind :fact
+                          :name &quot;perm.QmdLhmeiaJTMPdv7oT7mUsztdtjHq7f16Dw6nkR6JhxswP/followee-tweets&quot;
+                          :key (str i)}]
+                  (async/&gt;!! database-chan [ev chan])
+                  (let [timeline (-&gt;&gt; chan
+                                      (async/reduce conj #{})
+                                      async/&lt;!!)]
+                    (cond (&lt; (count timeline) 20)
+                          (do
+                            (Thread/sleep 1000)
+                            (recur))
+                          :else
+                          (do
+                            (count timeline) =&gt; 20)))))))</code></pre></div><div class="code"><pre><code class="clojure">:integ
+ (async/&lt;!! following-thread)
+ (async/&lt;!! tweet-thread)
+ (async/&lt;!! app-thread)
+ (di/shutdown $)</code></pre></div>
+        </div>
+      </div>
+    </div>
+
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+  </body>
+
+  <script>
+  if (false) {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', '<@=tracking>', 'caudate.me');
+    ga('send', 'pageview');
+  }
+  </script>
+  
+  <script type="text/javascript">
+    smoothScroll.init();
+    gumshoe.init({});
+  
+    hljs.registerLanguage("clojure",function(e){var t={"builtin-name":"def defonce cond apply if-not if-let if not not= = < > <= >= == + / * - rem quot neg? pos? delay? symbol? keyword? true? false? integer? empty? coll? list? set? ifn? fn? associative? sequential? sorted? counted? reversible? number? decimal? class? distinct? isa? float? rational? reduced? ratio? odd? even? char? seq? vector? string? map? nil? contains? zero? instance? not-every? not-any? libspec? -> ->> .. . inc compare do dotimes mapcat take remove take-while drop letfn drop-last take-last drop-while while intern condp case reduced cycle split-at split-with repeat replicate iterate range merge zipmap declare line-seq sort comparator sort-by dorun doall nthnext nthrest partition eval doseq await await-for let agent atom send send-off release-pending-sends add-watch mapv filterv remove-watch agent-error restart-agent set-error-handler error-handler set-error-mode! error-mode shutdown-agents quote var fn loop recur throw try monitor-enter monitor-exit defmacro defn defn- macroexpand macroexpand-1 for dosync and or when when-not when-let comp juxt partial sequence memoize constantly complement identity assert peek pop doto proxy defstruct first rest cons defprotocol cast coll deftype defrecord last butlast sigs reify second ffirst fnext nfirst nnext defmulti defmethod meta with-meta ns in-ns create-ns import refer keys select-keys vals key val rseq name namespace promise into transient persistent! conj! assoc! dissoc! pop! disj! use class type num float double short byte boolean bigint biginteger bigdec print-method print-dup throw-if printf format load compile get-in update-in pr pr-on newline flush read slurp read-line subvec with-open memfn time re-find re-groups rand-int rand mod locking assert-valid-fdecl alias resolve ref deref refset swap! reset! set-validator! compare-and-set! alter-meta! reset-meta! commute get-validator alter ref-set ref-history-count ref-min-history ref-max-history ensure sync io! new next conj set! to-array future future-call into-array aset gen-class reduce map filter find empty hash-map hash-set sorted-map sorted-map-by sorted-set sorted-set-by vec vector seq flatten reverse assoc dissoc list disj get union difference intersection extend extend-type extend-protocol int nth delay count concat chunk chunk-buffer chunk-append chunk-first chunk-rest max min dec unchecked-inc-int unchecked-inc unchecked-dec-inc unchecked-dec unchecked-negate unchecked-add-int unchecked-add unchecked-subtract-int unchecked-subtract chunk-next chunk-cons chunked-seq? prn vary-meta lazy-seq spread list* str find-keyword keyword symbol gensym force rationalize"},r="a-zA-Z_\\-!.?+*=<>&#'",n="["+r+"]["+r+"0-9/;:]*",a="[-+]?\\d+(\\.\\d+)?",o={b:n,r:0},s={cN:"number",b:a,r:0},i=e.inherit(e.QSM,{i:null}),c=e.C(";","$",{r:0}),d={cN:"literal",b:/\b(true|false|nil)\b/},l={b:"[\\[\\{]",e:"[\\]\\}]"},m={cN:"comment",b:"\\^"+n},p=e.C("\\^\\{","\\}"),u={cN:"symbol",b:"[:]{1,2}"+n},f={b:"\\(",e:"\\)"},h={eW:!0,r:0},y={k:t,l:n,cN:"name",b:n,starts:h},b=[f,i,m,p,c,u,l,s,d,o];return f.c=[e.C("comment",""),y,h],h.c=b,l.c=b,{aliases:["clj"],i:/\S/,c:[f,i,m,p,c,u,l,s,d]}});
+    hljs.initHighlightingOnLoad();
+  </script>
+</html>
