@@ -94,7 +94,7 @@
    :num-database-retriever-threads 1
    :dynamodb-default-throughput {:read 1 :write 1}
    :dynamodb-event-storage-num-threads 3
-   :amqp-config {:username &quot;guest&quot;
+   :rabbitmq-config {:username &quot;guest&quot;
                  :password &quot;guest&quot;
                  :vhost &quot;/&quot;
                  :host &quot;localhost&quot;
@@ -107,11 +107,11 @@
                :access-key (System/getenv &quot;AWS_ACCESS_KEY&quot;)
                :secret-key (System/getenv &quot;AWS_SECRET_KEY&quot;)}
    :local-storm-cluster true
-   :fact-spout {:include [:amqp-config]}
+   :fact-spout {:include [:rabbitmq-config]}
    :store-bolt {:include [:dynamodb-event-storage-num-threads
                           :dynamodb-default-throughput
                           :dynamodb-config]}
-   :output-bolt {:include [:amqp-config]}
+   :output-bolt {:include [:rabbitmq-config]}
    :initlal-link-bolt {:include [:s3-config]}
    :link-bolt {:include [:s3-config
                          :dynamodb-config
