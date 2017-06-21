@@ -44,9 +44,9 @@ It is provided a partial event, and calls the given function on any event that m
 
 
 [[:chapter {:title "declare-service: Declare an AMQP Queue" :tag "declare-service"}]]
-"`declare-service` depends on an `amqp-service` resource (which itself depends on `amqp-config`)."
+"`declare-service` depends on an `rabbitmq-service` resource (which itself depends on `rabbitmq-config`)."
 (fact
- (let [$ (di/injector {:amqp-service {:chan :some-chan}})]
+ (let [$ (di/injector {:rabbitmq-service {:chan :some-chan}})]
    (module $)
    (di/startup $)
    (def declare-service (di/do-with! $ [declare-service] declare-service))))
@@ -58,12 +58,13 @@ It is provided a partial event, and calls the given function on any event that m
  (provided
   (lq/declare :some-chan "foobar") => irrelevant
   (lq/bind :some-chan "foobar"
-           facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"}) => irrelevant))
+           facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"})
+  => irrelevant))
 
 [[:chapter {:title "assign-service: Register an Event Handler" :tag "assign-service"}]]
-"`assign-service` depends on an `amqp-service`."
+"`assign-service` depends on an `rabbitmq-service`."
 (fact
- (let [$ (di/injector {:amqp-service {:chan :some-chan}})]
+ (let [$ (di/injector {:rabbitmq-service {:chan :some-chan}})]
    (module $)
    (di/startup $)
    (def assign-service (di/do-with! $ [assign-service] assign-service))))
@@ -89,9 +90,9 @@ Please refer to it for more information."
 
 [[:chapter {:title "publish: Publish an Event from the Outside" :tag "publish"}]]
 "`publish` is a service that allows its users to publish events from outside the context of a service.
-It depends on `amqp-service`."
+It depends on `rabbitmq-service`."
 (fact
- (let [$ (di/injector {:amqp-service {:chan :some-chan}})]
+ (let [$ (di/injector {:rabbitmq-service {:chan :some-chan}})]
    (module $)
    (di/startup $)
    (def publish (di/do-with! $ [publish] publish))))
@@ -151,12 +152,12 @@ It depends on `amqp-service`."
           {:kind :fact
            :name "count"})))
 
-"For the `serve` resource to initialize, we need to provide an `amqp-config` resource with values needed for the underlying `langohr` library
+"For the `serve` resource to initialize, we need to provide an `rabbitmq-config` resource with values needed for the underlying `langohr` library
 to find the AMQP broker.
 We will use the default values."
 (fact
  :integ
- (di/provide $ amqp-config []
+ (di/provide $ rabbitmq-config []
              rmq/*default-config*)
  (di/startup $))
 
@@ -175,13 +176,22 @@ All we need is to get the fire started is a little match -- a single event."
       (println "done!"))
 
 [[:chapter {:title "Under the Hood"}]]
-[[:section {:title "create-service: Initialization" :tag "create-service"}]]
-"`create-service` initializes a connection and a channel to RabbitMQ.
-It also declares the `facts` exchange, which is a topic-based AMQP exchange.
-The returned map contains the connection, the channel and an `:alive` atom, that defaults to `true`."
+[[:section {:title "rabbitmq-service"}]]
+"`rabbitmq-service` is a DI resource that represents a running RabbitMQ broker.
+It is a map containing the following properties:
+- `:conn` -- a connection object to a server.
+- `:chan` -- an open channel.
+- `:alive` -- an atom holding a Boolean value used for shutting down the conection."
+
+"Initialization also declares the `facts` exchange, which is a topic-based AMQP exchange."
 (fact
- (let [srv (create-service)]
-   [(:conn srv) (:chan srv) @(:alive srv)]) => [..conn.. ..chan.. true]
+ (let [$ (di/injector {:rabbitmq-config rmq/*default-config*})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [rabbitmq-service]
+                [(:conn rabbitmq-service)
+                 (:chan rabbitmq-service)
+                 @(:alive rabbitmq-service)])) => [..conn.. ..chan.. true]
  (provided
   (rmq/connect) => ..conn..
   (lch/open ..conn..) => ..chan..

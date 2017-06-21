@@ -286,7 +286,7 @@ We will use [dependency injection](di.html) to initialize the needed services."
  (let [$ (di/injector {:dynamodb-config client-opts
                        :num-database-retriever-threads 1
                        :dynamodb-default-throughput {:read 1 :write 1}
-                       :amqp-config langohr.core/*default-config*})]
+                       :rabbitmq-config langohr.core/*default-config*})]
    (module $)
    (rabbit-microservices.core/module $)
    (di/startup $)

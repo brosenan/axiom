@@ -287,7 +287,7 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
    :num-database-retriever-threads 1
    :dynamodb-default-throughput {:read 1 :write 1}
    :dynamodb-event-storage-num-threads 3
-   :amqp-config {:username "guest"
+   :rabbitmq-config {:username "guest"
                  :password "guest"
                  :vhost "/"
                  :host "localhost"

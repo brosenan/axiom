@@ -86,8 +86,8 @@
        (re-find #"[^@]*")))
 
 (defn module [$]
-  (di/provide $ amqp-service [amqp-config]
-              (binding [rmq/*default-config* amqp-config]
+  (di/provide $ rabbitmq-service [rabbitmq-config]
+              (binding [rmq/*default-config* rabbitmq-config]
                 (create-service)))
 
   (di/provide $ serve [declare-service
@@ -98,9 +98,9 @@
                   (assign-service key func))
                 nil))
 
-  (di/provide $ declare-service [amqp-service info]
+  (di/provide $ declare-service [rabbitmq-service info]
               (fn [key reg]
-                (let [chan (:chan amqp-service)
+                (let [chan (:chan rabbitmq-service)
                       routing-key (event-routing-key reg)]
                   (info {:source "rabbit"
                          :desc (str "Declaring queue " key " with routing key " routing-key)})
@@ -108,11 +108,11 @@
                   (lq/bind chan key facts-exch {:routing-key routing-key}))
                 nil))
 
-  (di/provide $ assign-service [amqp-service]
+  (di/provide $ assign-service [rabbitmq-service]
               (fn [key func]
-                (lc/subscribe (:chan amqp-service) key (partial handle-event func (:alive amqp-service)) {:auto-ack (< (arg-count func) 3)})
+                (lc/subscribe (:chan rabbitmq-service) key (partial handle-event func (:alive rabbitmq-service)) {:auto-ack (< (arg-count func) 3)})
                 nil))
 
-  (di/provide $ publish [amqp-service info]
-              (partial publisher amqp-service info)))
+  (di/provide $ publish [rabbitmq-service info]
+              (partial publisher rabbitmq-service info)))
 

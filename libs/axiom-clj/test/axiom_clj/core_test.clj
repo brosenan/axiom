@@ -47,7 +47,7 @@ and how data is not lost in the process."
    :num-database-retriever-threads 1
    :dynamodb-default-throughput {:read 1 :write 1}
    :dynamodb-event-storage-num-threads 3
-   :amqp-config {:username "guest"
+   :rabbitmq-config {:username "guest"
                  :password "guest"
                  :vhost "/"
                  :host "localhost"
@@ -60,11 +60,11 @@ and how data is not lost in the process."
                :access-key (System/getenv "AWS_ACCESS_KEY")
                :secret-key (System/getenv "AWS_SECRET_KEY")}
    :local-storm-cluster true
-   :fact-spout {:include [:amqp-config]}
+   :fact-spout {:include [:rabbitmq-config]}
    :store-bolt {:include [:dynamodb-event-storage-num-threads
                           :dynamodb-default-throughput
                           :dynamodb-config]}
-   :output-bolt {:include [:amqp-config]}
+   :output-bolt {:include [:rabbitmq-config]}
    :initlal-link-bolt {:include [:s3-config]}
    :link-bolt {:include [:s3-config
                          :dynamodb-config
