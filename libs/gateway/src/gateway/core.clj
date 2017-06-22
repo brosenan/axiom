@@ -14,6 +14,6 @@
                   (->> (vals chanmap)
                        async/merge
                        list
-                       (async/map (fn [ev] (vec (cons (:name ev) (:data ev)))))
+                       (async/map (fn [ev] (vec (cons (keyword (:name ev)) (:data ev)))))
                        (async/reduce conj #{user})
                        (async/<!!))))))
