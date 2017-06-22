@@ -92,6 +92,10 @@
                     {:input "libs/storm/test/storm/core_test.clj"
                      :title "storm.core"
                      :subtitle "Converting Cloudlog Rules to Apache Storm Topologies"}
+                    "gateway"
+                    {:input "libs/gateway/test/gateway/core_test.clj"
+                     :title "gateway.core"
+                     :subtitle "Axiom's External Interface"}
                     "axiom-clj"
                     {:input "libs/axiom-clj/test/axiom_clj/core_test.clj"
                      :title "axiom-clj.core"
