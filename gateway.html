@@ -1,0 +1,157 @@
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+
+  <!-- Enable responsiveness on mobile devices-->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <link rel="shortcut icon" href="favicon.ico">
+  <title>axiom//gateway.core - Axiom's External Interface</title>
+  <script src="js/highlight.min.js"></script>
+  <script src="js/gumshoe.min.js"></script>
+  <script src="js/smooth-scroll.min.js"></script>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/poole.css">
+  <link rel="stylesheet" href="css/syntax.css">
+  <link rel="stylesheet" href="css/lanyon.css">
+  <link rel="stylesheet" href="css/bolton.css">
+  <link rel="stylesheet" href="css/bolton-api.css">
+  <link rel="stylesheet" href="css/bolton-highlight.css">
+  <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=PT+Serif:400,400italic,700|PT+Sans:400">
+  
+</head>
+
+  <body class="theme-base-08">
+    <span id="page-top"></span>
+
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+     styles, `#sidebar-checkbox` for behavior. -->
+<input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox">
+
+<!-- Toggleable sidebar -->
+<div class="sidebar" id="sidebar">
+  <nav class="sidebar-nav">
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item" href="axiom-clj.html">axiom-clj.core</a><a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="di.html">di.core</a><a class="sidebar-nav-item" href="docs.html"></a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item active" href="gateway.html">gateway.core</a><a class="sidebar-nav-item" href="migrator.html">migrator.core</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="s3.html">s3.core</a><a class="sidebar-nav-item" href="storm.html">storm.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
+    <span class="sidebar-nav-item">&nbsp;</span>
+    <span class="sidebar-nav-item">&nbsp;</span>
+  </nav>
+</div>
+
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+	  <a href="index.html"><img src="img/axiom-logo.png"></a>
+          <h3 class="masthead-title">
+            <span>axiom//gateway.core</span>
+            <small>Axiom's External Interface</small>
+          </h3>
+        </div>
+      </div>
+
+      <div class="container content">
+        <div class="page">
+          <div class="heading">
+            <div>
+              <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
+              <h5>Date: 22 June 2017</h5>
+              <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
+              <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
+          <hr/>
+          <div class="outline">
+            <div class="toc">
+              <nav data-gumshoe-header>
+                <ul data-gumshoe>
+                  <a data-scroll class="top" href="#page-top">gateway.core</a>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#identity-set"><h4>2 &nbsp; identity-set</h4></a></li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+
+          <div class="toc">
+              <nav>
+                <ul>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#identity-set"><h4>2 &nbsp; identity-set</h4></a></li>
+                </ul>
+              </nav>
+          </div>
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p>This library implement Axiom's gateway tier. Axiom's architecture is a bit different than that of traditional web apps. The server side of traditional apps consists of a <em>logic tier</em> and a <em>data tier</em>. The logic tier consists of a web server that is typically extended with application code to answer requests coming from the client side (the <em>presentation tier</em>). To do that it typically consults a database comprising the data tier.</p></div><div><p>This traditional three-tier architecture puts a lot of burden on the shoulders of the logic tier. On the one hand, the client side can be malicious &ndash; an attacker trying to make unauthorized access to user data, and on the other hand, the data tier stores plain, unencapsulated data, so it typically does not protect itself agains such attacks. The logic tier alone is thus responsible for proteecting user data against attackers, while also being responsible for properly serving the application.</p></div><div><p>Axiom makes a different distinction between tiers on the server side. It upgrades the data tier one step up the <a href='https://en.wikipedia.org/wiki/DIKW_pyramid'>DIKW pyramid</a> to become an <em>information tier</em>, While downgrading the logic tier to being a mere <em>gateway</em> to the information tier. The information tier stores both <em>facts</em> and <em>rules</em>, and is capable of answering queries based on them. The facts and the rules together define the requirements in terms <a href='cloudlog-events.html#confidentiality'>confidentiality</a>  and <a href='cloudlog.html#integrity'>integrity</a>. This makes it fully capable of deciding who can see what, and who can do what.</p></div><div><p>The gateway tier provides an external interface to the information tier. Among its roles are authenticating users, querying the information tier for user rights and filtering results according to these rights. It implements an HTTP server that provides access to <a href='cloudlog-events.html#introduction'>events</a> &ndash; both creating and querying them.</p></div><div><span id="identity-set"></span><h2><b>2 &nbsp;&nbsp; identity-set</b></h2></div><div><p>The <code>identity-set</code> function converts a user ID and a collection of relation names into an <a href='cloudlog.interset.html'>interset</a> that can be used as a <a href='cloudlog-events.html#introduction'>writer or reader set</a> for that user.</p></div><div><p><code>identity-set</code> is a <a href='di.html'>DI resource</a> that depends on the following resource:</p><ul><li><code>database-chan</code> &ndash; A <code>core.async</code> channel for retreiving events stored in a database (e.g., <a href='dynamo.html#database-chan'>DynamoDB</a>).</li></ul></div><div><p>For an empty collection of relation names, it returns a set containing only the user ID.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-chan (async/chan)})]
+ (module $)
+ (di/startup $)
+ (di/do-with! $ [identity-set]
+              (identity-set &quot;foo&quot; []) =&gt; #{&quot;foo&quot;}))</code></pre></div><div><p>For each relation name in the given collection, <code>identity-set</code> will make a query in the database.</p></div><div class="code"><pre><code class="clojure">(def db-chan (async/chan))
+ (let [$ (di/injector {:database-chan db-chan})]
+ (module $)
+ (di/startup $)
+ (def res
+   (async/thread
+     (di/do-with! $ [identity-set]
+                  (identity-set &quot;foo&quot; [&quot;bar&quot; &quot;baz&quot;])))))</code></pre></div><div><p>For user <code>u</code> and relation <code>rel</code> it will query the database using <code>:name = rel</code> and <code>:key = u</code>.</p></div><div class="code"><pre><code class="clojure">(defn get-query []
+ (let [[req chan] (async/alts!! [db-chan
+                                 (async/timeout 1000)])]
+   (when (nil? req)
+     (throw (Exception. &quot;Timed out waiting for DB request&quot;)))
+   req))
+ 
+ (let [[query reply-chan] (get-query)]
+ query =&gt; {:kind :fact
+           :name &quot;bar&quot;
+           :key &quot;foo&quot;}
+ ;; We will reply to this with :data = quux
+ (async/&gt;!! reply-chan {:kind :fact
+                        :name &quot;bar&quot;
+                        :key &quot;foo&quot;
+                        :data [&quot;quux&quot;]})
+ (async/close! reply-chan))
+ (let [[query reply-chan] (get-query)]
+ query =&gt; {:kind :fact
+           :name &quot;baz&quot;
+           :key &quot;foo&quot;}
+ ;; We will reply with :data = boo and :data = goo
+ (async/&gt;!! reply-chan {:kind :fact
+                        :name &quot;baz&quot;
+                        :key &quot;foo&quot;
+                        :data [&quot;boo&quot;]})
+ (async/&gt;!! reply-chan {:kind :fact
+                        :name &quot;baz&quot;
+                        :key &quot;foo&quot;
+                        :data [&quot;goo&quot;]})
+ (async/close! reply-chan))</code></pre></div><div><p>For each result we should get a term (sequence) that has the relation name as its first element and the <code>:data</code> as the rest of its elements.</p></div><div class="code"><pre><code class="clojure">(async/&lt;!! res) =&gt; #{&quot;foo&quot;
+                    [&quot;bar&quot; &quot;quux&quot;]
+                    [&quot;baz&quot; &quot;boo&quot;]
+                    [&quot;baz&quot; &quot;goo&quot;]}</code></pre></div>
+        </div>
+      </div>
+    </div>
+
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+  </body>
+
+  <script>
+  if (false) {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', '<@=tracking>', 'caudate.me');
+    ga('send', 'pageview');
+  }
+  </script>
+  
+  <script type="text/javascript">
+    smoothScroll.init();
+    gumshoe.init({});
+  
+    hljs.registerLanguage("clojure",function(e){var t={"builtin-name":"def defonce cond apply if-not if-let if not not= = < > <= >= == + / * - rem quot neg? pos? delay? symbol? keyword? true? false? integer? empty? coll? list? set? ifn? fn? associative? sequential? sorted? counted? reversible? number? decimal? class? distinct? isa? float? rational? reduced? ratio? odd? even? char? seq? vector? string? map? nil? contains? zero? instance? not-every? not-any? libspec? -> ->> .. . inc compare do dotimes mapcat take remove take-while drop letfn drop-last take-last drop-while while intern condp case reduced cycle split-at split-with repeat replicate iterate range merge zipmap declare line-seq sort comparator sort-by dorun doall nthnext nthrest partition eval doseq await await-for let agent atom send send-off release-pending-sends add-watch mapv filterv remove-watch agent-error restart-agent set-error-handler error-handler set-error-mode! error-mode shutdown-agents quote var fn loop recur throw try monitor-enter monitor-exit defmacro defn defn- macroexpand macroexpand-1 for dosync and or when when-not when-let comp juxt partial sequence memoize constantly complement identity assert peek pop doto proxy defstruct first rest cons defprotocol cast coll deftype defrecord last butlast sigs reify second ffirst fnext nfirst nnext defmulti defmethod meta with-meta ns in-ns create-ns import refer keys select-keys vals key val rseq name namespace promise into transient persistent! conj! assoc! dissoc! pop! disj! use class type num float double short byte boolean bigint biginteger bigdec print-method print-dup throw-if printf format load compile get-in update-in pr pr-on newline flush read slurp read-line subvec with-open memfn time re-find re-groups rand-int rand mod locking assert-valid-fdecl alias resolve ref deref refset swap! reset! set-validator! compare-and-set! alter-meta! reset-meta! commute get-validator alter ref-set ref-history-count ref-min-history ref-max-history ensure sync io! new next conj set! to-array future future-call into-array aset gen-class reduce map filter find empty hash-map hash-set sorted-map sorted-map-by sorted-set sorted-set-by vec vector seq flatten reverse assoc dissoc list disj get union difference intersection extend extend-type extend-protocol int nth delay count concat chunk chunk-buffer chunk-append chunk-first chunk-rest max min dec unchecked-inc-int unchecked-inc unchecked-dec-inc unchecked-dec unchecked-negate unchecked-add-int unchecked-add unchecked-subtract-int unchecked-subtract chunk-next chunk-cons chunked-seq? prn vary-meta lazy-seq spread list* str find-keyword keyword symbol gensym force rationalize"},r="a-zA-Z_\\-!.?+*=<>&#'",n="["+r+"]["+r+"0-9/;:]*",a="[-+]?\\d+(\\.\\d+)?",o={b:n,r:0},s={cN:"number",b:a,r:0},i=e.inherit(e.QSM,{i:null}),c=e.C(";","$",{r:0}),d={cN:"literal",b:/\b(true|false|nil)\b/},l={b:"[\\[\\{]",e:"[\\]\\}]"},m={cN:"comment",b:"\\^"+n},p=e.C("\\^\\{","\\}"),u={cN:"symbol",b:"[:]{1,2}"+n},f={b:"\\(",e:"\\)"},h={eW:!0,r:0},y={k:t,l:n,cN:"name",b:n,starts:h},b=[f,i,m,p,c,u,l,s,d,o];return f.c=[e.C("comment",""),y,h],h.c=b,l.c=b,{aliases:["clj"],i:/\S/,c:[f,i,m,p,c,u,l,s,d]}});
+    hljs.initHighlightingOnLoad();
+  </script>
+</html>
