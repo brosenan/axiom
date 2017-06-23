@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 22 June 2017</h5>
+              <h5>Date: 23 June 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">gateway.core</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#identity-set"><h4>2 &nbsp; identity-set</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#identity-set"><h4>2 &nbsp; identity-set</h4></a><a class="section" data-scroll="" href="#accumulation"><h5><i>2.1 &nbsp; Accumulation</i></h5></a><a class="section" data-scroll="" href="#integrity-and-confidentiality"><h5><i>2.2 &nbsp; Integrity and Confidentiality</i></h5></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,55 +80,77 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#identity-set"><h4>2 &nbsp; identity-set</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#identity-set"><h4>2 &nbsp; identity-set</h4></a><a class="section" data-scroll="" href="#accumulation"><h5><i>2.1 &nbsp; Accumulation</i></h5></a><a class="section" data-scroll="" href="#integrity-and-confidentiality"><h5><i>2.2 &nbsp; Integrity and Confidentiality</i></h5></a></li>
                 </ul>
               </nav>
           </div>
-          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p>This library implement Axiom's gateway tier. Axiom's architecture is a bit different than that of traditional web apps. The server side of traditional apps consists of a <em>logic tier</em> and a <em>data tier</em>. The logic tier consists of a web server that is typically extended with application code to answer requests coming from the client side (the <em>presentation tier</em>). To do that it typically consults a database comprising the data tier.</p></div><div><p>This traditional three-tier architecture puts a lot of burden on the shoulders of the logic tier. On the one hand, the client side can be malicious &ndash; an attacker trying to make unauthorized access to user data, and on the other hand, the data tier stores plain, unencapsulated data, so it typically does not protect itself agains such attacks. The logic tier alone is thus responsible for proteecting user data against attackers, while also being responsible for properly serving the application.</p></div><div><p>Axiom makes a different distinction between tiers on the server side. It upgrades the data tier one step up the <a href='https://en.wikipedia.org/wiki/DIKW_pyramid'>DIKW pyramid</a> to become an <em>information tier</em>, While downgrading the logic tier to being a mere <em>gateway</em> to the information tier. The information tier stores both <em>facts</em> and <em>rules</em>, and is capable of answering queries based on them. The facts and the rules together define the requirements in terms <a href='cloudlog-events.html#confidentiality'>confidentiality</a>  and <a href='cloudlog.html#integrity'>integrity</a>. This makes it fully capable of deciding who can see what, and who can do what.</p></div><div><p>The gateway tier provides an external interface to the information tier. Among its roles are authenticating users, querying the information tier for user rights and filtering results according to these rights. It implements an HTTP server that provides access to <a href='cloudlog-events.html#introduction'>events</a> &ndash; both creating and querying them.</p></div><div><span id="identity-set"></span><h2><b>2 &nbsp;&nbsp; identity-set</b></h2></div><div><p>The <code>identity-set</code> function converts a user ID and a collection of relation names into an <a href='cloudlog.interset.html'>interset</a> that can be used as a <a href='cloudlog-events.html#introduction'>writer or reader set</a> for that user.</p></div><div><p><code>identity-set</code> is a <a href='di.html'>DI resource</a> that depends on the following resource:</p><ul><li><code>database-chan</code> &ndash; A <code>core.async</code> channel for retreiving events stored in a database (e.g., <a href='dynamo.html#database-chan'>DynamoDB</a>).</li></ul></div><div><p>For an empty collection of relation names, it returns a set containing only the user ID.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-chan (async/chan)})]
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p>This library implement Axiom's gateway tier. Axiom's architecture is a bit different than that of traditional web apps. The server side of traditional apps consists of a <em>logic tier</em> and a <em>data tier</em>. The logic tier consists of a web server that is typically extended with application code to answer requests coming from the client side (the <em>presentation tier</em>). To do that it typically consults a database comprising the data tier.</p></div><div><p>This traditional three-tier architecture puts a lot of burden on the shoulders of the logic tier. On the one hand, the client side can be malicious &ndash; an attacker trying to make unauthorized access to user data, and on the other hand, the data tier stores plain, unencapsulated data, so it typically does not protect itself agains such attacks. The logic tier alone is thus responsible for proteecting user data against attackers, while also being responsible for properly serving the application.</p></div><div><p>Axiom makes a different distinction between tiers on the server side. It upgrades the data tier one step up the <a href='https://en.wikipedia.org/wiki/DIKW_pyramid'>DIKW pyramid</a> to become an <em>information tier</em>, While downgrading the logic tier to being a mere <em>gateway</em> to the information tier. The information tier stores both <em>facts</em> and <em>rules</em>, and is capable of answering queries based on them. The facts and the rules together define the requirements in terms confidentiality and integrity. This makes it fully capable of deciding who can see what, and who can do what.</p></div><div><p>The gateway tier provides an external interface to the information tier. Among its roles are authenticating users, querying the information tier for user rights and filtering results according to these rights. It implements an HTTP server that provides access to <a href='cloudlog-events.html#introduction'>events</a> &ndash; both creating and querying them.</p></div><div><span id="identity-set"></span><h2><b>2 &nbsp;&nbsp; identity-set</b></h2></div><div><p>Axiom has a unique method for managing user rights. Instead of checking, for each action, if a user may or may not perform that action, Axiom marks <a href='cloudlog-events.html#introduction'>each event that flows through its information tier</a> with two annotations: it <em>reader set</em> and its <em>writer set</em>. The reader set represents a mathematical set of users who are allowed to know about this event, and the writer set represents a mathematical set of users who may have caused this event. <a href='cloudlog-events.html#confidentiality'>The reader sets are used to guarantee confidentiality</a>,  while <a href='cloudlog.html#integrity'>writer sets guarantee integrity</a>.</p></div><div><p>We treat these sets as mathematical sets, but in reality we need an efficient programatic representation for them. We use <a href='cloudlog.interset.html'>intersets</a> for that. The intersets are expressed in terms of <em>user groups</em>, which are (mathematical) sets of users that are provided by name, and not by content. Without further information it is impossible to determine if a user <code>u</code> is or is not a member of a writer set or a reader set attached to an event.</p></div><div><p>Instead of asking the question <em>which users belong in a readers/writers set</em>, the <code>identity-set</code> function answers the opposite question: <em>what is the smallest known user set that <code>u</code> belongs to?</em></p></div><div><p><code>identity-set</code> is a <a href='di.html'>DI resource</a> that depends on the following resource:</p><ul><li><code>database-chan</code> &ndash; A <code>core.async</code> channel for retreiving events stored in a database (e.g., <a href='dynamo.html#database-chan'>DynamoDB</a>).</li></ul></div><div><p><code>identity-set</code> is an <em>async function</em>, meaning that instead of returning an result it returns a channel to which a result will be posted in the future. With no further information (an empty collection as a second argument that we will discuss later),  <code>identity-set</code> returns (via a channel) a set containing only the user ID. We treat strings as singleton sets, so the user group <code>&quot;alice&quot;</code> is a group of users containing only one user &ndash; <code>alice</code>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-chan (async/chan)})]
  (module $)
  (di/startup $)
  (di/do-with! $ [identity-set]
-              (identity-set &quot;foo&quot; []) =&gt; #{&quot;foo&quot;}))</code></pre></div><div><p>For each relation name in the given collection, <code>identity-set</code> will make a query in the database.</p></div><div class="code"><pre><code class="clojure">(def db-chan (async/chan))
+              (async/&lt;!! (identity-set &quot;alice&quot; [])) =&gt; #{&quot;alice&quot;}))</code></pre></div><div><p>A user can belong to many groups, and is therefore a member of the intersection of all these groups with his or her own singleton group (represented by his or her user ID). But how do we determine which user belongs to which group?</p></div><div><p>Axiom has an original solution for that as well. Instead of explicitly assigining users to groups (as some access control systems suggest), Axiom uses <a href='cloudlog.html#defrule'>rules</a> to define user groups.</p></div><div><p>Any rule that create derived facts of the form <code>&#91;rule-name user args...&#93;</code> defines a user group of the form <code>&#91;rule-name args...&#93;</code>, which contains any <code>user</code> for which such a derived fact exists.</p></div><div><p><code>identity-set</code> takes as its second argument a list of <em>rule names</em> based on which we would like to search for identities. Let us consider a Facebook-like application, in which users can have rights based on who their friends are, and which groups they own. Two rules: <code>perm.AAA/friend</code> and <code>perm.BBB/group-owner</code> convey this relationships, respectively. Now consider we query for user <code>alice</code>'s user-set with respect to these two rules.</p></div><div class="code"><pre><code class="clojure">(def db-chan (async/chan))
  (let [$ (di/injector {:database-chan db-chan})]
  (module $)
  (di/startup $)
  (def res
-   (async/thread
-     (di/do-with! $ [identity-set]
-                  (identity-set &quot;foo&quot; [&quot;bar&quot; &quot;baz&quot;])))))</code></pre></div><div><p>For user <code>u</code> and relation <code>rel</code> it will query the database using <code>:name = rel</code> and <code>:key = u</code>.</p></div><div class="code"><pre><code class="clojure">(defn get-query []
- (let [[req chan] (async/alts!! [db-chan
-                                 (async/timeout 1000)])]
-   (when (nil? req)
-     (throw (Exception. &quot;Timed out waiting for DB request&quot;)))
-   req))
- 
- (let [[query reply-chan] (get-query)]
+   (di/do-with! $ [identity-set]
+                (identity-set &quot;alice&quot; [&quot;perm.AAA/friend&quot; &quot;perm.BBB/group-owner&quot;]))))</code></pre></div><div><p>We will use the following function to safely retrieve request made to our mock database:</p></div><div class="code"><pre><code class="clojure">(defn get-query []
+  (let [[req chan] (async/alts!! [db-chan
+                                  (async/timeout 1000)])]
+    (when (nil? req)
+      (throw (Exception. &quot;Timed out waiting for DB request&quot;)))
+    req))</code></pre></div><div><p><code>identity-set</code> queries the database for all derived facts created by these rules, where <code>:key</code> is <code>alice</code>.</p></div><div class="code"><pre><code class="clojure">(let [[query reply-chan] (get-query)]
  query =&gt; {:kind :fact
-           :name &quot;bar&quot;
-           :key &quot;foo&quot;}
- ;; We will reply to this with :data = quux
- (async/&gt;!! reply-chan {:kind :fact
-                        :name &quot;bar&quot;
-                        :key &quot;foo&quot;
-                        :data [&quot;quux&quot;]})
+           :name &quot;perm.AAA/friend&quot;
+           :key &quot;alice&quot;}
+ ;; Alice has two friends: bob and charlie
+ (doseq [friend [&quot;bob&quot; &quot;charlie&quot;]]
+   (async/&gt;!! reply-chan {:kind :fact
+                          :name &quot;perm.AAA/friend&quot;
+                          :key &quot;alice&quot;
+                          :data [friend]
+                          :ts 1000
+                          :change 1
+                          :readers #{}
+                          :writers #{&quot;perm.AAA&quot;}}))
  (async/close! reply-chan))
  (let [[query reply-chan] (get-query)]
  query =&gt; {:kind :fact
-           :name &quot;baz&quot;
-           :key &quot;foo&quot;}
- ;; We will reply with :data = boo and :data = goo
+           :name &quot;perm.BBB/group-owner&quot;
+           :key &quot;alice&quot;}
+ ;; Alice owns one group: &quot;cats for free wifi&quot;
  (async/&gt;!! reply-chan {:kind :fact
-                        :name &quot;baz&quot;
-                        :key &quot;foo&quot;
-                        :data [&quot;boo&quot;]})
- (async/&gt;!! reply-chan {:kind :fact
-                        :name &quot;baz&quot;
-                        :key &quot;foo&quot;
-                        :data [&quot;goo&quot;]})
- (async/close! reply-chan))</code></pre></div><div><p>For each result we should get a term (sequence) that has the relation name as its first element and the <code>:data</code> as the rest of its elements.</p></div><div class="code"><pre><code class="clojure">(async/&lt;!! res) =&gt; #{&quot;foo&quot;
-                    [&quot;bar&quot; &quot;quux&quot;]
-                    [&quot;baz&quot; &quot;boo&quot;]
-                    [&quot;baz&quot; &quot;goo&quot;]}</code></pre></div>
+                        :name &quot;perm.BBB/group-owner&quot;
+                        :key &quot;alice&quot;
+                        :data [&quot;cats for free wifi&quot;]
+                        :ts 2000
+                        :change 1
+                        :readers #{}
+                        :writers #{&quot;perm.BBB&quot;}})
+ (async/close! reply-chan))</code></pre></div><div><p><code>alice</code>'s user-set is now the intersection between her own singleton set (<code>&quot;alice&quot;</code>), and the groups of <code>bob</code>'s and <code>charlie</code>'s friends, as well as the owners of <code>cats for free wifi</code>.</p></div><div class="code"><pre><code class="clojure">(async/&lt;!! res) =&gt; (interset/intersection #{&quot;alice&quot;}
+                                         #{[:perm.AAA/friend &quot;bob&quot;]}
+                                         #{[:perm.AAA/friend &quot;charlie&quot;]}
+                                         #{[:perm.BBB/group-owner &quot;cats for free wifi&quot;]})</code></pre></div><div><span id="accumulation"></span><h3>2.1 &nbsp;&nbsp; Accumulation</h3></div><div><p>Axiom is an <a href='https://martinfowler.com/eaaDev/EventSourcing.html'>event sourcing</a> system. This means that it doesn't store <em>state</em>, but rather events that record <em>change of state</em>.</p></div><div><p>When discussing user rights, we need to refer to user rights at a specific point in time. When a user makes some query, the result he or she is supposed to see depend on which groups he or she blongs to at <em>the moment of the query</em>. To know this, we need to look at an <a href='cloudlog-events.html#accumulating-events'>accumulation of the events</a>, and not at the individual events, that is, the current state of each group and not the individual changes in this state.</p></div><div><p>For example, consider <code>alice</code> was once a friend of <code>eve</code> and then they parted ways. This friendship will not appear in <code>alice</code>'s user-set.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-chan db-chan})]
+ (module $)
+ (di/startup $)
+ (let [res
+       (di/do-with! $ [identity-set]
+                    (identity-set &quot;alice&quot; [&quot;perm.AAA/friend&quot;]))
+       [query reply-chan] (get-query)]
+   (doseq [[ts change] [[1000 1] ;; Became friends at time 1000
+                        [2000 -1] ;; Parted ways at time 2000
+                        ]]
+     (async/&gt;!! reply-chan {:kind :fact
+                            :name &quot;perm.AAA/friend&quot;
+                            :key &quot;alice&quot;
+                            :data [&quot;eve&quot;]
+                            :ts ts
+                            :change change
+                            :writers #{&quot;perm.AAA&quot;}
+                            :readers #{}}))
+   (async/close! reply-chan)
+   (async/&lt;!! res) =&gt; #{&quot;alice&quot;} ;; No mention of friendship with eve
+   ))</code></pre></div><div><span id="integrity-and-confidentiality"></span><h3>2.2 &nbsp;&nbsp; Integrity and Confidentiality</h3></div>
         </div>
       </div>
     </div>
