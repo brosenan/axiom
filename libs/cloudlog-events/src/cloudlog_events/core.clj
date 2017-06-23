@@ -82,20 +82,27 @@
       (let [rule-evs (split-atomic-update rule-ev)]
         (join-atomic-updates (mapcat #(single-event-mult % fact-ev) rule-evs))))))
 
+(defn aggregate-tuple [f g]
+  (fn [[x1 y1] [x2 y2]]
+    [(f x1 x2) (g y1 y2)]))
 
 (defn accumulate
   ([] {})
   ([accum ev]
    (let [single-event-accum (fn [accum ev]
-                              (merge-with + accum {(dissoc ev :change)
-                                                   (:change ev)}))]
+                              (merge-with (aggregate-tuple + max) accum {(-> ev
+                                                                             (dissoc :change)
+                                                                             (dissoc :ts))
+                                                                         ((juxt :change :ts) ev)}))]
      (->> ev
           split-atomic-update
           (reduce single-event-accum accum)))))
 
 (defn accumulated-events [accum]
-  (->> (for [[ev ch] accum]
-         (assoc ev :change ch))
+  (->> (for [[ev [ch ts]] accum]
+         (-> ev
+             (assoc :change ch)
+             (assoc :ts ts)))
        (filter #(> (:change %) 0))))
 
 (defn mapchan [f chan]
@@ -122,6 +129,7 @@
     (recur (-> rulefunc meta :continuation) (dec link))
     ;; else
     (-> rulefunc meta :source-fact cloudlog/fact-table)))
+
 
 (defn matcher [rulefunc link db-chan]
   (let [mult (multiplier rulefunc link)

@@ -51,15 +51,17 @@ answers the opposite question: *what is the smallest known user set that `u` bel
 "`identity-set` is a [DI resource](di.html) that depends on the following resource:
 - `database-chan` -- A `core.async` channel for retreiving events stored in a database (e.g., [DynamoDB](dynamo.html#database-chan))."
 
-"With no further information (an empty collection as a second argument that we will discuss later), 
-`identity-set` returns a set containing only the user ID.
+"`identity-set` is an *async function*, meaning that instead of returning an result it returns a channel to which a result will be
+posted in the future.
+With no further information (an empty collection as a second argument that we will discuss later), 
+`identity-set` returns (via a channel) a set containing only the user ID.
 We treat strings as singleton sets, so the user group `\"alice\"` is a group of users containing only one user -- `alice`."
 (fact
  (let [$ (di/injector {:database-chan (async/chan)})]
    (module $)
    (di/startup $)
    (di/do-with! $ [identity-set]
-                (identity-set "alice" []) => #{"alice"})))
+                (async/<!! (identity-set "alice" [])) => #{"alice"})))
 
 "A user can belong to many groups, and is therefore a member of the intersection of all these groups with his or her own singleton group
 (represented by his or her user ID).
@@ -83,9 +85,8 @@ Now consider we query for user `alice`'s user-set with respect to these two rule
    (module $)
    (di/startup $)
    (def res
-     (async/thread
-       (di/do-with! $ [identity-set]
-                    (identity-set "alice" ["perm.AAA/friend" "perm.BBB/group-owner"]))))))
+     (di/do-with! $ [identity-set]
+                  (identity-set "alice" ["perm.AAA/friend" "perm.BBB/group-owner"])))))
 
 "We will use the following function to safely retrieve request made to our mock database:"
 (defn get-query []
@@ -135,4 +136,41 @@ and the groups of `bob`'s and `charlie`'s friends, as well as the owners of `cat
                                            #{[:perm.AAA/friend "charlie"]}
                                            #{[:perm.BBB/group-owner "cats for free wifi"]}))
 
-"TODO: Accumulation, integrity and confidentiality."
+[[:section {:title "Accumulation"}]]
+"Axiom is an [event sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) system.
+This means that it doesn't store *state*, but rather events that record *change of state*."
+
+"When discussing user rights, we need to refer to user rights at a specific point in time.
+When a user makes some query, the result he or she is supposed to see depend on which groups he or she blongs to at *the moment of the query*.
+To know this, we need to look at an [accumulation of the events](cloudlog-events.html#accumulating-events),
+and not at the individual events,
+that is, the current state of each group and not the individual changes in this state."
+
+"For example, consider `alice` was once a friend of `eve` and then they parted ways.
+This friendship will not appear in `alice`'s user-set."
+(fact
+  (let [$ (di/injector {:database-chan db-chan})]
+   (module $)
+   (di/startup $)
+   (let [res
+         (di/do-with! $ [identity-set]
+                      (identity-set "alice" ["perm.AAA/friend"]))
+         [query reply-chan] (get-query)]
+     (doseq [[ts change] [[1000 1] ;; Became friends at time 1000
+                          [2000 -1] ;; Parted ways at time 2000
+                          ]]
+       (async/>!! reply-chan {:kind :fact
+                              :name "perm.AAA/friend"
+                              :key "alice"
+                              :data ["eve"]
+                              :ts ts
+                              :change change
+                              :writers #{"perm.AAA"}
+                              :readers #{}}))
+     (async/close! reply-chan)
+     (async/<!! res) => #{"alice"} ;; No mention of friendship with eve
+     )))
+
+[[:section {:title "Integrity and Confidentiality"}]]
+
+

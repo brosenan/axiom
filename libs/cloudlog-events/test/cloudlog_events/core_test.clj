@@ -418,28 +418,31 @@ However, sometimes we wish to see the complete picture and accumulate events.
 The following functions support event accumulation."
 
 [[:section {:title "accumulate"}]]
-"`accumulate` is a *reducing function* that accumulates events into a map for which the keys are the events themselves, excluding their `:change` fields,
-and the values are the sums of the `:change` for one particular event."
+"`accumulate` is a *reducing function* that accumulates events into a map for which the keys are the events themselves, excluding their `:change` and `:ts` fields,
+and the values are tuples, containing the sums of the `:change` and the maximum `:ts` for each entry."
 
 "With arity 0, `accumulate` returns and empty map."
 (fact
  (accumulate) => {})
 
 "With arity 2, it will take a map and an event, and if the event is not already a key in the map, it will be added
-so that the `:change` is the value"
+so that the `:change` and `:ts` fields move from the key to the value."
 (fact
- (accumulate {} (event :fact "foo/bar" "k1" [1 2]))
+ (accumulate {} (event :fact "foo/bar" "k1" [1 2] :ts 1000))
  => {(-> (event :fact "foo/bar" "k1" [1 2])
-         (dissoc :change)) 1})
+         (dissoc :change)
+         (dissoc :ts)) [1 1000]})
 
-"If the event exists as a key in the map (possibly with a different `:change` value),
-the entry is updated to include the sum of the existing value and the event's `:change`."
+"If the event exists as a key in the map (possibly with a different `:change` and `:ts` values),
+the entry is updated to include the sum of the existing value and the event's `:change`, and the latest `:ts`."
 (fact
  (accumulate {(-> (event :fact "foo/bar" "k1" [1 2])
-                  (dissoc :change)) 1}
-             (event :fact "foo/bar" "k1" [1 2]))
+                  (dissoc :change)
+                  (dissoc :ts)) [1 1000]}
+             (event :fact "foo/bar" "k1" [1 2] :ts 2000))
  => {(-> (event :fact "foo/bar" "k1" [1 2])
-         (dissoc :change)) 2})
+         (dissoc :change)
+         (dissoc :ts)) [2 2000]})
 
 "[Atomic update events](cloudlog-events.html#atomic-updates) are accumulated as two different events.
 In the following example the first event sets the value of `k1` to `[1 2]`,
@@ -448,30 +451,36 @@ The accumulation shows only a single event with the updated value.
 (The old value is still present, but with value of 0)."
 (fact
  (reduce accumulate {}
-         [(event :fact "foo/bar" "k1" [1 2])
+         [(event :fact "foo/bar" "k1" [1 2] :ts 1000)
           (event :fact "foo/bar" "k1" [2 3]
-                 :removed [1 2])])
+                 :removed [1 2] :ts 2000)])
  => {(-> (event :fact "foo/bar" "k1" [2 3])
-         (dissoc :change)) 1
+         (dissoc :change)
+         (dissoc :ts)) [1 2000]
      (-> (event :fact "foo/bar" "k1" [1 2])
-         (dissoc :change)) 0})
+         (dissoc :change)
+         (dissoc :ts)) [0 2000]})
 
 [[:section {:title "accumulated-events"}]]
-"With an accumulated map we can get a sequence of the underlying accumulated events by calling `accumulated-events`."
+"With an accumulated map at hand, we can get a sequence of the underlying accumulated events by calling `accumulated-events`."
 (fact
  (set (accumulated-events {(-> (event :fact "foo/bar" "k1" [1 2])
-                               (dissoc :change)) 1
+                               (dissoc :change)
+                               (dissoc :ts)) [1 1000]
                            (-> (event :fact "foo/bar" "k2" [3 4])
-                               (dissoc :change)) 2}))
- => #{(event :fact "foo/bar" "k1" [1 2])
-      (event :fact "foo/bar" "k2" [3 4] :change 2)})
+                               (dissoc :change)
+                               (dissoc :ts)) [2 2000]}))
+ => #{(event :fact "foo/bar" "k1" [1 2] :ts 1000)
+      (event :fact "foo/bar" "k2" [3 4] :change 2 :ts 2000)})
 
 "Events for which the accumulated `:change` value is zero or negative are ignored."
 (fact
  (accumulated-events {(-> (event :fact "foo/bar" "k1" [1 2])
-                          (dissoc :change)) 0
+                          (dissoc :change)
+                          (dissoc :ts)) [0 9999]
                       (-> (event :fact "foo/bar" "k2" [3 4])
-                          (dissoc :change)) -1})
+                          (dissoc :change)
+                          (dissoc :ts)) [-1 8888]})
  => [])
 
 [[:section {:title "accumulate-db-chan"}]]
