@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">gateway.core</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#identity-set"><h4>2 &nbsp; identity-set</h4></a><a class="section" data-scroll="" href="#accumulation"><h5><i>2.1 &nbsp; Accumulation</i></h5></a><a class="section" data-scroll="" href="#integrity-and-confidentiality"><h5><i>2.2 &nbsp; Integrity and Confidentiality</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#identity-set"><h4>2 &nbsp; identity-set</h4></a><a class="section" data-scroll="" href="#accumulation"><h5><i>2.1 &nbsp; Accumulation</i></h5></a><a class="section" data-scroll="" href="#integrity"><h5><i>2.2 &nbsp; Integrity</i></h5></a><a class="section" data-scroll="" href="#confidentiality"><h5><i>2.3 &nbsp; Confidentiality</i></h5></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,7 +80,7 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#identity-set"><h4>2 &nbsp; identity-set</h4></a><a class="section" data-scroll="" href="#accumulation"><h5><i>2.1 &nbsp; Accumulation</i></h5></a><a class="section" data-scroll="" href="#integrity-and-confidentiality"><h5><i>2.2 &nbsp; Integrity and Confidentiality</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#identity-set"><h4>2 &nbsp; identity-set</h4></a><a class="section" data-scroll="" href="#accumulation"><h5><i>2.1 &nbsp; Accumulation</i></h5></a><a class="section" data-scroll="" href="#integrity"><h5><i>2.2 &nbsp; Integrity</i></h5></a><a class="section" data-scroll="" href="#confidentiality"><h5><i>2.3 &nbsp; Confidentiality</i></h5></a></li>
                 </ul>
               </nav>
           </div>
@@ -88,7 +88,7 @@
  (module $)
  (di/startup $)
  (di/do-with! $ [identity-set]
-              (async/&lt;!! (identity-set &quot;alice&quot; [])) =&gt; #{&quot;alice&quot;}))</code></pre></div><div><p>A user can belong to many groups, and is therefore a member of the intersection of all these groups with his or her own singleton group (represented by his or her user ID). But how do we determine which user belongs to which group?</p></div><div><p>Axiom has an original solution for that as well. Instead of explicitly assigining users to groups (as some access control systems suggest), Axiom uses <a href='cloudlog.html#defrule'>rules</a> to define user groups.</p></div><div><p>Any rule that create derived facts of the form <code>&#91;rule-name user args...&#93;</code> defines a user group of the form <code>&#91;rule-name args...&#93;</code>, which contains any <code>user</code> for which such a derived fact exists.</p></div><div><p><code>identity-set</code> takes as its second argument a list of <em>rule names</em> based on which we would like to search for identities. Let us consider a Facebook-like application, in which users can have rights based on who their friends are, and which groups they own. Two rules: <code>perm.AAA/friend</code> and <code>perm.BBB/group-owner</code> convey this relationships, respectively. Now consider we query for user <code>alice</code>'s user-set with respect to these two rules.</p></div><div class="code"><pre><code class="clojure">(def db-chan (async/chan))
+              (async/&lt;!! (identity-set &quot;alice&quot; [])) =&gt; #{&quot;alice&quot;}))</code></pre></div><div><p>A user can belong to many groups, and is therefore a member of the intersection of all these groups with his or her own singleton group (represented by his or her user ID). But how do we determine which user belongs to which group?</p></div><div><p>Axiom has an original solution for that as well. Instead of explicitly assigining users to groups (as some access control systems suggest), Axiom uses <a href='cloudlog.html#defrule'>rules</a> to define user groups.</p></div><div><p>Any rule that create derived facts of the form <code>&#91;rule-name user args...&#93;</code> defines a user group of the form <code>&#91;rule-name args...&#93;</code>, which contains any <code>user</code> for which such a derived fact exists.</p></div><div><p><code>identity-set</code> takes as its second argument a list of <em>rule names</em> based on which we would like to search for identities. Let us consider a Facebook-like application, in which users can have rights based on who their friends are, and which groups they own. Two rules: <code>perm.AAA/friend</code> and <code>perm.BBB/group-owner</code> convey this relationships, respectively. Now consider we query for user <code>alice</code>'s identity set with respect to these two rules.</p></div><div class="code"><pre><code class="clojure">(def db-chan (async/chan))
  (let [$ (di/injector {:database-chan db-chan})]
  (module $)
  (di/startup $)
@@ -127,10 +127,10 @@
                         :change 1
                         :readers #{}
                         :writers #{&quot;perm.BBB&quot;}})
- (async/close! reply-chan))</code></pre></div><div><p><code>alice</code>'s user-set is now the intersection between her own singleton set (<code>&quot;alice&quot;</code>), and the groups of <code>bob</code>'s and <code>charlie</code>'s friends, as well as the owners of <code>cats for free wifi</code>.</p></div><div class="code"><pre><code class="clojure">(async/&lt;!! res) =&gt; (interset/intersection #{&quot;alice&quot;}
+ (async/close! reply-chan))</code></pre></div><div><p><code>alice</code>'s identity set is now the intersection between her own singleton set (<code>&quot;alice&quot;</code>), and the groups of <code>bob</code>'s and <code>charlie</code>'s friends, as well as the owners of <code>cats for free wifi</code>.</p></div><div class="code"><pre><code class="clojure">(async/&lt;!! res) =&gt; (interset/intersection #{&quot;alice&quot;}
                                          #{[:perm.AAA/friend &quot;bob&quot;]}
                                          #{[:perm.AAA/friend &quot;charlie&quot;]}
-                                         #{[:perm.BBB/group-owner &quot;cats for free wifi&quot;]})</code></pre></div><div><span id="accumulation"></span><h3>2.1 &nbsp;&nbsp; Accumulation</h3></div><div><p>Axiom is an <a href='https://martinfowler.com/eaaDev/EventSourcing.html'>event sourcing</a> system. This means that it doesn't store <em>state</em>, but rather events that record <em>change of state</em>.</p></div><div><p>When discussing user rights, we need to refer to user rights at a specific point in time. When a user makes some query, the result he or she is supposed to see depend on which groups he or she blongs to at <em>the moment of the query</em>. To know this, we need to look at an <a href='cloudlog-events.html#accumulating-events'>accumulation of the events</a>, and not at the individual events, that is, the current state of each group and not the individual changes in this state.</p></div><div><p>For example, consider <code>alice</code> was once a friend of <code>eve</code> and then they parted ways. This friendship will not appear in <code>alice</code>'s user-set.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-chan db-chan})]
+                                         #{[:perm.BBB/group-owner &quot;cats for free wifi&quot;]})</code></pre></div><div><span id="accumulation"></span><h3>2.1 &nbsp;&nbsp; Accumulation</h3></div><div><p>Axiom is an <a href='https://martinfowler.com/eaaDev/EventSourcing.html'>event sourcing</a> system. This means that it doesn't store <em>state</em>, but rather events that record <em>change of state</em>.</p></div><div><p>When discussing user rights, we need to refer to user rights at a specific point in time. When a user makes some query, the result he or she is supposed to see depend on which groups he or she blongs to at <em>the moment of the query</em>. To know this, we need to look at an <a href='cloudlog-events.html#accumulating-events'>accumulation of the events</a>, and not at the individual events, that is, the current state of each group and not the individual changes in this state.</p></div><div><p>For example, consider <code>alice</code> was once a friend of <code>eve</code> and then they parted ways. This friendship will not appear in <code>alice</code>'s identity set.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-chan db-chan})]
  (module $)
  (di/startup $)
  (let [res
@@ -150,7 +150,75 @@
                             :readers #{}}))
    (async/close! reply-chan)
    (async/&lt;!! res) =&gt; #{&quot;alice&quot;} ;; No mention of friendship with eve
-   ))</code></pre></div><div><span id="integrity-and-confidentiality"></span><h3>2.2 &nbsp;&nbsp; Integrity and Confidentiality</h3></div>
+   ))</code></pre></div><div><span id="integrity"></span><h3>2.2 &nbsp;&nbsp; Integrity</h3></div><div><p>Integrity and confidentiality are important to take into consideration when calculating a user's identity set.</p></div><div><p>Integrity is important because we do not want users to be able to assume permissions they are not entitled to. This could happen if they publish a fact that looks like a derived fact from a rule giving them access to something the wouldn't have otherwise.</p></div><div><p>To avoid this kind of problem we require that facts taken into consideration by <code>identity-set</code> are created by rules,  so that their <a href='cloudlog.html#integrity'>writer sets include the fact's namespace</a>.</p></div><div><p>Imagine <code>eve</code> wishing to gain access to <code>alice</code>'s inner-circle by forging an event that makes her one of <code>alice</code>'s friends.</p></div><div class="code"><pre><code class="clojure">(def forged-event
+  {:kind :fact
+   :name &quot;perm.AAA/friend&quot;
+   :key &quot;eve&quot;
+   :data [&quot;alice&quot;]
+   :ts 3000
+   :change 1
+   :writers #{&quot;eve&quot;}
+   :readers #{}})</code></pre></div><div><p>Note that <code>eve</code>'s identity set does not include <code>perm.AAA</code> (the fact's namespace), so the <code>:writers</code> set does not contain it. It may contain other groups <code>eve</code> is a member of, but they are irrelevant to this discussion.</p></div><div><p>When <code>eve</code> tries to access Axiom and perform operations (such as reading statuses on our Facebook-like application), the gateway tier will first call <code>identity-set</code> to see which groups she belongs to. In her request she will ask to identify as a friend of whoever possible, by placing <code>perm.AAA/friend</code> in the <code>rule-names</code> argument. However, <code>identity-set</code> will know to ignore the forged fact and will not consider her a friend of <code>alice</code>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-chan db-chan})]
+ (module $)
+ (di/startup $)
+ (let [res
+       (di/do-with! $ [identity-set]
+                    (identity-set &quot;eve&quot; [&quot;perm.AAA/friend&quot;]))
+       [query reply-chan] (get-query)]
+   (async/&gt;!! reply-chan forged-event)
+   (async/close! reply-chan)
+   (async/&lt;!! res) =&gt; #{&quot;eve&quot;} ;; No mention of friendship with alice
+   ))</code></pre></div><div><span id="confidentiality"></span><h3>2.3 &nbsp;&nbsp; Confidentiality</h3></div><div><p>The role confidentiality plays here is a bit less obvious. The identity set returned by <code>identity-set</code> is not directly visible to users. However, if we do not take special measures to prefent this, users can indirectly learn about things they should not.</p></div><div><p>Consider a private message written by <code>alice</code> to <code>bob</code>:</p></div><div class="code"><pre><code class="clojure">(def bobs-message
+  {:kind :fact
+   :name &quot;social-app/message&quot;
+   :key &quot;bob&quot;
+   :data [&quot;alice&quot; &quot;I like you!&quot;]
+   :ts 1234
+   :change 1
+   :writers #{&quot;alice&quot;}
+   :readers #{&quot;bob&quot;}})</code></pre></div><div><p>Note that the <code>:readers</code> set includes only <code>bob</code>, so <code>bob</code> alone can see this message or even know it exists.</p></div><div><p><code>eve</code> suspects <code>alice</code>'s effection to <code>bob</code>, and is willing to go through extreme measures to see if she is correct. To do so she creates her own application, and submits code containing the following rule:</p></div><div class="code"><pre><code class="clojure">(clg/defrule evil-plan [&quot;eve&quot; msg]
+  [:social-app/message &quot;bob&quot; &quot;alice&quot; msg] (clg/by &quot;alice&quot;))</code></pre></div><div><p>Note that although the message facts were created by a different application, Axiom does not restrict that fact to be used only by that application. This is a fundemental principle in Axiom: User data belongs to <em>users</em>, not <em>applications</em>.</p></div><div><p>If we apply <code>eve</code>'s rule to <code>bob</code>'s message we get the following event:</p></div><div class="code"><pre><code class="clojure">(let [em (ev/emitter evil-plan)]
+ (def evil-facts (em bobs-message))
+ evil-facts =&gt; [{:kind :fact
+                 :name &quot;gateway.core-test/evil-plan&quot;
+                 :key &quot;eve&quot;
+                 :data [&quot;I like you!&quot;]
+                 :ts 1234
+                 :change 1
+                 :writers #{&quot;gateway.core-test&quot;}
+                 :readers #{&quot;bob&quot;}}])</code></pre></div><div><p>Axiom's confidentiality mechanism made sure that although it was <code>eve</code>'s evil rule that created this event, <code>eve</code> herself cannot read it, as its <code>:readers</code> set contains only <code>bob</code>.</p></div><div><p>But this is where <code>identity-set</code> could (potentially) help <code>eve</code> with her plan. Her exploit consists of the following facts she stores in Axiom:</p></div><div class="code"><pre><code class="clojure">[{:kind :fact
+  :name &quot;eve-the-evil/exploit&quot;
+  :key &quot;love-life&quot;
+  :data [&quot;It's toast&quot;]
+  :ts 2345
+  :change 1
+  :writers #{&quot;eve&quot;}
+  :readers #{[[:gateway.core-test/evil-plan &quot;I like you!&quot;]]}}
+ {:kind :fact
+  :name &quot;eve-the-evil/exploit&quot;
+  :key &quot;love-life&quot;
+  :data [&quot;It's over&quot;]
+  :ts 2346
+  :change 1
+  :writers #{&quot;eve&quot;}
+  :readers #{[[:gateway.core-test/evil-plan &quot;I love you!&quot;]]}}
+ {:kind :fact
+  :name &quot;eve-the-evil/exploit&quot;
+  :key &quot;love-life&quot;
+  :data [&quot;There's still hope...&quot;]
+  :ts 2347
+  :change 1
+  :writers #{&quot;eve&quot;}
+  :readers #{[[:gateway.core-test/evil-plan &quot;I hate you!&quot;]]}}]</code></pre></div><div><p>In all these facts she sets the <code>:readers</code> set to groups defined by the rule she created herself. Each of these facts will be visible to her if <code>alice</code> sent <code>bob</code> a message with the text that appears in the group's description.</p></div><div><p>Now all <code>eve</code> has to do is make a query (through the gateway) and look for a fact <code>eve-the-evil/exploit</code> with key <code>love-life</code>,  providing <code>gateway.core-test/evil-plan</code> in the rule-list. Then she just needs to wait and see if any of her guesses got lucky.</p></div><div><p>To make sure <code>eve</code>'s evel plan cannot succeed,  <code>identity-set</code> only takes into consideration results for which the user for which the query is made is allowed to know about. In our case, <code>eve</code> is not allowed to know about the different <code>gateway.core-test/evil-plan</code> results, and therefore they are not added to her identity set.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-chan db-chan})]
+ (module $)
+ (di/startup $)
+ (let [res
+       (di/do-with! $ [identity-set]
+                    (identity-set &quot;eve&quot; [&quot;perm.AAA/friend&quot;]))
+       [query reply-chan] (get-query)]
+   (async/pipe (async/to-chan evil-facts) reply-chan)
+   (async/&lt;!! res) =&gt; #{&quot;eve&quot;} ;; No results from evil-plan
+   ))</code></pre></div><div><p>One subtle point to note is the potentially circular relationship between a user's identity set and the confidentiality requirement. We need to know what a user's identity set is in order to know what facts to consider for the identity set. We resolve this circular relationship by making the confidentiality requirement event more strict than it (theorecitally) have to be. For the purpose of group membership (the identity set) we only consider facts that are accessible to the user itself, without looking up group membership.</p></div>
         </div>
       </div>
     </div>
