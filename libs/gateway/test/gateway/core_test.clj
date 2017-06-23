@@ -3,7 +3,9 @@
             [gateway.core :refer :all]
             [clojure.core.async :as async]
             [di.core :as di]
-            [cloudlog.interset :as interset]))
+            [cloudlog.interset :as interset]
+            [cloudlog.core :as clg]
+            [cloudlog-events.core :as ev]))
 
 [[:chapter {:title "Introduction"}]]
 "This library implement Axiom's gateway tier.
@@ -77,7 +79,7 @@ which contains any `user` for which such a derived fact exists."
 "`identity-set` takes as its second argument a list of *rule names* based on which we would like to search for identities.
 Let us consider a Facebook-like application, in which users can have rights based on who their friends are, and which groups they own.
 Two rules: `perm.AAA/friend` and `perm.BBB/group-owner` convey this relationships, respectively.
-Now consider we query for user `alice`'s user-set with respect to these two rules."
+Now consider we query for user `alice`'s identity set with respect to these two rules."
 
 (fact
  (def db-chan (async/chan))
@@ -128,7 +130,7 @@ Now consider we query for user `alice`'s user-set with respect to these two rule
                           :writers #{"perm.BBB"}})
    (async/close! reply-chan)))
 
-"`alice`'s user-set is now the intersection between her own singleton set (`\"alice\"`),
+"`alice`'s identity set is now the intersection between her own singleton set (`\"alice\"`),
 and the groups of `bob`'s and `charlie`'s friends, as well as the owners of `cats for free wifi`."
 (fact
  (async/<!! res) => (interset/intersection #{"alice"}
@@ -147,7 +149,7 @@ and not at the individual events,
 that is, the current state of each group and not the individual changes in this state."
 
 "For example, consider `alice` was once a friend of `eve` and then they parted ways.
-This friendship will not appear in `alice`'s user-set."
+This friendship will not appear in `alice`'s identity set."
 (fact
   (let [$ (di/injector {:database-chan db-chan})]
    (module $)
@@ -171,6 +173,144 @@ This friendship will not appear in `alice`'s user-set."
      (async/<!! res) => #{"alice"} ;; No mention of friendship with eve
      )))
 
-[[:section {:title "Integrity and Confidentiality"}]]
+[[:section {:title "Integrity"}]]
+"Integrity and confidentiality are important to take into consideration when calculating a user's identity set."
 
+"Integrity is important because we do not want users to be able to assume permissions they are not entitled to.
+This could happen if they publish a fact that looks like a derived fact from a rule giving them access to something the wouldn't have otherwise."
 
+"To avoid this kind of problem we require that facts taken into consideration by `identity-set` are created by rules, 
+so that their [writer sets include the fact's namespace](cloudlog.html#integrity)."
+
+"Imagine `eve` wishing to gain access to `alice`'s inner-circle by forging an event that makes her one of `alice`'s friends."
+(def forged-event
+  {:kind :fact
+   :name "perm.AAA/friend"
+   :key "eve"
+   :data ["alice"]
+   :ts 3000
+   :change 1
+   :writers #{"eve"}
+   :readers #{}})
+
+"Note that `eve`'s identity set does not include `perm.AAA` (the fact's namespace), so the `:writers` set does not contain it.
+It may contain other groups `eve` is a member of, but they are irrelevant to this discussion."
+
+"When `eve` tries to access Axiom and perform operations (such as reading statuses on our Facebook-like application),
+the gateway tier will first call `identity-set` to see which groups she belongs to.
+In her request she will ask to identify as a friend of whoever possible, by placing `perm.AAA/friend` in the `rule-names` argument.
+However, `identity-set` will know to ignore the forged fact and will not consider her a friend of `alice`."
+(fact
+ (let [$ (di/injector {:database-chan db-chan})]
+   (module $)
+   (di/startup $)
+   (let [res
+         (di/do-with! $ [identity-set]
+                      (identity-set "eve" ["perm.AAA/friend"]))
+         [query reply-chan] (get-query)]
+     (async/>!! reply-chan forged-event)
+     (async/close! reply-chan)
+     (async/<!! res) => #{"eve"} ;; No mention of friendship with alice
+     )))
+
+[[:section {:title "Confidentiality"}]]
+"The role confidentiality plays here is a bit less obvious.
+The identity set returned by `identity-set` is not directly visible to users.
+However, if we do not take special measures to prefent this,
+users can indirectly learn about things they should not."
+
+"Consider a private message written by `alice` to `bob`:"
+(def bobs-message
+  {:kind :fact
+   :name "social-app/message"
+   :key "bob"
+   :data ["alice" "I like you!"]
+   :ts 1234
+   :change 1
+   :writers #{"alice"}
+   :readers #{"bob"}})
+
+"Note that the `:readers` set includes only `bob`, so `bob` alone can see this message
+or even know it exists."
+
+"`eve` suspects `alice`'s effection to `bob`, and is willing to go through extreme measures to see if she is correct.
+To do so she creates her own application, and submits code containing the following rule:"
+(clg/defrule evil-plan ["eve" msg]
+  [:social-app/message "bob" "alice" msg] (clg/by "alice"))
+
+"Note that although the message facts were created by a different application,
+Axiom does not restrict that fact to be used only by that application.
+This is a fundemental principle in Axiom: User data belongs to *users*, not *applications*."
+
+"If we apply `eve`'s rule to `bob`'s message we get the following event:"
+(fact
+ (let [em (ev/emitter evil-plan)]
+   (def evil-facts (em bobs-message))
+   evil-facts => [{:kind :fact
+                   :name "gateway.core-test/evil-plan"
+                   :key "eve"
+                   :data ["I like you!"]
+                   :ts 1234
+                   :change 1
+                   :writers #{"gateway.core-test"}
+                   :readers #{"bob"}}]))
+
+"Axiom's confidentiality mechanism made sure that although it was `eve`'s evil rule that created this event,
+`eve` herself cannot read it, as its `:readers` set contains only `bob`."
+
+"But this is where `identity-set` could (potentially) help `eve` with her plan.
+Her exploit consists of the following facts she stores in Axiom:"
+(comment
+  [{:kind :fact
+    :name "eve-the-evil/exploit"
+    :key "love-life"
+    :data ["It's toast"]
+    :ts 2345
+    :change 1
+    :writers #{"eve"}
+    :readers #{[[:gateway.core-test/evil-plan "I like you!"]]}}
+   {:kind :fact
+    :name "eve-the-evil/exploit"
+    :key "love-life"
+    :data ["It's over"]
+    :ts 2346
+    :change 1
+    :writers #{"eve"}
+    :readers #{[[:gateway.core-test/evil-plan "I love you!"]]}}
+   {:kind :fact
+    :name "eve-the-evil/exploit"
+    :key "love-life"
+    :data ["There's still hope..."]
+    :ts 2347
+    :change 1
+    :writers #{"eve"}
+    :readers #{[[:gateway.core-test/evil-plan "I hate you!"]]}}])
+
+"In all these facts she sets the `:readers` set to groups defined by the rule she created herself.
+Each of these facts will be visible to her if `alice` sent `bob` a message with the text that appears in the group's description."
+
+"Now all `eve` has to do is make a query (through the gateway) and look for a fact `eve-the-evil/exploit` with key `love-life`, 
+providing `gateway.core-test/evil-plan` in the rule-list.
+Then she just needs to wait and see if any of her guesses got lucky."
+
+"To make sure `eve`'s evel plan cannot succeed, 
+`identity-set` only takes into consideration results for which the user for which the query is made is allowed to know about.
+In our case, `eve` is not allowed to know about the different `gateway.core-test/evil-plan` results,
+and therefore they are not added to her identity set."
+(fact
+  (let [$ (di/injector {:database-chan db-chan})]
+   (module $)
+   (di/startup $)
+   (let [res
+         (di/do-with! $ [identity-set]
+                      (identity-set "eve" ["perm.AAA/friend"]))
+         [query reply-chan] (get-query)]
+     (async/pipe (async/to-chan evil-facts) reply-chan)
+     (async/<!! res) => #{"eve"} ;; No results from evil-plan
+     )))
+
+"One subtle point to note is the potentially circular relationship between a user's identity set and the confidentiality requirement.
+We need to know what a user's identity set is in order to know what facts to consider for the identity set.
+We resolve this circular relationship by making the confidentiality requirement event more strict than it (theorecitally) have to be.
+For the purpose of group membership (the identity set) we only consider facts that are accessible to the user itself,
+without looking up group membership."
