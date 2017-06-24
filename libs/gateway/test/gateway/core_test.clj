@@ -54,8 +54,18 @@ answers the opposite question: *what is the smallest known user set that `u` bel
 - `database-chan` -- A `core.async` channel for retreiving events stored in a database (e.g., [DynamoDB](dynamo.html#database-chan))."
 
 "`identity-set` is an *async function*, meaning that instead of returning an result it returns a channel to which a result will be
-posted in the future.
-With no further information (an empty collection as a second argument that we will discuss later), 
+posted in the future."
+
+"For an unauthenticated user (user ID of `nil`), `identity-set` returns a [universal interset](cloudlog.interset.html#universe),
+that is to say that the user can be any user and we do not have any information about who that might be."
+(fact
+ (let [$ (di/injector {:database-chan (async/chan)})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [identity-set]
+                (async/<!! (identity-set nil [:this :is :ignored])) => interset/universe)))
+
+"Given a valid identity, but with no further information (an empty collection as a second argument that we will discuss later), 
 `identity-set` returns (via a channel) a set containing only the user ID.
 We treat strings as singleton sets, so the user group `\"alice\"` is a group of users containing only one user -- `alice`."
 (fact
@@ -314,3 +324,105 @@ We need to know what a user's identity set is in order to know what facts to con
 We resolve this circular relationship by making the confidentiality requirement event more strict than it (theorecitally) have to be.
 For the purpose of group membership (the identity set) we only consider facts that are accessible to the user itself,
 without looking up group membership."
+
+[[:chapter {:title "authenticator"}]]
+"The starting point for [identity-set](#identity-set) is an authenticated user identity.
+But how do we get one?
+In practice, user authentication is a difficult problem with many possibilities and serious trade-offs between them.
+In this library we defer this problem.
+Instead of defining a single authentication scheme, we provide an extension point in the form of a [DI resource](di.html),
+and expect concrete implementations to implement it."
+
+"The interface we define here is simple.
+An authenticator is a [Ring middleware](https://github.com/ring-clojure/ring/wiki/Concepts#middleware),
+that is, a higher-order function that takes and returns a [Ring handler](https://github.com/ring-clojure/ring/wiki/Concepts#handlers).
+It should be placed after middleware for parsing the request, e.g., handling cookies and parameters,
+but before any middleware that performs operations on behalf of a user."
+
+"Upon successful authentication, an `:identity` field should be added to the request map."
+
+[[:section {:title "dummy-authenticator"}]]
+"To define this extension point, as well as to allow testing of this library and \"raw\" Axiom in general,
+we provide an *unsafe*, `dummy-authenticator` which does something you are not supposed to do on the internet:
+trust the user...
+The `dummy-authenticator` takes the user's identity from a query parameter or a cookie."
+
+"The `dummy-authenticator` is based on the `:use-dummy-authenticator` configuration parameter.
+If it exists (regardless of its value), a `dummy-authenticator` will be provided as the `authenticator`."
+(fact
+ (let [$ (di/injector {:use-dummy-authenticator true})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [authenticator]
+                (def dummy-authenticator authenticator))))
+
+"`dummy-authenticator` assumes the existence of `:cookies` and `:params` keys in the request,
+so the [cookie](https://github.com/ring-clojure/ring/wiki/Cookies) and [params](https://github.com/ring-clojure/ring/wiki/Parameter-Middleware)
+middleware should be wrapped around it."
+
+"If a request contains a cookie named `user_identity`, the dummy authenticator takes its value as the user's identity."
+(fact
+ (let [id (atom nil)
+       handler (fn [req res raise]
+                 (reset! id (:identity req)))
+       app (-> handler
+               dummy-authenticator)]
+   (app {:cookies {"user_identity" "foobar"}
+         :params {}} :res :raise)
+   @id => "foobar"))
+
+"If a query parameter named `_identity` exists, its value becomes the `:identity`.
+Additionally, the new value is stored in a cookie for future reference."
+(fact
+ (let [resp (atom nil)
+       respond (fn [res]
+                 (reset! resp res))
+       handler (fn [req res raise]
+                 (res {:body (str "Hello, " (:identity req))}))
+       app (-> handler
+               dummy-authenticator)]
+   (app {:cookies {}
+         :params {"_identity" "barfoo"}} respond :raise)
+   @resp => {:body "Hello, barfoo"
+             :cookies {"user_identity" "barfoo"}}))
+
+"Adding a cookie works in concert with other cookies..."
+(fact
+ (let [resp (atom nil)
+       respond (fn [res]
+                 (reset! resp res))
+       handler (fn [req res raise]
+                 (res {:body "Hello"
+                       :cookies {"some" "cookie"}}))
+       app (-> handler
+               dummy-authenticator)]
+   (app {:cookies {}
+         :params {"_identity" "barfoo"}} respond :raise)
+   @resp => {:body "Hello"
+             :cookies {"user_identity" "barfoo"
+                       "some" "cookie"}}))
+
+"If both a cookie and a parameter exist with different identity values, the *parameter wins*."
+(fact
+ (let [id (atom nil)
+       handler (fn [req res raise]
+                 (reset! id (:identity req)))
+       app (-> handler
+               dummy-authenticator)]
+   (app {:cookies {"user_identity" "foobar"}
+         :params {"_identity" "barfoo"}} :res :raise)
+   @id => "barfoo"))
+
+"If none are present, the authenticator does not add an `:identity` entry to the request."
+(fact
+ (let [res (atom nil)
+       respond (fn [r] (reset! res r))
+       handler (fn [req res raise]
+                 (when (contains? req :identity)
+                   (throw (Exception. "Request should not have an :identity field")))
+                 (res {:body "Hello"}))
+       app (-> handler
+               dummy-authenticator)]
+   (app {:cookies {}
+         :params {}} respond :raise)
+   @res => {:body "Hello"}))
