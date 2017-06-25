@@ -206,7 +206,7 @@
                                           (recur (rest ruleseq) last-task))))
                                     (mark-as-ready plan)))
                                 nil)))
-  (di/do-with $ [serve sh migration-config hasher]
+  (di/do-with $ [serve sh migration-config hasher hash-static-files]
               (serve (fn [ev publish]
                        (let [unique (rand-int 1000000000)
                              dir (str (:clone-location migration-config) "/repo" unique)
@@ -216,11 +216,14 @@
                              (:key ev)
                              dir)
                          (sh "git" "checkout" version :dir dir)
-                         (let [hashes (permpub/hash-all hasher (io/file (str dir "/src")))]
+                         (let [hashes (permpub/hash-all hasher (io/file (str dir "/src")))
+                               static-hashes (hash-static-files (io/file (str dir "/static")))]
                            (publish {:kind :fact
                                      :name "axiom/perm-versions"
                                      :key (:key ev)
-                                     :data [version (set (vals hashes))]}))
+                                     :data [version
+                                            (set (vals hashes))
+                                            static-hashes]}))
                          (sh "rm" "-rf" dir))
                        nil)
                      {:kind :fact

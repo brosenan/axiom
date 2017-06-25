@@ -56,9 +56,11 @@ It relies on the following resources:
 1. `sh`: A shell to run `git` commands in.
 2. `migration-config`: where the `:clone-location` -- the directory where all clones are performed, is specified, and the `:clone-depth`.
 3. `hasher`: to be used for storing the versions loaded from git.
-3. `serve`: which registers this function with the `:axiom/app-version` event."
+4. `serve`: which registers this function with the `:axiom/app-version` event.
+5. [hash-static-files](#hash-static-files): intended to store all static content under the `/static` sub-directory."
 (fact
  (def cmds (transient []))
+ (def staticdir (atom nil))
  (let [reg (transient {})
        $ (di/injector {:sh (fn [& args]
                              (conj! cmds args)
@@ -69,7 +71,12 @@ It relies on the following resources:
                                           :clone-depth 12}
                        :hasher [:my-hasher]
                        :serve (fn [f r]
-                                (assoc! reg r f))})]
+                                (assoc! reg r f))
+                       :hash-static-files (fn [root]
+                                            (reset! staticdir root)
+                                            {"/a.html" "hash1"
+                                             "/b.css" "hash2"
+                                             "/c.js" "hash3"})})]
    (module $)
    (di/startup $)
    (def push-handler ((persistent! reg) {:kind :fact
@@ -78,7 +85,7 @@ It relies on the following resources:
 
 "The `push-handler` function responds to such events by calling `git clone` and `git checkout` 
 to get the specified version of the specified repo inside the given directory.
-Then `permacode.publish/hash-all` is called on the local repo, and then the directory is removed."
+Then `permacode.publish/hash-all` and `hash-static-files` are called on the local repo, and then the directory is removed."
 (fact
  (def published (transient []))
  (push-handler {:kind :fact
@@ -90,18 +97,24 @@ Then `permacode.publish/hash-all` is called on the local repo, and then the dire
  (provided
   (rand-int 1000000000) => 12345
   (io/file "/my/clone/location/repo12345/src") => ..dir..
+  (io/file "/my/clone/location/repo12345/static") => ..staticdir..
   (permpub/hash-all [:my-hasher] ..dir..) => {'foo 'perm.ABCD123
                                             'bar 'perm.EFGH456})
  (persistent! cmds) => [["git" "clone" "--depth" "12" "https://example.com/some/repo" "/my/clone/location/repo12345"]
                         ["git" "checkout" "ABCD1234" :dir "/my/clone/location/repo12345"]
-                        ["rm" "-rf" "/my/clone/location/repo12345"]])
+                        ["rm" "-rf" "/my/clone/location/repo12345"]]
+ @staticdir => ..staticdir..)
 
 "The handler publishes an `:axiom/perm-versions` event."
 (fact
  (persistent! published) => [{:kind :fact
                               :name "axiom/perm-versions"
                               :key "https://example.com/some/repo"
-                              :data ["ABCD1234" #{'perm.ABCD123 'perm.EFGH456}]}])
+                              :data ["ABCD1234"
+                                     #{'perm.ABCD123 'perm.EFGH456}
+                                     {"/a.html" "hash1"
+                                      "/b.css" "hash2"
+                                      "/c.js" "hash3"}]}])
 
 [[:chapter {:title "perm-tracker"}]]
 "`perm-tracker` registers to `:axiom/perm-versions` and tracks the quantity of each [permacode module](permacode.html) by summing the `:change`
@@ -805,7 +818,7 @@ It is a function that takes a path to a file in the local file system, reads its
    (module $)
    (di/startup $)
    (di/do-with! $ [hash-static-file]
-                (hash-static-file (clojure.java.io/file "/tmp/foo.txt")) => "some-hash")
+                (hash-static-file (io/file "/tmp/foo.txt")) => "some-hash")
    (class @content) => (class (byte-array 1))
    (-> @content
        String.
@@ -819,13 +832,13 @@ It returns a map from relative paths to hash values."
 
 "To demonstrate this we will create a directory under `/tmp` and populate it with three file -- `a.html`, `b.css` and `c.js`."
 (fact
- (let [dir (clojure.java.io/file "/tmp/mock-static")]
+ (let [dir (io/file "/tmp/mock-static")]
    (.mkdirs dir)
-   (with-open [a (clojure.java.io/writer (clojure.java.io/file dir "a.html"))]
+   (with-open [a (io/writer (io/file dir "a.html"))]
      (.write a "Some html..."))
-   (with-open [b (clojure.java.io/writer (clojure.java.io/file dir "b.css"))]
+   (with-open [b (io/writer (io/file dir "b.css"))]
      (.write b "Some CSS..."))
-   (with-open [c (clojure.java.io/writer (clojure.java.io/file dir "c.js"))]
+   (with-open [c (io/writer (io/file dir "c.js"))]
      (.write c "Some JavaScript..."))))
 
 "Calling `hash-static-files` on `/tmp/mock-static` will return a map containing entries for `/a.html`, `/b.css` and `c.js`."
@@ -836,7 +849,7 @@ It returns a map from relative paths to hash values."
    (module $)
    (di/startup $)
    (di/do-with! $ [hash-static-files]
-                (hash-static-files (clojure.java.io/file "/tmp/mock-static"))
+                (hash-static-files (io/file "/tmp/mock-static"))
                 => {"/a.html" "hash-for-/tmp/mock-static/a.html"
                     "/b.css" "hash-for-/tmp/mock-static/b.css"
                     "/c.js" "hash-for-/tmp/mock-static/c.js"})))
