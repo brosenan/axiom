@@ -14,7 +14,8 @@
             [dynamo.core :as dyn]
             [zookeeper :as zk]
             [clojure.java.io :as io]
-            [s3.core :as s3]))
+            [s3.core :as s3]
+            [clojure.string :as str]))
 
 [[:chapter {:title "Introduction"}]]
 "`migrator` is a microservice that listens to events describing new rules being published,
@@ -66,7 +67,7 @@ It relies on the following resources:
                               :err ""})
                        :migration-config {:clone-location "/my/clone/location"
                                           :clone-depth 12}
-                       :hasher :my-hasher
+                       :hasher [:my-hasher]
                        :serve (fn [f r]
                                 (assoc! reg r f))})]
    (module $)
@@ -89,7 +90,7 @@ Then `permacode.publish/hash-all` is called on the local repo, and then the dire
  (provided
   (rand-int 1000000000) => 12345
   (io/file "/my/clone/location/repo12345/src") => ..dir..
-  (permpub/hash-all :my-hasher ..dir..) => {'foo 'perm.ABCD123
+  (permpub/hash-all [:my-hasher] ..dir..) => {'foo 'perm.ABCD123
                                             'bar 'perm.EFGH456})
  (persistent! cmds) => [["git" "clone" "--depth" "12" "https://example.com/some/repo" "/my/clone/location/repo12345"]
                         ["git" "checkout" "ABCD1234" :dir "/my/clone/location/repo12345"]
@@ -195,7 +196,7 @@ We will mock this module with functions that record their own operation, so that
  (def last-task (atom 0))
  (def mock-zk-plan
    {:create-plan (fn [parent]
-                   (when-not (= permval/*hasher* :my-hasher)
+                   (when-not (= permval/*hasher* [:my-hasher])
                      (throw (Exception. "A custom hasher needs to be bound")))
                    (conj! calls [:create-plan parent])
                    :plan-node)
@@ -219,7 +220,7 @@ The `hasher` resource is used to retrieve the content of the permacode modules."
                        :zk-plan mock-zk-plan
                        :migration-config {:number-of-shards 3
                                           :plan-prefix "/my-plans"}
-                       :hasher :my-hasher})]
+                       :hasher [:my-hasher]})]
    (module $)
    (di/startup $)
    (async/alts!! [calls-chan
@@ -494,9 +495,9 @@ and `hasher` (e.g., [the one implemented for S3](s3.html#hasher)).
 We will mock them here."
 (fact
  (let [calls (async/chan 10)
-       $ (di/injector {:hasher :my-hasher
+       $ (di/injector {:hasher [:my-hasher]
                        :declare-service (fn [key reg]
-                                          (when-not (= permval/*hasher* :my-hasher)
+                                          (when-not (= permval/*hasher* [:my-hasher])
                                             (throw (Exception.
                                                     "A custom hasher needs to be bound")))
                                           (async/>!! calls [:declare-service key reg]))})]
@@ -526,7 +527,7 @@ We mock this function by providing `:test/follows` facts for Alice, who follows 
 (defn mock-scanner [name shard shards chan]
   (when-not (= [name shard shards] ["test/follows" 2 6])
     (throw (Exception. (str "Unexpected args in mock-scanner: " [name shard shards]))))
-  (when-not (= permval/*hasher* :my-hasher)
+  (when-not (= permval/*hasher* [:my-hasher])
     (throw (Exception. "A custom hasher needs to be bound")))
   (doseq [followee ["bob" "charlie" "dave"]]
     (async/>!! chan {:kind :fact
@@ -546,7 +547,7 @@ Once called, it will use [permacode.core/eval-symbol](permacode.html#eval-symbol
 Evaluation leverages the `hasher` resource.
 It will evaluate this function on each result comming from the `database-scanner`."
 (fact
- (let [$ (di/injector {:hasher :my-hasher
+ (let [$ (di/injector {:hasher [:my-hasher]
                        :database-scanner mock-scanner
                        :database-event-storage-chan rule-tuple-chan})]
    (my-migrator $ :ignored) => nil
@@ -605,7 +606,7 @@ We will mock one to produce `:test/tweeted` facts, stating that Bob, Charlie and
 (defn mock-scanner [name shard shards chan]
   (when-not (= [name shard shards] ["test/tweeted" 3 17])
     (throw (Exception. (str "Unexpected args in mock-scanner: " [name shard shards]))))
-  (when-not (= permval/*hasher* :my-hasher)
+  (when-not (= permval/*hasher* [:my-hasher])
     (throw (Exception. "A custom hasher needs to be bound")))
   (doseq [user ["bob" "charlie" "dave"]]
     (async/>!! chan {:kind :fact
@@ -655,7 +656,7 @@ based on it."
  (let [$ (di/injector {:database-scanner mock-scanner
                        :database-chan mock-db-chan
                        :database-event-storage-chan mock-store-chan
-                       :hasher :my-hasher})]
+                       :hasher [:my-hasher]})]
    (my-link-migrator $ :ignored) => nil
    (provided
     (perm/eval-symbol 'perm.ABC/my-rule) => timeline)))
@@ -775,3 +776,67 @@ corresponding `:axiom/rule` events."
     (perm/module-publics 'perm.1234ABC) => {'foo foo
                                             'bar bar} ; bar will not be published
     )))
+
+[[:section {:title "hash-static-file"}]]
+"When a new version is pushed we wish to scan everything under its `/static` directory (if exists),
+and store all these files in a way that will allow the [gateway tier](gateway.html) to retrieve them."
+
+"We use the `hasher` resource (e.g., the one provided for [S3](s3.html#hasher)) to store the content of files.
+This way, if a file is not modifed, we store only one copy of it."
+
+"The resource `hash-static-file` depends on a `hasher`.
+It is a function that takes a path to a file in the local file system, reads its content and [hashes it](permacode.hasher.html#introduction)."
+
+"To demonstrate how it works we create a temporary file:"
+(fact
+ (with-open [f (clojure.java.io/writer "/tmp/foo.txt")]
+   (doseq [i (range 1000)]
+     (.write f (str "This is line number " i "\n")))))
+
+"Now, when we call `hash-static-file` it will use the `hash` part of the `hasher` to store the content of the file, given as a binary array."
+(fact
+ (let [content (atom nil)
+       hash (fn [c]
+              (reset! content c)
+              "some-hash")
+       unhash (fn [h]
+                (throw (Exception. "unhash should not be called")))
+       $ (di/injector {:hasher [hash unhash]})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [hash-static-file]
+                (hash-static-file (clojure.java.io/file "/tmp/foo.txt")) => "some-hash")
+   (class @content) => (class (byte-array 1))
+   (-> @content
+       String.
+       (str/split #"\n")
+       (get 745)) => "This is line number 745"))
+
+[[:section {:title "hash-static-files"}]]
+"To recursively store all files under a given directory (the `/static` directory in the repo),
+the function `hash-static-files` applies `hash-static-file` to each file in the subtree under the given root.
+It returns a map from relative paths to hash values."
+
+"To demonstrate this we will create a directory under `/tmp` and populate it with three file -- `a.html`, `b.css` and `c.js`."
+(fact
+ (let [dir (clojure.java.io/file "/tmp/mock-static")]
+   (.mkdirs dir)
+   (with-open [a (clojure.java.io/writer (clojure.java.io/file dir "a.html"))]
+     (.write a "Some html..."))
+   (with-open [b (clojure.java.io/writer (clojure.java.io/file dir "b.css"))]
+     (.write b "Some CSS..."))
+   (with-open [c (clojure.java.io/writer (clojure.java.io/file dir "c.js"))]
+     (.write c "Some JavaScript..."))))
+
+"Calling `hash-static-files` on `/tmp/mock-static` will return a map containing entries for `/a.html`, `/b.css` and `c.js`."
+(fact
+ (let [$ (di/injector {:hash-static-file
+                       (fn [f]
+                         (str "hash-for-" (.getPath f)))})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [hash-static-files]
+                (hash-static-files (clojure.java.io/file "/tmp/mock-static"))
+                => {"/a.html" "hash-for-/tmp/mock-static/a.html"
+                    "/b.css" "hash-for-/tmp/mock-static/b.css"
+                    "/c.js" "hash-for-/tmp/mock-static/c.js"})))

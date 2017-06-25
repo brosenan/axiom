@@ -88,6 +88,16 @@
                                   (not (str/ends-with? (first src) "?"))))))
        vals))
 
+
+(defn to-bin-seq [f]
+  (let [len (.length f)
+        b (byte-array len)]
+    (with-open [inp (clojure.java.io/input-stream f)]
+      (let [len-read (.read inp b 0 len)]
+        (when (not= len-read len)
+          (throw (Exception. (str "Problem reading from file " (.getAbsolutePath f) ": expected " len " bytes, but got " len-read))))))
+    b))
+
 (defn module [$]
   (di/provide $ zookeeper-counter-add [zookeeper]
               (fn zookeeper-counter-add
@@ -214,4 +224,15 @@
                          (sh "rm" "-rf" dir))
                        nil)
                      {:kind :fact
-                      :name "axiom/app-version"})))
+                      :name "axiom/app-version"}))
+  (di/provide $ hash-static-file [hasher]
+              (let [[hash unhash] hasher]
+                (fn [f]
+                  (hash (to-bin-seq f)))))
+  (di/provide $ hash-static-files [hash-static-file]
+              (fn [root]
+                (let [root-path-len (count (.getPath root))]
+                  (->> (for [f (file-seq root)
+                             :when (.isFile f)]
+                         [(subs (.getPath f) root-path-len) (hash-static-file f)])
+                       (into {}))))))
