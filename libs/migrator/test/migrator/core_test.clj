@@ -99,19 +99,19 @@ Then `permacode.publish/hash-all` and `hash-static-files` are called on the loca
   (io/file "/my/clone/location/repo12345/src") => ..dir..
   (io/file "/my/clone/location/repo12345/static") => ..staticdir..
   (permpub/hash-all [:my-hasher] ..dir..) => {'foo 'perm.ABCD123
-                                            'bar 'perm.EFGH456})
+                                              'bar 'perm.EFGH456})
  (persistent! cmds) => [["git" "clone" "--depth" "12" "https://example.com/some/repo" "/my/clone/location/repo12345"]
                         ["git" "checkout" "ABCD1234" :dir "/my/clone/location/repo12345"]
                         ["rm" "-rf" "/my/clone/location/repo12345"]]
  @staticdir => ..staticdir..)
 
-"The handler publishes an `:axiom/perm-versions` event."
+"The handler publishes an `:axiom/perm-versions` event, for which the key is the new version, 
+and the data consists of the set of permacode hashes for the logic, and a map of static assets with their hashes."
 (fact
  (persistent! published) => [{:kind :fact
                               :name "axiom/perm-versions"
-                              :key "https://example.com/some/repo"
-                              :data ["ABCD1234"
-                                     #{'perm.ABCD123 'perm.EFGH456}
+                              :key "ABCD1234"
+                              :data [#{'perm.ABCD123 'perm.EFGH456}
                                      {"/a.html" "hash1"
                                       "/b.css" "hash2"
                                       "/c.js" "hash3"}]}])
@@ -146,9 +146,9 @@ Then `permacode.publish/hash-all` and `hash-static-files` are called on the loca
 "The `perm-tracker` service function is given an `:axiom/perm-versions` event and a `publish` function."
 (fact
  (rule-tracker {:kind :fact
-                :name "axiom/rule-versions"
-                :key "https://example.com/some/repo"
-                :data ["ABCD1234" #{'perm.ABCD123}]
+                :name "axiom/perm-versions"
+                :key "ABCD1234"
+                :data [#{'perm.ABCD123} {}]
                 :change 3}
                (fn publish [ev]
                  (throw (Exception. "This should not be called")))) => nil)
@@ -160,40 +160,40 @@ Then `permacode.publish/hash-all` and `hash-static-files` are called on the loca
 "If one or more perms go from 0 to a positive count, an `:axiom/perms-exist` event with `:change = 1` is published."
 (fact
  (rule-tracker {:kind :fact
-                :name "axiom/rule-versions"
-                :key "https://example.com/some/repo"
-                :data ["ABCD1234" #{'perm.ABCD123
-                                    'perm.EFGH456}]
+                :name "axiom/perm-versions"
+                :key "ABCD1234"
+                :data [#{'perm.ABCD123
+                         'perm.EFGH456} {}]
                 :change 3} ..pub..) => nil
  (provided
   (..pub.. {:kind :fact
             :name "axiom/perms-exist"
-            :key "https://example.com/some/repo"
-            :data ["ABCD1234" #{'perm.EFGH456}]
+            :key "ABCD1234"
+            :data [#{'perm.EFGH456}]
             :change 1}) => irrelevant))
 
 "This of-course only happens when the change is positive."
 (fact
  (rule-tracker {:kind :fact
-                :name "axiom/rule-versions"
-                :key "https://example.com/some/repo"
-                :data ["ABCD1234" #{'perm.FOOBAR}]
+                :name "axiom/perm-versions"
+                :key "ABCD1234"
+                :data [#{'perm.FOOBAR} {}]
                 :change -3} (fn publish [ev]
                               (throw (Exception. "This should not be called")))) => nil)
 
 "If the aggregated value of the rule goes down to 0, an `:axiom/perms-exist` event with `:change = -1` is published."
 (fact
  (rule-tracker {:kind :fact
-                :name "axiom/rule-versions"
-                :key "https://example.com/some/repo"
-                :data ["ABCD1234" #{'perm.ABCD123
-                                    'perm.EFGH456}]
+                :name "axiom/perm-versions"
+                :key "ABCD1234"
+                :data [#{'perm.ABCD123
+                         'perm.EFGH456} {}]
                 :change -3} ..pub..) => nil
  (provided
   (..pub.. {:kind :fact
             :name "axiom/perms-exist"
-            :key "https://example.com/some/repo"
-            :data ["ABCD1234" #{'perm.EFGH456}]
+            :key "ABCD1234"
+            :data [#{'perm.EFGH456}]
             :change -1}) => irrelevant))
 
 [[:chapter {:title "rule-migrator"}]]
@@ -256,8 +256,8 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
 (fact
  (migrate-rules {:kind :fact
                  :name "axiom/perms-exist"
-                 :key "https://example.com/some/repo"
-                 :data ["ABCD1234" #{'perm.ABC1234 'perm.DEF5678}]
+                 :key "ABCD1234"
+                 :data [#{'perm.ABC1234 'perm.DEF5678}]
                  :writers #{:some-writers}
                  :change 1}) => nil
  (provided

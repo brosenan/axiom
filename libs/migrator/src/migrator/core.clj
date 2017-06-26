@@ -129,8 +129,8 @@
               (assign-service "migrator.core/perm-tracker"
                               (fn perm-tracker
                                 [ev publish]
-                                (let [ver (-> ev :data first)
-                                      perms (-> ev :data second)]
+                                (let [ver (-> ev :key)
+                                      perms (-> ev :data first)]
                                   (loop [perms (seq perms)
                                          new-perms #{}
                                          removed-perms #{}]
@@ -139,14 +139,14 @@
                                             (when-not (empty? new-perms)
                                                 (publish {:kind :fact
                                                           :name "axiom/perms-exist"
-                                                          :key (:key ev)
-                                                          :data [ver new-perms]
+                                                          :key ver
+                                                          :data [new-perms]
                                                           :change 1}))
                                             (when-not (empty? removed-perms)
                                               (publish {:kind :fact
                                                         :name "axiom/perms-exist"
-                                                        :key (:key ev)
-                                                        :data [ver removed-perms]
+                                                        :key ver
+                                                        :data [removed-perms]
                                                         :change -1})))
                                           :else
                                           (let [perm (first perms)
@@ -172,7 +172,8 @@
               (assign-service "migrator.core/rule-migrator"
                               (fn [ev]
                                 (binding [permval/*hasher* hasher]
-                                  (let [[gitver perms] (:data ev)
+                                  (let [gitver (:key ev)
+                                        [perms] (:data ev)
                                         ruleset (apply set/union (map extract-version-rules perms))
                                         writers (:writers ev)
                                         {:keys [create-plan add-task mark-as-ready]} zk-plan
@@ -220,9 +221,8 @@
                                static-hashes (hash-static-files (io/file (str dir "/static")))]
                            (publish {:kind :fact
                                      :name "axiom/perm-versions"
-                                     :key (:key ev)
-                                     :data [version
-                                            (set (vals hashes))
+                                     :key version
+                                     :data [(set (vals hashes))
                                             static-hashes]}))
                          (sh "rm" "-rf" dir))
                        nil)
