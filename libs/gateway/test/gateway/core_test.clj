@@ -426,3 +426,78 @@ Additionally, the new value is stored in a cookie for future reference."
    (app {:cookies {}
          :params {}} respond :raise)
    @res => {:body "Hello"}))
+
+[[:chapter {:title "version-selector"}]]
+"Axiom is intended to be multi-tenant.
+In is not only intended to host multiple applications, but also to host different *versions* of the same application.
+Control over this allows features to be introduced gradually and things like A/B testing."
+
+"A `version-selector` in Axiom is a DI resource that acts as Ring middleware, and adds a `:app-version` key to the request."
+
+[[:section {:title "cookie-version-selector"}]]
+"The most straightforward way to determine a version is by taking it off a cookie.
+By managing versions in cookies, applications can manipulate them through Javascript.
+The `cookie-version-selector` is a middleware function that does just that.
+It assumes a `:cookies` field exists in the request (i.e., the [cookies middleware](https://github.com/ring-clojure/ring/wiki/Cookies) is wrapping it),
+and that a cookie named `app-version` is defined.
+It copies its content to the `:app-version` key in the request."
+(fact
+ (let [ver (atom nil)
+       handler (fn [req resp raise]
+                 (reset! ver (:app-version req)))
+       app (cookie-version-selector handler)]
+   (app {:cookies {"app-version" "ver123"}} :resp :raise)
+   @ver => "ver123"))
+
+[[:section {:title "Picking a Version based on Domain"}]]
+"But how do we get the initial version value?
+The complete answer is complicated and involves a few factors.
+The best way to determine a version starts with the domain name.
+Since Axiom is multi-tenant, different applications are expected to have different domain names.
+The application provides own their domains, and direct traffic to an instance of Axiom by managing DNS records.
+The `HOST` HTTP header conveys the domain name used by the user when accessing the application, and can be used to determine which application
+needs to run.
+But how do we determine the version?"
+
+"First, we need to know who to trust.
+We want to take the domain owner's word for it.
+A common way to establish this kind of trust is by asking the domain owner to set up some `TXT` DNS record, with some fixed text and his or her identity,
+Something like: `TXT: Axiom Identity: foo@example.com`, where `foo@example.com` is an identity verifyable by the [authenticator](#authenticator) we use.
+This tells Axiom the the owner of the domain trusts the mentioned user to manage content in Axiom for that domain."
+
+"The mapping between domain names and user identities should be queried using a DNS lookup and cached.
+Then a query should be made for a fact stated by that user, connecting the domain to a version.
+If more than one such version exists, one of them should be picked at random.
+Javascript code that runs on behalf of the application can update the `app-version` cookie with another version
+if a random choice is not the correct one for this application."
+
+"At this point we do not implement this selector."
+
+[[:section {:title "dummy-version-selector"}]]
+"To support development, we provide `dummy-version-selector`.
+It is a provider of the `version-selector` resource.
+It depends on `:dummy-version` -- a string containing a version."
+(fact
+ (let [$ (di/injector {:dummy-version "ver456"})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [version-selector]
+                (def ver-selector version-selector))))
+
+"If an `app-version` cookie already exists, the `dummy-version-selector` lets it be, to allow Javascript code to manipulate the version as it sees fit."
+(fact
+ (let [ver (atom nil)
+       handler (fn [req resp raise]
+                 (reset! ver (get-in req [:cookies "app-version"])))
+       app (ver-selector handler)]
+   (app {:cookies {"app-version" "ver123"}} :resp :raise)
+   @ver => "ver123"))
+
+"If an `app-version` cookie does not exist, `dummy-version-selector` creates one with the value from `:dummy-version`."
+(fact
+ (let [ver (atom nil)
+       handler (fn [req resp raise]
+                 (reset! ver (get-in req [:cookies "app-version"])))
+       app (ver-selector handler)]
+   (app {:cookies {}} :resp :raise)
+   @ver => "ver456"))

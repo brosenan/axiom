@@ -4,6 +4,11 @@
             [cloudlog-events.core :as ev]
             [cloudlog.interset :as interset]))
 
+
+(defn cookie-version-selector [handler]
+  (fn [req resp raise]
+    (handler (assoc req :app-version (get-in req [:cookies "app-version"])) resp raise)))
+
 (defn module [$]
   (di/provide $ identity-set [database-chan]
               (let [database-chan (ev/accumulate-db-chan database-chan)]
@@ -41,4 +46,12 @@
                                          (update-in [:cookies] #(assoc % "user_identity" id))
                                          res)) raise)
                           :else
-                          (handler req res raise)))))))
+                          (handler req res raise))))))
+  (di/provide $ version-selector [dummy-version]
+              (fn [handler]
+                (fn [req resp raise]
+                  (let [req (cond (contains? (:cookies req) "app-version")
+                                  req
+                                  :else
+                                  (assoc-in req [:cookies "app-version"] dummy-version))]
+                    (handler req resp raise))))))
