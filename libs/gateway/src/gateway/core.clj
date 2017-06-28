@@ -12,6 +12,13 @@
   (fn [req resp raise]
     (handler (assoc req :app-version (get-in req [:cookies "app-version"])) resp raise)))
 
+
+(defn uri-partial-event [req]
+  (let [{:keys [ns name key]} (:route-params req)]
+    {:kind :fact
+     :name (str (symbol ns name))
+     :key (-> key codec/url-decode edn/read-string)}))
+
 (defn module [$]
   (di/provide $ identity-set [database-chan]
               (let [database-chan (ev/accumulate-db-chan database-chan)]
@@ -87,29 +94,39 @@
                                     authenticator]
               (fn [handler]
                 (-> (fn [req resp raise]
-                      (async/go
-                        (let [id-set (async/<! (identity-set (:identity req)))]
-                          (handler (assoc req :identity-set id-set) resp raise))))
+                      (let [rule-list (or (get-in req [:headers "Axiom-Id-Rules"])
+                                          [])]
+                        (async/go
+                          (let [id-set (async/<! (identity-set (:identity req) rule-list))]
+                            (handler (assoc req :identity-set id-set) resp raise)))))
                     authenticator)))
   (di/provide $ get-fact-handler [wrap-authorization
                                   database-chan]
               (-> (fn [req resp raise]
                     (async/go
-                      (let [{:keys [ns name key]} (:route-params req)
-                            reply-chan (async/chan 2 (comp
+                      (let [reply-chan (async/chan 2 (comp
                                                       (filter (fn [ev] (interset/subset? (:identity-set req) (:readers ev))))
                                                       (map #(-> %
                                                                 (dissoc :kind)
                                                                 (dissoc :name)
                                                                 (dissoc :key)))))
                             database-chan (ev/accumulate-db-chan database-chan)]
-                        (async/>! database-chan [{:kind :fact
-                                                  :name (str (symbol ns name))
-                                                  :key (-> key codec/url-decode edn/read-string)} reply-chan])
+                        (async/>! database-chan [(uri-partial-event req) reply-chan])
                         (let [events (->> reply-chan
                                           (async/reduce conj nil)
                                           async/<!)]
                           (resp {:status 200
                                  :headers {"Content-Type" "application/edn"}
                                  :body (pr-str events)})))))
-                  wrap-authorization)))
+                  wrap-authorization))
+  (di/provide $ patch-fact-handler [publish
+                                    wrap-authorization]
+              (->
+               (fn [req resp raise]
+                 (let [events (-> req :body slurp edn/read-string)]
+                   (doseq [ev events]
+                     (let [ev (-> ev
+                                  (merge (uri-partial-event req))
+                                  (assoc :writers (:identity-set req)))]
+                       (publish ev)))))
+               wrap-authorization)))

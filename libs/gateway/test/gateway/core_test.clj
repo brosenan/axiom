@@ -433,12 +433,15 @@ Additionally, the new value is stored in a cookie for future reference."
 "`wrap-authorization` is a DI resource that combines [authenticator](#authenticator) and [identity-set](#identity-set) to one middleware function
 that authenticates a user and stores his or her identity set as the :identity-set field in the request."
 
-"`wrap-authorization` depends on `authenticator` and `identity-set`."
+"`wrap-authorization` depends on `authenticator` and `identity-set`.
+`authenticator` provides an `:identity` field, and `identity-set` converts this identity to an identity set.
+In order to do so, it must be given a `rule-list` parameter.
+By default, this parameter will be an empty list."
 (fact
  (let [$ (di/injector {:use-dummy-authenticator true
-                       :identity-set (fn [id]
+                       :identity-set (fn [id rules]
                                        (async/go
-                                         #{id :some-other-cred}))})]
+                                         #{id rules}))})]
    (module $)
    (di/startup $)
    (di/do-with! $ [wrap-authorization]
@@ -450,7 +453,26 @@ that authenticates a user and stores his or her identity set as the :identity-se
                   (let [[result chan] (async/alts!! [req-with-id-set
                                                      (async/timeout 1000)])]
                     chan => req-with-id-set
-                    (:identity-set result) => #{"foo" :some-other-cred})))))
+                    (:identity-set result) => #{"foo" []})))))
+
+"If a header named `Axiom-Id-Rules` exists, its content is decoded as EDN and treated as the `rule-list`."
+(fact
+ (let [$ (di/injector {:use-dummy-authenticator true
+                       :identity-set (fn [id rules]
+                                       (async/go
+                                         #{id rules}))})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [wrap-authorization]
+                (let [req-with-id-set (async/chan 10)
+                      handler (fn [req resp raise]
+                                (async/>!! req-with-id-set req))
+                      app (wrap-authorization handler)]
+                  (app {:cookies {"user_identity" "foo"}
+                        :headers {"Axiom-Id-Rules" ['foo-rule 'bar-rule]}} :resp :raise)
+                  (let [[result chan] (async/alts!! [req-with-id-set
+                                                     (async/timeout 1000)])]
+                    (:identity-set result) => #{"foo" ['foo-rule 'bar-rule]})))))
 
 [[:chapter {:title "version-selector"}]]
 "Axiom is intended to be multi-tenant.
@@ -597,9 +619,8 @@ It is depends on the following:
    (:status res) => 404))
 
 [[:chapter {:title "get-fact-handler"}]]
-"`get-fact-handler` is a Ring handler that handles `GET` requests for querying facts at a certain key."
-
-"`get-fact-handler` is a DI resource that depends on:
+"`get-fact-handler` is a Ring handler that handles `GET` requests for querying facts at a certain key.
+it is a DI resource that depends on:
 1. [wrap-authorization](#wrap-authorization), which is used to determine the user's access rights.
 2. `database-chan`, which is used to query the facts."
 (fact
@@ -665,7 +686,8 @@ The database is expected to respond with some events."
    (async/close! reply-chan)))
 
 "The response is an [accumulation](cloudlog-events.html#accumulating-events) of the returned events.
-They are returned EDN encoded, with the `application/edn` content type."
+We remove the fields that are common to all event: `:kind`, `:name` and `:key`.
+The events are sent EDN encoded, with the `application/edn` content type."
 (fact
  (let [[resp chan] (async/alts!! [response
                                   (async/timeout 1000)])]
@@ -677,3 +699,62 @@ They are returned EDN encoded, with the `application/edn` content type."
                                          :change 2
                                          :readers #{}
                                          :writers #{"bob"}}]))
+
+[[:chapter {:title "patch-fact-handler"}]]
+"`patch-fact-handler` is the handler by which clients can submit new events to Axiom.
+Because events represent change in state, this handler is intended to be associated with the `PATCH` HTTP method
+(rather than `PUT`, which refers to absolute state).
+It is a DI resource based on the following:
+1. [wrap-authorization](#wrap-authorization), to determine the `:writers` set for the generated events, and
+2. `publish` (e.g., for [RabbitMQ](rabbit-microservices.html#publish)), to submit events created using this handler."
+(fact
+ (def published (async/chan 10))
+ (let [$ (di/injector {:wrap-authorization (fn [handler]
+                                             (fn [req resp raise]
+                                               (let [req (assoc req :identity-set #{"foo" :some-cred})]
+                                                 (handler req resp raise))))
+                       :publish (fn [ev]
+                                  (async/>!! published ev))})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [patch-fact-handler]
+                (def patch-fact-handler patch-fact-handler))))
+
+"The URI structure for `patch-fact-handler` is the same as for [get-fact-handler](#get-fact-handler), 
+so the same fields are expected in `:route-params`.
+The body is EDN encoded, and represents a sequence (list or vector) of maps,
+each of which represents one event with `:kind`, `:name`, `:key` and `:writers` removed."
+(fact
+ (def response (async/chan 2))
+ (patch-fact-handler {:route-params {:ns "tweetlog"
+                                     :name "tweeted"
+                                     :key (-> "foo" pr-str codec/url-encode)}
+                      :body (->
+                             [{:data ["I am foo!"]
+                               :ts 1000
+                               :change 1
+                               :readers #{"alice"}}]
+                             pr-str
+                             .getBytes
+                             clojure.java.io/input-stream)}
+                     (fn [res]
+                       (async/>!! response res))
+                     :raise))
+
+"Once called, `patch-fact-handler` `publish`es the given events, after adding the missing fields.
+The fields `:kind`, `:name` and `:key` are completed based on the URI,
+and `:writers` is taken from the `:identity-set`."
+(fact
+ (let [[pub chan] (async/alts!! [published
+                                 (async/timeout 1000)])]
+   chan => published
+   pub => {:kind :fact
+           :name "tweetlog/tweeted"
+           :key "foo"
+           :data ["I am foo!"]
+           :ts 1000
+           :change 1
+           :writers #{"foo" :some-cred}
+           :readers #{"alice"}}))
+
+
