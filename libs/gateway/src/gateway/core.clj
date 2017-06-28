@@ -80,4 +80,12 @@
                                   (resp {:status 200
                                          :body (clojure.java.io/input-stream content)})))))))
                   ctype/wrap-content-type
-                  version-selector)))
+                  version-selector))
+  (di/provide $ wrap-authorization [identity-set
+                                    authenticator]
+              (fn [handler]
+                (-> (fn [req resp raise]
+                      (async/go
+                        (let [id-set (async/<! (identity-set (:identity req)))]
+                          (handler (assoc req :identity-set id-set) resp raise))))
+                    authenticator))))

@@ -427,6 +427,29 @@ Additionally, the new value is stored in a cookie for future reference."
          :params {}} respond :raise)
    @res => {:body "Hello"}))
 
+[[:chapter {:title "wrap-authorization"}]]
+"`wrap-authorization` is a DI resource that combines [authenticator](#authenticator) and [identity-set](#identity-set) to one middleware function
+that authenticates a user and stores his or her identity set as the :identity-set field in the request."
+
+"`wrap-authorization` depends on `authenticator` and `identity-set`."
+(fact
+ (let [$ (di/injector {:use-dummy-authenticator true
+                       :identity-set (fn [id]
+                                       (async/go
+                                         #{id :some-other-cred}))})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [wrap-authorization]
+                (let [req-with-id-set (async/chan 10)
+                      handler (fn [req resp raise]
+                                (async/>!! req-with-id-set req))
+                      app (wrap-authorization handler)]
+                  (app {:cookies {"user_identity" "foo"}} :resp :raise)
+                  (let [[result chan] (async/alts!! [req-with-id-set
+                                                     (async/timeout 1000)])]
+                    chan => req-with-id-set
+                    (:identity-set result) => #{"foo" :some-other-cred})))))
+
 [[:chapter {:title "version-selector"}]]
 "Axiom is intended to be multi-tenant.
 In is not only intended to host multiple applications, but also to host different *versions* of the same application.
