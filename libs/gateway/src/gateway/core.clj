@@ -3,7 +3,9 @@
             [clojure.core.async :as async]
             [cloudlog-events.core :as ev]
             [cloudlog.interset :as interset]
-            [ring.middleware.content-type :as ctype]))
+            [ring.middleware.content-type :as ctype]
+            [ring.util.codec :as codec]
+            [clojure.edn :as edn]))
 
 
 (defn cookie-version-selector [handler]
@@ -88,4 +90,26 @@
                       (async/go
                         (let [id-set (async/<! (identity-set (:identity req)))]
                           (handler (assoc req :identity-set id-set) resp raise))))
-                    authenticator))))
+                    authenticator)))
+  (di/provide $ get-fact-handler [wrap-authorization
+                                  database-chan]
+              (-> (fn [req resp raise]
+                    (async/go
+                      (let [{:keys [ns name key]} (:route-params req)
+                            reply-chan (async/chan 2 (comp
+                                                      (filter (fn [ev] (interset/subset? (:identity-set req) (:readers ev))))
+                                                      (map #(-> %
+                                                                (dissoc :kind)
+                                                                (dissoc :name)
+                                                                (dissoc :key)))))
+                            database-chan (ev/accumulate-db-chan database-chan)]
+                        (async/>! database-chan [{:kind :fact
+                                                  :name (str (symbol ns name))
+                                                  :key (-> key codec/url-decode edn/read-string)} reply-chan])
+                        (let [events (->> reply-chan
+                                          (async/reduce conj nil)
+                                          async/<!)]
+                          (resp {:status 200
+                                 :headers {"Content-Type" "application/edn"}
+                                 :body (pr-str events)})))))
+                  wrap-authorization)))

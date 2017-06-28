@@ -5,7 +5,9 @@
             [di.core :as di]
             [cloudlog.interset :as interset]
             [cloudlog.core :as clg]
-            [cloudlog-events.core :as ev]))
+            [cloudlog-events.core :as ev]
+            [ring.util.codec :as codec]
+            [clojure.edn :as edn]))
 
 [[:chapter {:title "Introduction"}]]
 "This library implement Axiom's gateway tier.
@@ -593,3 +595,85 @@ It is depends on the following:
                                  (async/timeout 1000)])]
    chan => response
    (:status res) => 404))
+
+[[:chapter {:title "get-fact-handler"}]]
+"`get-fact-handler` is a Ring handler that handles `GET` requests for querying facts at a certain key."
+
+"`get-fact-handler` is a DI resource that depends on:
+1. [wrap-authorization](#wrap-authorization), which is used to determine the user's access rights.
+2. `database-chan`, which is used to query the facts."
+(fact
+ (let [$ (di/injector {:wrap-authorization
+                       (fn [handler]
+                         (fn [req resp raise]
+                           (let [req (assoc req :identity-set #{"foo"})]
+                             (handler req resp raise))))
+                       :database-chan db-chan})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [get-fact-handler]
+                (def get-fact-handler get-fact-handler))))
+
+"The `get-fact-handler` handler assumes the following fields exist in the `:route-params` field of the request:
+1. `:ns`: the fact's namespace,
+2. `:name`: the fact's name within this namespace, and
+3. `:key`: the key, EDN-encoded, uri-encoded (as with [encodeURIComponent](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent)."
+
+"For example, the following request queries all tweets made by user \"bob\"."
+(fact
+ (def response (async/chan 10))
+ (get-fact-handler {:route-params {:ns "tweetlog"
+                                   :name "tweeted"
+                                   :key (-> "bob" pr-str codec/url-encode)}}
+                   (fn [res]
+                     (async/>!! response res))
+                   :raise))
+
+"It performs a database query based on these `:route-params`.
+The database is expected to respond with some events."
+(fact
+ (let [[query reply-chan] (get-query)]
+   query => {:kind :fact
+             :name "tweetlog/tweeted"
+             :key "bob"}
+   (async/>!! reply-chan {:kind :fact
+                          :name "tweetlog/tweeted"
+                          :key "bob"
+                          :data ["I am Bob!"]
+                          :ts 1000
+                          :change 1
+                          :readers #{}
+                          :writers #{"bob"}})
+   ;; This event will be merged with the previous one...
+   (async/>!! reply-chan {:kind :fact
+                          :name "tweetlog/tweeted"
+                          :key "bob"
+                          :data ["I am Bob!"]
+                          :ts 2000
+                          :change 1
+                          :readers #{}
+                          :writers #{"bob"}})
+   ;; The following event will not show up because user foo is not allowed to see it.
+   (async/>!! reply-chan {:kind :fact
+                          :name "tweetlog/tweeted"
+                          :key "bob"
+                          :data ["Some secret..."]
+                          :ts 2000
+                          :change 1
+                          :readers #{"alice"}
+                          :writers #{"bob"}})
+   (async/close! reply-chan)))
+
+"The response is an [accumulation](cloudlog-events.html#accumulating-events) of the returned events.
+They are returned EDN encoded, with the `application/edn` content type."
+(fact
+ (let [[resp chan] (async/alts!! [response
+                                  (async/timeout 1000)])]
+   chan => response
+   (:status resp) => 200
+   (:headers resp) => {"Content-Type" "application/edn"}
+   (-> resp :body edn/read-string) => [{:data ["I am Bob!"]
+                                         :ts 2000
+                                         :change 2
+                                         :readers #{}
+                                         :writers #{"bob"}}]))

@@ -5,7 +5,9 @@
                  [di "MONOLITH-SNAPSHOT"]
                  [cloudlog "MONOLITH-SNAPSHOT"]
                  [cloudlog-events "MONOLITH-SNAPSHOT"]
-                 [ring/ring-core "1.6.1"]]
+                 [ring/ring-core "1.6.1"]
+                 [ring/ring-codec "1.0.1"]
+                 [compojure "1.6.0"]]
   :monolith/inherit true
   :profiles {:dev {:dependencies [[midje "1.7.0"]]}
              :midje {}})
