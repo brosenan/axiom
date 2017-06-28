@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 25 June 2017</h5>
+              <h5>Date: 28 June 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -90,7 +90,8 @@
 
 (clg/defrule trending [tweet]
   [:test/influencer influencer] (clg/by-anyone)
-  [timeline influencer tweet] (clg/by-anyone))</code></pre></div><div><p>If we introduce these rules when <code>:test/follows</code>, <code>:test/tweeted</code> and <code>:test/influencer</code> facts already exist, a migration process is necessary to do the following:</p><ol><li>Create timeline entries for all the tweets that already have followers.</li><li>Create trending entries based on newly-calculated timeline entries for all existing influencers.</li><li>Create intermediate data so that new followers will receive existing tweets in their timelines.</li><li>Create intermediate data so that new tweets will be added to the timelines of existing followers.</li><li>Create intermediate data so that new timeline entries of existing influencers will be taken into account for trending.</li></ol></div><div><p>To allow this to happen, we need to go through all the <code>:test/follows</code> facts first and create intermediate rule tuples based on them. Then we need to go through all the <code>:test/tweeted</code> facts and match them against the tuples we generated in the previous step to know to which timelines each tweet needs to go. Then, after all timeline entries are calculated we can go through all influencers and create trending data.</p></div><div><p>Going through all the existing facts with a certain name can be a lengthy process. To speed things up we do the following:</p><ul><li>We use <a href='zk-plan.html'>zk-plan</a> to distribute this work across multiple workers.</li><li>We <a href='dynamo.html#database-scanner'>scan the facts</a> in the database in shards, to allow different computer nodes to process different pieces of data in parallel.</li></ul></div><div><span id="push-handler"></span><h2><b>2 &nbsp;&nbsp; push-handler</b></h2></div><div><p>When developers push a new version of their code, they publish an <code>:axiom/app-version</code> event stating the clone URL and git commit hash for that new version. The origin of such operation could be a handler for a <a href='#https://developer.github.com/webhooks/'>GitHub webhook</a> or something similar.</p></div><div><p>This service uses <a href='https://git-scm.com'>git</a> to clone the specified version into the local file system. It relies on the following resources:</p><ol><li><code>sh</code>: A shell to run <code>git</code> commands in.</li><li><code>migration-config</code>: where the <code>:clone-location</code> &ndash; the directory where all clones are performed, is specified, and the <code>:clone-depth</code>.</li><li><code>hasher</code>: to be used for storing the versions loaded from git.</li><li><code>serve</code>: which registers this function with the <code>:axiom/app-version</code> event.</li></ol></div><div class="code"><pre><code class="clojure">(def cmds (transient []))
+  [timeline influencer tweet] (clg/by-anyone))</code></pre></div><div><p>If we introduce these rules when <code>:test/follows</code>, <code>:test/tweeted</code> and <code>:test/influencer</code> facts already exist, a migration process is necessary to do the following:</p><ol><li>Create timeline entries for all the tweets that already have followers.</li><li>Create trending entries based on newly-calculated timeline entries for all existing influencers.</li><li>Create intermediate data so that new followers will receive existing tweets in their timelines.</li><li>Create intermediate data so that new tweets will be added to the timelines of existing followers.</li><li>Create intermediate data so that new timeline entries of existing influencers will be taken into account for trending.</li></ol></div><div><p>To allow this to happen, we need to go through all the <code>:test/follows</code> facts first and create intermediate rule tuples based on them. Then we need to go through all the <code>:test/tweeted</code> facts and match them against the tuples we generated in the previous step to know to which timelines each tweet needs to go. Then, after all timeline entries are calculated we can go through all influencers and create trending data.</p></div><div><p>Going through all the existing facts with a certain name can be a lengthy process. To speed things up we do the following:</p><ul><li>We use <a href='zk-plan.html'>zk-plan</a> to distribute this work across multiple workers.</li><li>We <a href='dynamo.html#database-scanner'>scan the facts</a> in the database in shards, to allow different computer nodes to process different pieces of data in parallel.</li></ul></div><div><span id="push-handler"></span><h2><b>2 &nbsp;&nbsp; push-handler</b></h2></div><div><p>When developers push a new version of their code, they publish an <code>:axiom/app-version</code> event stating the clone URL and git commit hash for that new version. The origin of such operation could be a handler for a <a href='#https://developer.github.com/webhooks/'>GitHub webhook</a> or something similar.</p></div><div><p>This service uses <a href='https://git-scm.com'>git</a> to clone the specified version into the local file system. It relies on the following resources:</p><ol><li><code>sh</code>: A shell to run <code>git</code> commands in.</li><li><code>migration-config</code>: where the <code>:clone-location</code> &ndash; the directory where all clones are performed, is specified, and the <code>:clone-depth</code>.</li><li><code>hasher</code>: to be used for storing the versions loaded from git.</li><li><code>serve</code>: which registers this function with the <code>:axiom/app-version</code> event.</li><li><a href='#hash-static-files'>hash-static-files</a>: intended to store all static content under the <code>/static</code> sub-directory.</li></ol></div><div class="code"><pre><code class="clojure">(def cmds (transient []))
+ (def staticdir (atom nil))
  (let [reg (transient {})
      $ (di/injector {:sh (fn [&amp; args]
                            (conj! cmds args)
@@ -101,12 +102,17 @@
                                         :clone-depth 12}
                      :hasher [:my-hasher]
                      :serve (fn [f r]
-                              (assoc! reg r f))})]
+                              (assoc! reg r f))
+                     :hash-static-files (fn [root]
+                                          (reset! staticdir root)
+                                          {&quot;/a.html&quot; &quot;hash1&quot;
+                                           &quot;/b.css&quot; &quot;hash2&quot;
+                                           &quot;/c.js&quot; &quot;hash3&quot;})})]
  (module $)
  (di/startup $)
  (def push-handler ((persistent! reg) {:kind :fact
                                        :name &quot;axiom/app-version&quot;})))
- push-handler =&gt; fn?</code></pre></div><div><p>The <code>push-handler</code> function responds to such events by calling <code>git clone</code> and <code>git checkout</code>  to get the specified version of the specified repo inside the given directory. Then <code>permacode.publish/hash-all</code> is called on the local repo, and then the directory is removed.</p></div><div class="code"><pre><code class="clojure">(def published (transient []))
+ push-handler =&gt; fn?</code></pre></div><div><p>The <code>push-handler</code> function responds to such events by calling <code>git clone</code> and <code>git checkout</code>  to get the specified version of the specified repo inside the given directory. Then <code>permacode.publish/hash-all</code> and <code>hash-static-files</code> are called on the local repo, and then the directory is removed.</p></div><div class="code"><pre><code class="clojure">(def published (transient []))
  (push-handler {:kind :fact
               :name &quot;axiom/app-version&quot;
               :key &quot;https://example.com/some/repo&quot;
@@ -116,14 +122,19 @@
  (provided
 (rand-int 1000000000) =&gt; 12345
 (io/file &quot;/my/clone/location/repo12345/src&quot;) =&gt; ..dir..
+(io/file &quot;/my/clone/location/repo12345/static&quot;) =&gt; ..staticdir..
 (permpub/hash-all [:my-hasher] ..dir..) =&gt; {'foo 'perm.ABCD123
-                                          'bar 'perm.EFGH456})
+                                            'bar 'perm.EFGH456})
  (persistent! cmds) =&gt; [[&quot;git&quot; &quot;clone&quot; &quot;--depth&quot; &quot;12&quot; &quot;https://example.com/some/repo&quot; &quot;/my/clone/location/repo12345&quot;]
                       [&quot;git&quot; &quot;checkout&quot; &quot;ABCD1234&quot; :dir &quot;/my/clone/location/repo12345&quot;]
-                      [&quot;rm&quot; &quot;-rf&quot; &quot;/my/clone/location/repo12345&quot;]]</code></pre></div><div><p>The handler publishes an <code>:axiom/perm-versions</code> event.</p></div><div class="code"><pre><code class="clojure">(persistent! published) =&gt; [{:kind :fact
+                      [&quot;rm&quot; &quot;-rf&quot; &quot;/my/clone/location/repo12345&quot;]]
+ @staticdir =&gt; ..staticdir..</code></pre></div><div><p>The handler publishes an <code>:axiom/perm-versions</code> event, for which the key is the new version,  and the data consists of the set of permacode hashes for the logic, and a map of static assets with their hashes.</p></div><div class="code"><pre><code class="clojure">(persistent! published) =&gt; [{:kind :fact
                             :name &quot;axiom/perm-versions&quot;
-                            :key &quot;https://example.com/some/repo&quot;
-                            :data [&quot;ABCD1234&quot; #{'perm.ABCD123 'perm.EFGH456}]}]</code></pre></div><div><span id="perm-tracker"></span><h2><b>3 &nbsp;&nbsp; perm-tracker</b></h2></div><div><p><code>perm-tracker</code> registers to <code>:axiom/perm-versions</code> and tracks the quantity of each <a href='permacode.html'>permacode module</a> by summing the <code>:change</code> <a href='cloudlog-events.html#introduction'>field of the event</a>.</p></div><div><p>It depends on the resources <a href='#zookeeper-counter-add'>zookeeper-counter-add</a> <code>declare-service</code> and <code>assign-service</code>, which we will mock.</p></div><div class="code"><pre><code class="clojure">(def mock-counters (transient {&quot;/perms/perm.ABCD123&quot; 2}))
+                            :key &quot;ABCD1234&quot;
+                            :data [#{'perm.ABCD123 'perm.EFGH456}
+                                   {&quot;/a.html&quot; &quot;hash1&quot;
+                                    &quot;/b.css&quot; &quot;hash2&quot;
+                                    &quot;/c.js&quot; &quot;hash3&quot;}]}]</code></pre></div><div><span id="perm-tracker"></span><h2><b>3 &nbsp;&nbsp; perm-tracker</b></h2></div><div><p><code>perm-tracker</code> registers to <code>:axiom/perm-versions</code> and tracks the quantity of each <a href='permacode.html'>permacode module</a> by summing the <code>:change</code> <a href='cloudlog-events.html#introduction'>field of the event</a>.</p></div><div><p>It depends on the resources <a href='#zookeeper-counter-add'>zookeeper-counter-add</a> <code>declare-service</code> and <code>assign-service</code>, which we will mock.</p></div><div class="code"><pre><code class="clojure">(def mock-counters (transient {&quot;/perms/perm.ABCD123&quot; 2}))
  (def calls (transient []))
  (let [$ (di/injector {:zookeeper-counter-add (fn [path change]
                                               (let [old (mock-counters path 0)
@@ -139,38 +150,38 @@
                                                                   :name &quot;axiom/perm-versions&quot;}])</code></pre></div><div><p>The function <code>rule-tracker</code> is the second argument given to <code>assign-service</code>.</p></div><div class="code"><pre><code class="clojure">(let [call (second calls)]
  (take 2 call) =&gt; [:assign-service &quot;migrator.core/perm-tracker&quot;]
  (def rule-tracker (call 2)))</code></pre></div><div><p>The <code>perm-tracker</code> service function is given an <code>:axiom/perm-versions</code> event and a <code>publish</code> function.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
-              :name &quot;axiom/rule-versions&quot;
-              :key &quot;https://example.com/some/repo&quot;
-              :data [&quot;ABCD1234&quot; #{'perm.ABCD123}]
+              :name &quot;axiom/perm-versions&quot;
+              :key &quot;ABCD1234&quot;
+              :data [#{'perm.ABCD123} {}]
               :change 3}
              (fn publish [ev]
                (throw (Exception. &quot;This should not be called&quot;)))) =&gt; nil</code></pre></div><div><p>It calls <code>zookeeper-counter-add</code> to increment the counter corresponding to the rule.</p></div><div class="code"><pre><code class="clojure">(mock-counters &quot;/perms/perm.ABCD123&quot;) =&gt; 5</code></pre></div><div><p>If one or more perms go from 0 to a positive count, an <code>:axiom/perms-exist</code> event with <code>:change = 1</code> is published.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
-              :name &quot;axiom/rule-versions&quot;
-              :key &quot;https://example.com/some/repo&quot;
-              :data [&quot;ABCD1234&quot; #{'perm.ABCD123
-                                  'perm.EFGH456}]
+              :name &quot;axiom/perm-versions&quot;
+              :key &quot;ABCD1234&quot;
+              :data [#{'perm.ABCD123
+                       'perm.EFGH456} {}]
               :change 3} ..pub..) =&gt; nil
  (provided
 (..pub.. {:kind :fact
           :name &quot;axiom/perms-exist&quot;
-          :key &quot;https://example.com/some/repo&quot;
-          :data [&quot;ABCD1234&quot; #{'perm.EFGH456}]
+          :key &quot;ABCD1234&quot;
+          :data [#{'perm.EFGH456}]
           :change 1}) =&gt; irrelevant)</code></pre></div><div><p>This of-course only happens when the change is positive.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
-              :name &quot;axiom/rule-versions&quot;
-              :key &quot;https://example.com/some/repo&quot;
-              :data [&quot;ABCD1234&quot; #{'perm.FOOBAR}]
+              :name &quot;axiom/perm-versions&quot;
+              :key &quot;ABCD1234&quot;
+              :data [#{'perm.FOOBAR} {}]
               :change -3} (fn publish [ev]
                             (throw (Exception. &quot;This should not be called&quot;)))) =&gt; nil</code></pre></div><div><p>If the aggregated value of the rule goes down to 0, an <code>:axiom/perms-exist</code> event with <code>:change = -1</code> is published.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
-              :name &quot;axiom/rule-versions&quot;
-              :key &quot;https://example.com/some/repo&quot;
-              :data [&quot;ABCD1234&quot; #{'perm.ABCD123
-                                  'perm.EFGH456}]
+              :name &quot;axiom/perm-versions&quot;
+              :key &quot;ABCD1234&quot;
+              :data [#{'perm.ABCD123
+                       'perm.EFGH456} {}]
               :change -3} ..pub..) =&gt; nil
  (provided
 (..pub.. {:kind :fact
           :name &quot;axiom/perms-exist&quot;
-          :key &quot;https://example.com/some/repo&quot;
-          :data [&quot;ABCD1234&quot; #{'perm.EFGH456}]
+          :key &quot;ABCD1234&quot;
+          :data [#{'perm.EFGH456}]
           :change -1}) =&gt; irrelevant)</code></pre></div><div><span id="rule-migrator"></span><h2><b>4 &nbsp;&nbsp; rule-migrator</b></h2></div><div><p>When the <a href='#perm-tracker'>perm-tracker</a> finds out new permacode modules have been introduced (for the first time), a migration process needs to take place to process all the existing facts that interact with any new rules defined in these modules, to create all the derived facts and intermediate rule tuples that are the result of this interaction.</p></div><div><p><code>rule-migrator</code> is the service function responsible for this. It depends on <a href='zk-plan.html#module'>zk-plan</a>, which it uses to create the migration plan. We will mock this module with functions that record their own operation, so that we will later be able to view the plan that was created.</p></div><div class="code"><pre><code class="clojure">(def calls (transient []))
  (def last-task (atom 0))
  (def mock-zk-plan
@@ -202,8 +213,8 @@
    (take 2 call) =&gt; [:assign-service &quot;migrator.core/rule-migrator&quot;]
    (def migrate-rules (call 2))))</code></pre></div><div><p>Now, if we call the migration function <code>migrate-rules</code> on a rule, it will create a migration plan. First, it will extract the rules out of the given permacode modules. Then it will sort them according to their dependencies. Finally, it will create a migration plan that will cover all rule functions in these modules, to be migrated one by one, in topological order.</p></div><div><p>The plan will include, for each rule, a singleton <a href='#fact-declarer'>fact-declarer</a> tasks that will start collecting events to be processed by the given rule once the migration is complete; a first phase of <a href='#initial-migrator'>initial-migrators</a> to process link 0 of the rule and any number of <a href='#link-migrator'>link-migrator</a> phases to process the rest of the links.</p></div><div class="code"><pre><code class="clojure">(migrate-rules {:kind :fact
                :name &quot;axiom/perms-exist&quot;
-               :key &quot;https://example.com/some/repo&quot;
-               :data [&quot;ABCD1234&quot; #{'perm.ABC1234 'perm.DEF5678}]
+               :key &quot;ABCD1234&quot;
+               :data [#{'perm.ABC1234 'perm.DEF5678}]
                :writers #{:some-writers}
                :change 1}) =&gt; nil
  (provided
@@ -541,25 +552,25 @@
  (module $)
  (di/startup $)
  (di/do-with! $ [hash-static-file]
-              (hash-static-file (clojure.java.io/file &quot;/tmp/foo.txt&quot;)) =&gt; &quot;some-hash&quot;)
+              (hash-static-file (io/file &quot;/tmp/foo.txt&quot;)) =&gt; &quot;some-hash&quot;)
  (class @content) =&gt; (class (byte-array 1))
  (-&gt; @content
      String.
      (str/split #&quot;&#92;n&quot;)
-     (get 745)) =&gt; &quot;This is line number 745&quot;)</code></pre></div><div><span id="hash-static-files"></span><h3>6.8 &nbsp;&nbsp; hash-static-files</h3></div><div><p>To recursively store all files under a given directory (the <code>/static</code> directory in the repo), the function <code>hash-static-files</code> applies <code>hash-static-file</code> to each file in the subtree under the given root. It returns a map from relative paths to hash values.</p></div><div><p>To demonstrate this we will create a directory under <code>/tmp</code> and populate it with three file &ndash; <code>a.html</code>, <code>b.css</code> and <code>c.js</code>.</p></div><div class="code"><pre><code class="clojure">(let [dir (clojure.java.io/file &quot;/tmp/mock-static&quot;)]
+     (get 745)) =&gt; &quot;This is line number 745&quot;)</code></pre></div><div><span id="hash-static-files"></span><h3>6.8 &nbsp;&nbsp; hash-static-files</h3></div><div><p>To recursively store all files under a given directory (the <code>/static</code> directory in the repo), the function <code>hash-static-files</code> applies <code>hash-static-file</code> to each file in the subtree under the given root. It returns a map from relative paths to hash values.</p></div><div><p>To demonstrate this we will create a directory under <code>/tmp</code> and populate it with three file &ndash; <code>a.html</code>, <code>b.css</code> and <code>c.js</code>.</p></div><div class="code"><pre><code class="clojure">(let [dir (io/file &quot;/tmp/mock-static&quot;)]
  (.mkdirs dir)
- (with-open [a (clojure.java.io/writer (clojure.java.io/file dir &quot;a.html&quot;))]
+ (with-open [a (io/writer (io/file dir &quot;a.html&quot;))]
    (.write a &quot;Some html...&quot;))
- (with-open [b (clojure.java.io/writer (clojure.java.io/file dir &quot;b.css&quot;))]
+ (with-open [b (io/writer (io/file dir &quot;b.css&quot;))]
    (.write b &quot;Some CSS...&quot;))
- (with-open [c (clojure.java.io/writer (clojure.java.io/file dir &quot;c.js&quot;))]
+ (with-open [c (io/writer (io/file dir &quot;c.js&quot;))]
    (.write c &quot;Some JavaScript...&quot;)))</code></pre></div><div><p>Calling <code>hash-static-files</code> on <code>/tmp/mock-static</code> will return a map containing entries for <code>/a.html</code>, <code>/b.css</code> and <code>c.js</code>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:hash-static-file
                      (fn [f]
                        (str &quot;hash-for-&quot; (.getPath f)))})]
  (module $)
  (di/startup $)
  (di/do-with! $ [hash-static-files]
-              (hash-static-files (clojure.java.io/file &quot;/tmp/mock-static&quot;))
+              (hash-static-files (io/file &quot;/tmp/mock-static&quot;))
               =&gt; {&quot;/a.html&quot; &quot;hash-for-/tmp/mock-static/a.html&quot;
                   &quot;/b.css&quot; &quot;hash-for-/tmp/mock-static/b.css&quot;
                   &quot;/c.js&quot; &quot;hash-for-/tmp/mock-static/c.js&quot;}))</code></pre></div>
