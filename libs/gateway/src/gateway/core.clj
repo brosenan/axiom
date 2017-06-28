@@ -49,9 +49,10 @@
                           (handler req res raise))))))
   (di/provide $ version-selector [dummy-version]
               (fn [handler]
-                (fn [req resp raise]
-                  (let [req (cond (contains? (:cookies req) "app-version")
-                                  req
-                                  :else
-                                  (assoc-in req [:cookies "app-version"] dummy-version))]
-                    (handler req resp raise))))))
+                (let [handler (cookie-version-selector handler)]
+                  (fn [req resp raise]
+                    (let [req (cond (contains? (:cookies req) "app-version")
+                                    req
+                                    :else
+                                    (assoc-in req [:cookies "app-version"] dummy-version))]
+                      (handler req resp raise)))))))

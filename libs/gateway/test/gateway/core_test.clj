@@ -484,11 +484,12 @@ It depends on `:dummy-version` -- a string containing a version."
    (di/do-with! $ [version-selector]
                 (def ver-selector version-selector))))
 
-"If an `app-version` cookie already exists, the `dummy-version-selector` lets it be, to allow Javascript code to manipulate the version as it sees fit."
+"If an `app-version` cookie already exists, the `dummy-version-selector` lets it be, to allow Javascript code to manipulate the version as it sees fit,
+and allowes the `cookie-version-selector` to expose its value as `:app-version`."
 (fact
  (let [ver (atom nil)
        handler (fn [req resp raise]
-                 (reset! ver (get-in req [:cookies "app-version"])))
+                 (reset! ver (:app-version req)))
        app (ver-selector handler)]
    (app {:cookies {"app-version" "ver123"}} :resp :raise)
    @ver => "ver123"))
@@ -497,7 +498,7 @@ It depends on `:dummy-version` -- a string containing a version."
 (fact
  (let [ver (atom nil)
        handler (fn [req resp raise]
-                 (reset! ver (get-in req [:cookies "app-version"])))
+                 (reset! ver (:app-version req)))
        app (ver-selector handler)]
    (app {:cookies {}} :resp :raise)
    @ver => "ver456"))
