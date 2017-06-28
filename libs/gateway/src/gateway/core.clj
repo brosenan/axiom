@@ -2,7 +2,8 @@
   (:require [di.core :as di]
             [clojure.core.async :as async]
             [cloudlog-events.core :as ev]
-            [cloudlog.interset :as interset]))
+            [cloudlog.interset :as interset]
+            [ring.middleware.content-type :as ctype]))
 
 
 (defn cookie-version-selector [handler]
@@ -55,4 +56,28 @@
                                     req
                                     :else
                                     (assoc-in req [:cookies "app-version"] dummy-version))]
-                      (handler req resp raise)))))))
+                      (handler req resp raise))))))
+  (di/provide $ static-handler [version-selector
+                                database-chan
+                                hasher]
+              (-> (fn [req resp raise]
+                    (async/go
+                      (let [resp-chan (async/chan)
+                            [_ unhash] hasher]
+                        (async/>! database-chan [{:kind :fact
+                                                  :name "axiom/perm-versions"
+                                                  :key (:app-version req)} resp-chan])
+                        (let [[ans] (->> resp-chan
+                                          (async/reduce conj [])
+                                          (async/<!))
+                              [perms static] (:data ans)
+                              hashcode (static (:uri req))]
+                          (cond (nil? hashcode)
+                                (resp {:status 404
+                                       :body "Not Found!"})
+                                :else
+                                (let [content (unhash hashcode)]
+                                  (resp {:status 200
+                                         :body (clojure.java.io/input-stream content)})))))))
+                  ctype/wrap-content-type
+                  version-selector)))

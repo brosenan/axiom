@@ -502,3 +502,71 @@ and allowes the `cookie-version-selector` to expose its value as `:app-version`.
        app (ver-selector handler)]
    (app {:cookies {}} :resp :raise)
    @ver => "ver456"))
+
+[[:chapter {:title "static-handler"}]]
+"Axiom applications serve static files that originate in the `/static` directory of the source repository when [pushing a new version](migrator.html#push-handler).
+The content of these files is [hashed](permacode.hasher.html), and the hash-code is stored in `axiom/perm-versions` events, keyed by the git version of the application."
+
+"`static-handler` is a DI resource that provides a [Ring handler](https://github.com/ring-clojure/ring/wiki/Concepts#handlers)
+for retreiving static files.
+It is depends on the following:
+1. `version-selector`, to determine the version for which to retrieve the static file.
+2. `database-chan`, to retrieve `axiom/perm-versions` events.
+3. `hasher`, to retrieve the static content."
+(fact
+ (let [unhash (fn [h]
+                (when (not= h "the-hash-code")
+                  (throw (Exception. (str "Bad hashcode: " h))))
+                (.getBytes "the content"))
+       $ (di/injector {:dummy-version "ver123"
+                       :database-chan db-chan
+                       :hasher [:hash unhash]})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [static-handler]
+                (def static-handler static-handler))))
+
+"`static-handler` handles requests by querying the database for the `axiom/perm-versions` for the given version."
+(fact
+ (def response (async/chan))
+ (static-handler {:cookies {} :uri "/foo.html"} (fn [res]
+                                                  (async/>!! response res)) :raise)
+ (let [[query resp-chan] (get-query)]
+   query => {:kind :fact
+             :name "axiom/perm-versions"
+             :key "ver123"}
+   (async/>!! resp-chan {:kind :fact
+                         :name "axiom/perm-versions"
+                         :key "ver123"
+                         :data [#{} {"/foo.html" "the-hash-code"}]})
+   (async/close! resp-chan)))
+
+"Upon receiving the response, `static-handler` gets the file's content from the hasher, and creates a `200` response."
+(fact
+ (let [[res chan] (async/alts!! [response
+                                 (async/timeout 1000)])]
+   chan => response
+   (:status res) => 200
+   (:body res) => #(instance? java.io.InputStream %)
+   (slurp (:body res)) => "the content"
+   ;; Content-Type is assigned according to file extension
+   (get-in res [:headers "Content-Type"]) => "text/html"))
+
+"If the path does not exist in that version of the application,
+`static-handler` responds with a status of `404`."
+(fact
+ (static-handler {:cookies {}
+                  :uri "/bar.html"}
+                 (fn [res]
+                   (async/>!! response res)) :raise)
+ ;; Same response as before...
+ (let [[query resp-chan] (get-query)]
+   (async/>!! resp-chan {:kind :fact
+                         :name "axiom/perm-versions"
+                         :key "ver123"
+                         :data [#{} {"/foo.html" "the-hash-code"}]})
+   (async/close! resp-chan))
+ (let [[res chan] (async/alts!! [response
+                                 (async/timeout 1000)])]
+   chan => response
+   (:status res) => 404))
