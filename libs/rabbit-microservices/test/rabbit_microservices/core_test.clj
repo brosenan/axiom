@@ -56,10 +56,27 @@ It is provided a partial event, and calls the given function on any event that m
  (declare-service "foobar" {:kind :fact
                             :name "foo/bar"}) => nil
  (provided
-  (lq/declare :some-chan "foobar") => irrelevant
+  (lq/declare :some-chan "foobar" {:durable true}) => irrelevant
   (lq/bind :some-chan "foobar"
            facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"})
   => irrelevant))
+
+[[:section {:title "declare-volatile-service"}]]
+"Sometimes we wish services to exist only temporarily.
+We set them up for a particular reason, and when that reason no longer exists we have no use for this service.
+`declare-volatile-service` creates a non-durable AMQP queue, so it is removed after a broker restart."
+(fact
+ (let [$ (di/injector {:rabbitmq-service {:chan :some-chan}})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [declare-volatile-service]
+                (declare-volatile-service "foobar" {:kind :fact
+                                                    :name "foo/bar"}) => nil
+                (provided
+                 (lq/declare :some-chan "foobar" {:durable false}) => irrelevant
+                 (lq/bind :some-chan "foobar"
+                          facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"})
+                 => irrelevant))))
 
 [[:chapter {:title "assign-service: Register an Event Handler" :tag "assign-service"}]]
 "`assign-service` depends on an `rabbitmq-service`."

@@ -21,8 +21,7 @@
           #(.substring 
             (Integer/toString 
              (+ (bit-and % 0xff) 0x100) 16) 1) 
-          data-bytes)
-         ))
+          data-bytes)))
 
 (defn sha1-digest [str]
   (get-hash-str (get-hash "sha1" str)))
@@ -97,16 +96,21 @@
                   (declare-service key reg)
                   (assign-service key func))
                 nil))
+  
+  (defn declare-declare-service [rabbitmq-service info options]
+    (fn [key reg]
+      (let [chan (:chan rabbitmq-service)
+            routing-key (event-routing-key reg)]
+        (info {:source "rabbit"
+               :desc (str "Declaring queue " key " with routing key " routing-key)})
+        (lq/declare chan key options)
+        (lq/bind chan key facts-exch {:routing-key routing-key}))
+      nil))
 
   (di/provide $ declare-service [rabbitmq-service info]
-              (fn [key reg]
-                (let [chan (:chan rabbitmq-service)
-                      routing-key (event-routing-key reg)]
-                  (info {:source "rabbit"
-                         :desc (str "Declaring queue " key " with routing key " routing-key)})
-                  (lq/declare chan key)
-                  (lq/bind chan key facts-exch {:routing-key routing-key}))
-                nil))
+              (declare-declare-service rabbitmq-service info {:durable true}))
+  (di/provide $ declare-volatile-service [rabbitmq-service info]
+              (declare-declare-service rabbitmq-service info {:durable false}))
 
   (di/provide $ assign-service [rabbitmq-service]
               (fn [key func]

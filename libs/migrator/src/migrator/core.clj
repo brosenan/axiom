@@ -207,27 +207,29 @@
                                           (recur (rest ruleseq) last-task))))
                                     (mark-as-ready plan)))
                                 nil)))
-  (di/do-with $ [serve sh migration-config hasher hash-static-files]
-              (serve (fn [ev publish]
-                       (let [unique (rand-int 1000000000)
-                             dir (str (:clone-location migration-config) "/repo" unique)
-                             [version] (:data ev)]
-                         (sh "git" "clone" "--depth"
-                             (str (:clone-depth migration-config))
-                             (:key ev)
-                             dir)
-                         (sh "git" "checkout" version :dir dir)
-                         (let [hashes (permpub/hash-all hasher (io/file (str dir "/src")))
-                               static-hashes (hash-static-files (io/file (str dir "/static")))]
-                           (publish {:kind :fact
-                                     :name "axiom/perm-versions"
-                                     :key version
-                                     :data [(set (vals hashes))
-                                            static-hashes]}))
-                         (sh "rm" "-rf" dir))
-                       nil)
-                     {:kind :fact
-                      :name "axiom/app-version"}))
+  (di/do-with $ [declare-service assign-service sh migration-config hasher hash-static-files]
+              (declare-service "migrator.core/push-handler"
+                               {:kind :fact
+                                :name "axiom/app-version"})
+              (assign-service "migrator.core/push-handler"
+                              (fn [ev publish]
+                                (let [unique (rand-int 1000000000)
+                                      dir (str (:clone-location migration-config) "/repo" unique)
+                                      [version] (:data ev)]
+                                  (sh "git" "clone" "--depth"
+                                      (str (:clone-depth migration-config))
+                                      (:key ev)
+                                      dir)
+                                  (sh "git" "checkout" version :dir dir)
+                                  (let [hashes (permpub/hash-all hasher (io/file (str dir "/src")))
+                                        static-hashes (hash-static-files (io/file (str dir "/static")))]
+                                    (publish {:kind :fact
+                                              :name "axiom/perm-versions"
+                                              :key version
+                                              :data [(set (vals hashes))
+                                                     static-hashes]}))
+                                  (sh "rm" "-rf" dir))
+                                nil)))
   (di/provide $ hash-static-file [hasher]
               (let [[hash unhash] hasher]
                 (fn [f]

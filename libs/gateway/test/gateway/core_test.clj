@@ -757,4 +757,18 @@ and `:writers` is taken from the `:identity-set`."
            :writers #{"foo" :some-cred}
            :readers #{"alice"}}))
 
+[[:chapter {:title "post-query-handler"}]]
+"`post-query-handler` is the handler that allows clients to execute *queries*.
+A query starts by publishing a fact which `:name` ends with a `?`.
+The `:key` to this fact is a unique identifier selected by this handler, 
+and the `:data` correspond to the input fields in all the [clauses](cloudlog.html#defclause)
+meant to answer this query.
+Query results are events of the same name, only with `!` replacing the `?`, with the same `:key`,
+and with `:data` corresponding to the output elements of the same clauses."
 
+"`post-query-handler` is indended to handle `POST` requests.
+The URI describes the *predicate* (the name of the query fact without the `?`),
+and the `:body` contains the query's input paramters, encoded as EDN (assuming content-type of `application/edn`)."
+
+"Instead of providing the results directly, `post-query-handler` returns a status of `303` (\"See Other\"),
+and redirects the client to a location where answers will be provided."

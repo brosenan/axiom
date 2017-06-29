@@ -56,12 +56,13 @@ It relies on the following resources:
 1. `sh`: A shell to run `git` commands in.
 2. `migration-config`: where the `:clone-location` -- the directory where all clones are performed, is specified, and the `:clone-depth`.
 3. `hasher`: to be used for storing the versions loaded from git.
-4. `serve`: which registers this function with the `:axiom/app-version` event.
+4. `declare-service` and `assign-service`: which registers this function with the `:axiom/app-version` event.
 5. [hash-static-files](#hash-static-files): intended to store all static content under the `/static` sub-directory."
 (fact
  (def cmds (transient []))
  (def staticdir (atom nil))
- (let [reg (transient {})
+ (let [decl (transient {})
+       assign (transient {})
        $ (di/injector {:sh (fn [& args]
                              (conj! cmds args)
                              {:exit 0
@@ -70,8 +71,10 @@ It relies on the following resources:
                        :migration-config {:clone-location "/my/clone/location"
                                           :clone-depth 12}
                        :hasher [:my-hasher]
-                       :serve (fn [f r]
-                                (assoc! reg r f))
+                       :declare-service (fn [q partial]
+                                          (assoc! decl q partial))
+                       :assign-service (fn [q func]
+                                         (assoc! assign q func))
                        :hash-static-files (fn [root]
                                             (reset! staticdir root)
                                             {"/a.html" "hash1"
@@ -79,8 +82,9 @@ It relies on the following resources:
                                              "/c.js" "hash3"})})]
    (module $)
    (di/startup $)
-   (def push-handler ((persistent! reg) {:kind :fact
-                                         :name "axiom/app-version"})))
+   ((persistent! decl) "migrator.core/push-handler") => {:kind :fact
+                                                         :name "axiom/app-version"}
+   (def push-handler ((persistent! assign) "migrator.core/push-handler")))
  push-handler => fn?)
 
 "The `push-handler` function responds to such events by calling `git clone` and `git checkout` 
