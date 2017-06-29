@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 28 June 2017</h5>
+              <h5>Date: 29 June 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -90,9 +90,10 @@
 
 (clg/defrule trending [tweet]
   [:test/influencer influencer] (clg/by-anyone)
-  [timeline influencer tweet] (clg/by-anyone))</code></pre></div><div><p>If we introduce these rules when <code>:test/follows</code>, <code>:test/tweeted</code> and <code>:test/influencer</code> facts already exist, a migration process is necessary to do the following:</p><ol><li>Create timeline entries for all the tweets that already have followers.</li><li>Create trending entries based on newly-calculated timeline entries for all existing influencers.</li><li>Create intermediate data so that new followers will receive existing tweets in their timelines.</li><li>Create intermediate data so that new tweets will be added to the timelines of existing followers.</li><li>Create intermediate data so that new timeline entries of existing influencers will be taken into account for trending.</li></ol></div><div><p>To allow this to happen, we need to go through all the <code>:test/follows</code> facts first and create intermediate rule tuples based on them. Then we need to go through all the <code>:test/tweeted</code> facts and match them against the tuples we generated in the previous step to know to which timelines each tweet needs to go. Then, after all timeline entries are calculated we can go through all influencers and create trending data.</p></div><div><p>Going through all the existing facts with a certain name can be a lengthy process. To speed things up we do the following:</p><ul><li>We use <a href='zk-plan.html'>zk-plan</a> to distribute this work across multiple workers.</li><li>We <a href='dynamo.html#database-scanner'>scan the facts</a> in the database in shards, to allow different computer nodes to process different pieces of data in parallel.</li></ul></div><div><span id="push-handler"></span><h2><b>2 &nbsp;&nbsp; push-handler</b></h2></div><div><p>When developers push a new version of their code, they publish an <code>:axiom/app-version</code> event stating the clone URL and git commit hash for that new version. The origin of such operation could be a handler for a <a href='#https://developer.github.com/webhooks/'>GitHub webhook</a> or something similar.</p></div><div><p>This service uses <a href='https://git-scm.com'>git</a> to clone the specified version into the local file system. It relies on the following resources:</p><ol><li><code>sh</code>: A shell to run <code>git</code> commands in.</li><li><code>migration-config</code>: where the <code>:clone-location</code> &ndash; the directory where all clones are performed, is specified, and the <code>:clone-depth</code>.</li><li><code>hasher</code>: to be used for storing the versions loaded from git.</li><li><code>serve</code>: which registers this function with the <code>:axiom/app-version</code> event.</li><li><a href='#hash-static-files'>hash-static-files</a>: intended to store all static content under the <code>/static</code> sub-directory.</li></ol></div><div class="code"><pre><code class="clojure">(def cmds (transient []))
+  [timeline influencer tweet] (clg/by-anyone))</code></pre></div><div><p>If we introduce these rules when <code>:test/follows</code>, <code>:test/tweeted</code> and <code>:test/influencer</code> facts already exist, a migration process is necessary to do the following:</p><ol><li>Create timeline entries for all the tweets that already have followers.</li><li>Create trending entries based on newly-calculated timeline entries for all existing influencers.</li><li>Create intermediate data so that new followers will receive existing tweets in their timelines.</li><li>Create intermediate data so that new tweets will be added to the timelines of existing followers.</li><li>Create intermediate data so that new timeline entries of existing influencers will be taken into account for trending.</li></ol></div><div><p>To allow this to happen, we need to go through all the <code>:test/follows</code> facts first and create intermediate rule tuples based on them. Then we need to go through all the <code>:test/tweeted</code> facts and match them against the tuples we generated in the previous step to know to which timelines each tweet needs to go. Then, after all timeline entries are calculated we can go through all influencers and create trending data.</p></div><div><p>Going through all the existing facts with a certain name can be a lengthy process. To speed things up we do the following:</p><ul><li>We use <a href='zk-plan.html'>zk-plan</a> to distribute this work across multiple workers.</li><li>We <a href='dynamo.html#database-scanner'>scan the facts</a> in the database in shards, to allow different computer nodes to process different pieces of data in parallel.</li></ul></div><div><span id="push-handler"></span><h2><b>2 &nbsp;&nbsp; push-handler</b></h2></div><div><p>When developers push a new version of their code, they publish an <code>:axiom/app-version</code> event stating the clone URL and git commit hash for that new version. The origin of such operation could be a handler for a <a href='#https://developer.github.com/webhooks/'>GitHub webhook</a> or something similar.</p></div><div><p>This service uses <a href='https://git-scm.com'>git</a> to clone the specified version into the local file system. It relies on the following resources:</p><ol><li><code>sh</code>: A shell to run <code>git</code> commands in.</li><li><code>migration-config</code>: where the <code>:clone-location</code> &ndash; the directory where all clones are performed, is specified, and the <code>:clone-depth</code>.</li><li><code>hasher</code>: to be used for storing the versions loaded from git.</li><li><code>declare-service</code> and <code>assign-service</code>: which registers this function with the <code>:axiom/app-version</code> event.</li><li><a href='#hash-static-files'>hash-static-files</a>: intended to store all static content under the <code>/static</code> sub-directory.</li></ol></div><div class="code"><pre><code class="clojure">(def cmds (transient []))
  (def staticdir (atom nil))
- (let [reg (transient {})
+ (let [decl (transient {})
+     assign (transient {})
      $ (di/injector {:sh (fn [&amp; args]
                            (conj! cmds args)
                            {:exit 0
@@ -101,8 +102,10 @@
                      :migration-config {:clone-location &quot;/my/clone/location&quot;
                                         :clone-depth 12}
                      :hasher [:my-hasher]
-                     :serve (fn [f r]
-                              (assoc! reg r f))
+                     :declare-service (fn [q partial]
+                                        (assoc! decl q partial))
+                     :assign-service (fn [q func]
+                                       (assoc! assign q func))
                      :hash-static-files (fn [root]
                                           (reset! staticdir root)
                                           {&quot;/a.html&quot; &quot;hash1&quot;
@@ -110,8 +113,9 @@
                                            &quot;/c.js&quot; &quot;hash3&quot;})})]
  (module $)
  (di/startup $)
- (def push-handler ((persistent! reg) {:kind :fact
-                                       :name &quot;axiom/app-version&quot;})))
+ ((persistent! decl) &quot;migrator.core/push-handler&quot;) =&gt; {:kind :fact
+                                                       :name &quot;axiom/app-version&quot;}
+ (def push-handler ((persistent! assign) &quot;migrator.core/push-handler&quot;)))
  push-handler =&gt; fn?</code></pre></div><div><p>The <code>push-handler</code> function responds to such events by calling <code>git clone</code> and <code>git checkout</code>  to get the specified version of the specified repo inside the given directory. Then <code>permacode.publish/hash-all</code> and <code>hash-static-files</code> are called on the local repo, and then the directory is removed.</p></div><div class="code"><pre><code class="clojure">(def published (transient []))
  (push-handler {:kind :fact
               :name &quot;axiom/app-version&quot;
