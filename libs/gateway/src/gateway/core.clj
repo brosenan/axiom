@@ -17,7 +17,8 @@
   (let [{:keys [ns name key]} (:route-params req)]
     {:kind :fact
      :name (str (symbol ns name))
-     :key (-> key codec/url-decode edn/read-string)}))
+     :key (cond key
+                (-> key codec/url-decode edn/read-string))}))
 
 (defn module [$]
   (di/provide $ identity-set [database-chan]
@@ -128,5 +129,26 @@
                      (let [ev (-> ev
                                   (merge (uri-partial-event req))
                                   (assoc :writers (:identity-set req)))]
-                       (publish ev)))))
-               wrap-authorization)))
+                       (publish ev)))
+                   (resp {:status 204 :body "No Content"})))
+               wrap-authorization))
+
+  (di/provide $ post-query-handler [publish
+                                    declare-volatile-service
+                                    authenticator
+                                    time
+                                    uuid]
+              (-> (fn [req resp raise]
+                    (let [key (uuid)
+                          reg (-> (uri-partial-event req)
+                                  (assoc :key key))]
+                      (declare-volatile-service key reg)
+                      (publish (merge reg
+                                      {:data (-> req :body slurp edn/read-string)
+                                       :ts (time)
+                                       :change 1
+                                       :readers #{(:identity req)}
+                                       :writers #{(:identity req)}}))
+                      (resp {:status 303
+                             :headers {"Location" (str "/.poll/" key)}})))
+                  authenticator)))

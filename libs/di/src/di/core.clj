@@ -39,7 +39,11 @@
       :deps [:log]})
    (with-meta (fn [res] clojure.java.shell/sh)
      {:resource :sh
-      :deps [:log]})])
+      :deps [:log]})
+   (with-meta (fn [res]
+                (fn [] (str (java.util.UUID/randomUUID))))
+     {:resource :uuid
+      :deps []})])
 
 (defn injector
   ([initial]

@@ -327,6 +327,29 @@ and the content of the standard `:out` and `:err` as strings."
                                    :out "foo\n"
                                    :err ""})))
 
+[[:section {:title "uuid"}]]
+"A Universally-Unique IDentifier is a sequence of characters that is guaranteed (beyond any practical probability) to be unique.
+There are different flavours and algorithms for UUIDs and their creation, but any of those will provide this basic property -- that every one is unique."
+
+"The `uuid` resource is a function that whenever called returns a new UUID string."
+(fact
+ (let [$ (injector)]
+   (startup $)
+   (do-with! $ [uuid]
+             (-> (for [_ (range 100)]
+                   (uuid))
+                 set
+                 count) => 100)))
+
+"The default `uuid` implementation leverages Java's [UUID class](https://docs.oracle.com/javase/7/docs/api/java/util/UUID.html),
+which implements the [RFC-4122](https://tools.ietf.org/html/rfc4122) variant."
+(fact
+ (let [$ (injector)]
+   (startup $)
+   (do-with! $ [uuid]
+             (uuid)
+             => #"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")))
+
 [[:chapter {:title "Under the Hood"}]]
 "`rule-edges` converts a function representing a rule to a collection of edges in a dependency graph.
 Each edge is represented by a `[src dest]` tuple. 

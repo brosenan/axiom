@@ -757,6 +757,13 @@ and `:writers` is taken from the `:identity-set`."
            :writers #{"foo" :some-cred}
            :readers #{"alice"}}))
 
+"Response should be a `204` *No Content*."
+(fact
+ (let [[res chan] (async/alts!! [response
+                                 (async/timeout 1000)])]
+   chan => response
+   (:status res) => 204))
+
 [[:chapter {:title "post-query-handler"}]]
 "`post-query-handler` is the handler that allows clients to execute *queries*.
 A query starts by publishing a fact which `:name` ends with a `?`.
@@ -766,9 +773,90 @@ meant to answer this query.
 Query results are events of the same name, only with `!` replacing the `?`, with the same `:key`,
 and with `:data` corresponding to the output elements of the same clauses."
 
+"`post-query-handler` is a DI resource based on:
+- `publish`, used to publish the query,
+- `declare-volatile-service` (e.g., [this](rabbit-microservices.html#declare-volatile-service)), to create a queue for waiting for the answers
+- [time](di.html#time) to assign a `:ts` for the query event
+- [uuid](di.html#uuid) to create a unique ID for this query, and
+- [authenticator](#authenticator) to make this query private to only the authenticated user."
+(fact
+ (def declared (async/chan 10))
+ (def published (async/chan 10))
+ (let [$ (di/injector {:publish (fn [ev]
+                                  (async/>!! published ev))
+                       :declare-volatile-service
+                       (fn [queue reg]
+                         (async/>!! declared [queue reg]))
+                       :use-dummy-authenticator true
+                       :uuid (fn [] "some-uuid")
+                       :time (fn [] 1234)})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [post-query-handler]
+                (def post-query-handler post-query-handler))))
+
 "`post-query-handler` is indended to handle `POST` requests.
 The URI describes the *predicate* (the name of the query fact without the `?`),
 and the `:body` contains the query's input paramters, encoded as EDN (assuming content-type of `application/edn`)."
+(fact
+ (def response (async/chan 2))
+ (post-query-handler {:cookies {"user_identity" "alice"}
+                      :route-params {:ns "tweetlog"
+                                     :name "timeline"}
+                      :body (-> ["alice"]
+                                pr-str .getBytes clojure.java.io/input-stream)}
+                     (fn [res]
+                       (async/>!! response res))
+                     :raise))
+
+"It first [declares a volatile queue](rabbit-microservices.html#declare-volatile-service) in which responses will be provided."
+(fact
+ (let [[decl chan] (async/alts!! [declared
+                                  (async/timeout 1000)])]
+   chan => declared
+   decl => ["some-uuid" {:kind :fact
+                         :name "tweetlog/timeline"
+                         :key "some-uuid"}]))
+
+"In response, `post-query-handler` publishes a query event."
+(fact
+ (let [[query chan] (async/alts!! [published
+                                   (async/timeout 1000)])]
+   chan => published
+   (def query query)))
+
+"The `:name` field in the published event is derived from the `:ns` and `:name` fields in the `:route-params`."
+(fact
+ (:kind query) => :fact
+ (:name query) => "tweetlog/timeline")
+
+"The `:key` is a UUID (as returned by `uuid`)."
+(fact
+ (:key query) => "some-uuid")
+
+"The `:data` is the vector we read from the `:body`."
+(fact
+ (:data query) => ["alice"])
+
+"The `:ts` is the current time in milliseconds (as returned by `time`)."
+(fact
+ (:ts query) => 1234)
+
+"The `:change` is always `1`."
+(fact
+ (:change query) => 1)
+
+"The `:readers` and `:writers` contain only the validated user."
+(fact
+ (:readers query) => #{"alice"}
+ (:writers query) => #{"alice"})
 
 "Instead of providing the results directly, `post-query-handler` returns a status of `303` (\"See Other\"),
-and redirects the client to a location where answers will be provided."
+and redirects the client to a location where answers will be provided.
+This location contans the obtained UUID that became the `:key`."
+(fact
+ (let [[res chan] (async/alts!! [response
+                                 (async/timeout 1000)])]
+   chan => response
+   (:status res) => 303
+   (get-in res [:headers "Location"]) => "/.poll/some-uuid"))
