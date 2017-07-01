@@ -883,11 +883,10 @@ The `poll-handler` handles the redirected `GET` request intended to retreive que
                                       @mock-poll)
                        :version-selector cookie-version-selector
                        :rule-version-verifier
-                       (fn [swver permver]
-                         (async/go
-                           (when-not (= swver "ver123")
-                             (throw (Exception. "wrong SW version")))
-                           (= permver "some-hash")))})]
+                       (fn [swver writers]
+                         (when-not (= swver "ver123")
+                           (throw (Exception. "wrong SW version")))
+                         (= writers #{"some-hash"}))})]
    (module $)
    (di/startup $)
    (di/do-with! $ [poll-handler]
@@ -922,7 +921,7 @@ If the queue contains events the user is allowed to read, these events are retur
           :writers #{"some-hash"}
           :readers #{"alice"}}])))
 
-[[:section {:title "Integrity"}]]
+[[:section {:title "Integrity" :tag "integrity-poll"}]]
 "Recall that [Axiom uses rule namespaces to assert that results were created by the correct rule](cloudlog.html#integrity).
 We use the cryptographic nature of the `app-version` (originally, a git version hash, which is a SHA1 hash of the content.
 Today SHA1 is not considered secure for new applications, but a second pre-image attack on SHA1 is still not considered feasible,
@@ -933,3 +932,109 @@ to make it difficult for an attacker to plant query results."
 These versions become the `:writers` sets events created by these rules and clauses.
 To protect users against such attacks, we use [rule-version-verifier](#rule-version-verifier) 
 to filter-out results not produced by the current software version."
+
+"Imagine an attacker who wishes to add some unwanted content to users' timelines.
+Such an attacker can create an application and add clauses that emit `tweetlog/timeline` entries.
+Since there is nothing special in the name `tweetlog/timeline`, there is nothing to restrict any application from providing content to this query.
+However, the permacode hash provided as the `:writers` set will not be in the list of hashes associated with `app-version`.
+As result, `rule-version-verifier` will indicate that results provided by the attacker's clause are not part of this application,
+and they will be blocked."
+(fact
+ (let [response (async/chan 2)]
+   (reset! mock-poll [{:kind :fact
+                       :name "tweetlog/timeline"
+                       :key "alice"
+                       :data ["bob" "hello"]
+                       :ts 1000
+                       :change 1
+                       ;; The attacker's permacode hash...
+                       :writers #{"some-other-hash"}
+                       :readers #{"alice"}}])
+   (poll-handler {:route-params {:queue "the-queue"}
+                  :cookies {"app-version" "ver123"}}
+                 (fn [res]
+                   (async/>!! response res))
+                 :raise)
+   (let [[res chan] (async/alts!! [response
+                                   (async/timeout 1000)])]
+     (-> res :body slurp edn/read-string)
+     => [] ;; The event is blocked
+     )))
+
+[[:section {:title "Confidentiality" :tag "confidentiality-poll"}]]
+"The `poll-handler` also need to protect user-data against unauthorized reads.
+A user making a query should only be able to access events he or she are allowed to read.
+This is true when their `:identity-set` is (conceptually) a subset of the result's `:reders` set.
+(By *conceptually* we mean the mathematical set that the Clojure set represents, and not the Clojure set itself)."
+(fact
+ (let [response (async/chan 2)]
+   (reset! mock-poll [{:kind :fact
+                       :name "tweetlog/timeline"
+                       :key "alice"
+                       :data ["bob" "hello"]
+                       :ts 1000
+                       :change 1
+                       :writers #{"some-hash"}
+                       :readers #{"not-alice"}}])
+   (poll-handler {:route-params {:queue "the-queue"}
+                  :cookies {"app-version" "ver123"}}
+                 (fn [res]
+                   (async/>!! response res))
+                 :raise)
+   (let [[res chan] (async/alts!! [response
+                                   (async/timeout 1000)])]
+     chan => response
+     (-> res :body slurp edn/read-string)
+     => [] ;; The event is blocked
+     )))
+
+[[:chapter {:title "Under the Hood"}]]
+[[:section {:title "rule-version-verifier"}]]
+"To maintain the [integrity of query results](#integrity-poll), we need to associate the `:writers` set of an event to a version of an application
+(given as the `:app-version` key in the request)."
+
+"`rule-version-verifier` is a DI resource that depends on `database-chan`."
+(fact
+ (let [$ (di/injector {:database-chan db-chan})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [rule-version-verifier]
+                (def rule-version-verifier rule-version-verifier))))
+
+"It is a function that takes two arguments:
+1. a version (the `:app-version` from the request, as provided by the [version-selector](#version-selector)), and
+2. the `:writers` set of an event."
+(fact
+ (def result (async/thread
+               (rule-version-verifier "ver123" #{"some-hash" :something-else}))))
+
+"It queries the database for a `axiom/perm-versions` fact associated with the given version."
+(fact
+ (let [[q reply-chan] (get-query)]
+   q => {:kind :fact
+         :name "axiom/perm-versions"
+         :key "ver123"}
+   (async/>!! reply-chan {:kind :fact
+                          :name "axiom/perm-versions"
+                          :key "ver123"
+                          :data [#{'some-hash 'some-other-hash} {}]})
+   (async/close! reply-chan)))
+
+"Because `some-hash` exists in the `axiom/perm-versions` for this version, the function should return `true`."
+(fact
+ (async/<!! result) => true)
+
+"If the `:writers` set does not mention a hash that exists, we return `false`."
+(fact
+ (def result (async/thread
+               (rule-version-verifier "ver234" #{"some-hash-that-does-not-exist" :something-else})))
+ (let [[q reply-chan] (get-query)]
+   q => {:kind :fact
+         :name "axiom/perm-versions"
+         :key "ver234"}
+   (async/>!! reply-chan {:kind :fact
+                          :name "axiom/perm-versions"
+                          :key "ver234"
+                          :data [#{'some-hash 'some-other-hash} {}]})
+   (async/close! reply-chan))
+ (async/<!! result) => false)

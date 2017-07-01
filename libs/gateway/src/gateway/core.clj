@@ -8,6 +8,9 @@
             [clojure.edn :as edn]))
 
 
+(defn any? [list]
+  (some? (some identity list)))
+
 (defn cookie-version-selector [handler]
   (fn [req resp raise]
     (handler (assoc req :app-version (get-in req [:cookies "app-version"])) resp raise)))
@@ -154,15 +157,33 @@
                   authenticator))
 
   (di/provide $ poll-handler [wrap-authorization
-                              poll-events]
-              (fn [req resp raise]
-                (let [body (->> (poll-events (-> req :route-params :queue))
-                                (map (comp #(dissoc % :kind)
-                                           #(dissoc % :name)
-                                           #(dissoc % :key))))]
-                  (resp {:status 200
-                         :headers {"Content-Type" "application/edn"}
-                         :body (-> body
-                                   pr-str
-                                   .getBytes
-                                   clojure.java.io/input-stream)})))))
+                              poll-events
+                              version-selector
+                              rule-version-verifier]
+              (-> (fn [req resp raise]
+                    (let [body (->> (poll-events (-> req :route-params :queue))
+                                    (filter #(rule-version-verifier (:app-version req) (:writers %)))
+                                    (filter #(interset/subset? (:identity-set req) (:readers %)))
+                                    (map (comp #(dissoc % :kind)
+                                               #(dissoc % :name)
+                                               #(dissoc % :key))))]
+                      (resp {:status 200
+                             :headers {"Content-Type" "application/edn"}
+                             :body (-> body
+                                       pr-str
+                                       .getBytes
+                                       clojure.java.io/input-stream)})))
+                  version-selector
+                  wrap-authorization))
+  
+  (di/provide $ rule-version-verifier [database-chan]
+              (fn [app-ver writers]
+                (let [reply-chan (async/chan 10)]
+                  (async/>!! database-chan [{:kind :fact
+                                             :name "axiom/perm-versions"
+                                             :key app-ver}
+                                            reply-chan])
+                  (let [{:keys [data]} (async/<!! reply-chan)
+                        [perms static] data]
+                    (any? (for [perm perms]
+                            (interset/subset? writers #{(str perm)}))))))))
