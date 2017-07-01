@@ -65,13 +65,14 @@
 (defn my-ack [& args]
   (apply lb/ack args))
 
-(defn handle-event [func alive chan meta-attrs binary]
+(defn handle-event [func alive info chan meta-attrs binary]
   (let [event (nippy/thaw binary)
         publish (fn [ev]
                   (when @alive
                     (lb/publish chan facts-exch (event-routing-key ev) (nippy/freeze (merge event ev)) meta-attrs)))
         ack (fn [] (my-ack chan (:delivery-tag meta-attrs)))]
-    (println "handling: " event " by: " (clojure.repl/demunge (str func)))
+    (info {:source "rabbit"
+           :desc (str "handling: " event " by: " (clojure.repl/demunge (str func)))})
     (case (arg-count func)
       1 (func event)
       2 (func event publish)
@@ -112,9 +113,9 @@
   (di/provide $ declare-volatile-service [rabbitmq-service info]
               (declare-declare-service rabbitmq-service info {:durable false}))
 
-  (di/provide $ assign-service [rabbitmq-service]
+  (di/provide $ assign-service [rabbitmq-service info]
               (fn [key func]
-                (lc/subscribe (:chan rabbitmq-service) key (partial handle-event func (:alive rabbitmq-service)) {:auto-ack (< (arg-count func) 3)})
+                (lc/subscribe (:chan rabbitmq-service) key (partial handle-event func (:alive rabbitmq-service) info) {:auto-ack (< (arg-count func) 3)})
                 nil))
 
   (di/provide $ publish [rabbitmq-service info]

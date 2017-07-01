@@ -306,7 +306,7 @@ If it takes one parameter, we pass this parameter a de-serialization of the even
                 :readers #{}})
  (def my-event-bin (nippy/freeze my-event))
  ; By running handle-event...
- (handle-event my-func alive :the-channel {:delivery-tag 777} my-event-bin) => nil
+ (handle-event my-func alive constantly :the-channel {:delivery-tag 777} my-event-bin) => nil
  ; we execute my-func, which adds the event to received
  @received => [my-event])
 
@@ -321,7 +321,7 @@ All fields that are not specified in the event default to their values in the ev
    (publish event2))
  (def event-that-was-sent
    (merge my-event event2))
- (handle-event my-func alive :the-channel :meta-attrs my-event-bin) => nil
+ (handle-event my-func alive constantly :the-channel :meta-attrs my-event-bin) => nil
  (provided
   (nippy/freeze event-that-was-sent) => ..bin..
   (lb/publish :the-channel facts-exch (event-routing-key event2) ..bin.. :meta-attrs) => irrelevant))
@@ -329,14 +329,14 @@ All fields that are not specified in the event default to their values in the ev
 "When the `alive` atom evaluates to `false`, the publish function does nothing."
 (fact
  (reset! alive false)
- (handle-event my-func alive :the-channel :meta-attrs my-event-bin) => nil
+ (handle-event my-func alive constantly :the-channel :meta-attrs my-event-bin) => nil
  ; Nothing is published
  )
 "If the wrapped function accepts three parameters, the third parameter is taken to be an `ack` function, that explicitly acknowledges the received event."
 (fact
  (defn my-func [ev publish ack]
    (ack))
- (handle-event my-func alive :the-channel {:delivery-tag "foo"} my-event-bin) => nil
+ (handle-event my-func alive constantly :the-channel {:delivery-tag "foo"} my-event-bin) => nil
  (provided
   (lb/ack :the-channel "foo") => irrelevant))
 
