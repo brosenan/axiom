@@ -121,6 +121,40 @@ It depends on `rabbitmq-service`."
   (event-routing-key ..ev..) => ..routing-key..
   (lb/publish :some-chan facts-exch ..routing-key.. ..bin.. {}) => irrelevant))
 
+[[:chapter {:title "poll-events: Pull Mode" :tag "poll-events"}]]
+"The most efficient and conveinent way to receive messages from a queue is in *push mode*, where
+the AMQP broker has control.
+In this approach (as implemented by [assign-service](#assign-service)), we implement a function that is called whenever a new event arrives."
+
+"However, sometimes we need to work the other way.
+We need to have control, and consume messages off a queue when *we* decide to do so."
+
+"An example for such a situation is where we respond to a user request.
+In such a case, without the user request we have nothing to do with the data, 
+so it does not make sense to have a service function handling all messages.
+When a user request comes in, we wish to read all messages currently on the queue and return them to the user.
+This is exactly what the `poll-events` function does."
+
+"`poll-events` is a DI resource which is based on `rabbitmq-service`."
+(fact
+ (let [$ (di/injector {:rabbitmq-service {:chan :some-chan}})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [poll-events]
+                (def poll-events poll-events))))
+
+"When called, it calls [lb/get](http://reference.clojurerabbitmq.info/langohr.basic.html#var-get) to read events off the given queue.
+It reads all events until the queue is empty.
+Events are auto-acknowledged."
+(fact
+ (poll-events ..queue..) => [..ev1.. ..ev2..]
+ (provided
+  (lb/get :some-chan ..queue.. true) =streams=> [[..metadata.. ..payload1..]
+                                                 [..metadata.. ..payload2..]
+                                                 nil]
+  (nippy/thaw ..payload1..) => ..ev1..
+  (nippy/thaw ..payload2..) => ..ev2..))
+
 [[:chapter {:title "Usage Example"}]]
 "To demonstrate how the above functions work together we build a small usage example."
 

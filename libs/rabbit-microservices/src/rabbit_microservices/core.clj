@@ -119,5 +119,16 @@
                 nil))
 
   (di/provide $ publish [rabbitmq-service info]
-              (partial publisher rabbitmq-service info)))
+              (partial publisher rabbitmq-service info))
+
+  (di/provide $ poll-events [rabbitmq-service]
+              (fn [queue]
+                (loop [res []]
+                  (let [resp (lb/get (:chan rabbitmq-service) queue true)]
+                    (cond (nil? resp)
+                          res
+                          :else
+                          (let [[metadata payload] resp
+                                ev (nippy/thaw payload)]
+                            (recur (conj res ev)))))))))
 
