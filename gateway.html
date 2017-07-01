@@ -451,7 +451,45 @@
          :ts 1000
          :change 1
          :writers #{&quot;foo&quot; :some-cred}
-         :readers #{&quot;alice&quot;}})</code></pre></div><div><span id="post-query-handler"></span><h2><b>9 &nbsp;&nbsp; post-query-handler</b></h2></div><div><p><code>post-query-handler</code> is the handler that allows clients to execute <em>queries</em>. A query starts by publishing a fact which <code>:name</code> ends with a <code>?</code>. The <code>:key</code> to this fact is a unique identifier selected by this handler,  and the <code>:data</code> correspond to the input fields in all the <a href='cloudlog.html#defclause'>clauses</a> meant to answer this query. Query results are events of the same name, only with <code>!</code> replacing the <code>?</code>, with the same <code>:key</code>, and with <code>:data</code> corresponding to the output elements of the same clauses.</p></div><div><p><code>post-query-handler</code> is indended to handle <code>POST</code> requests. The URI describes the <em>predicate</em> (the name of the query fact without the <code>?</code>), and the <code>:body</code> contains the query's input paramters, encoded as EDN (assuming content-type of <code>application/edn</code>).</p></div><div><p>Instead of providing the results directly, <code>post-query-handler</code> returns a status of <code>303</code> ("See Other"), and redirects the client to a location where answers will be provided.</p></div>
+         :readers #{&quot;alice&quot;}})</code></pre></div><div><p>Response should be a <code>204</code> <em>No Content</em>.</p></div><div class="code"><pre><code class="clojure">(let [[res chan] (async/alts!! [response
+                               (async/timeout 1000)])]
+ chan =&gt; response
+ (:status res) =&gt; 204)</code></pre></div><div><span id="post-query-handler"></span><h2><b>9 &nbsp;&nbsp; post-query-handler</b></h2></div><div><p><code>post-query-handler</code> is the handler that allows clients to execute <em>queries</em>. A query starts by publishing a fact which <code>:name</code> ends with a <code>?</code>. The <code>:key</code> to this fact is a unique identifier selected by this handler,  and the <code>:data</code> correspond to the input fields in all the <a href='cloudlog.html#defclause'>clauses</a> meant to answer this query. Query results are events of the same name, only with <code>!</code> replacing the <code>?</code>, with the same <code>:key</code>, and with <code>:data</code> corresponding to the output elements of the same clauses.</p></div><div><p><code>post-query-handler</code> is a DI resource based on:</p><ul><li><code>publish</code>, used to publish the query,</li><li><code>declare-volatile-service</code> (e.g., <a href='rabbit-microservices.html#declare-volatile-service'>this</a>), to create a queue for waiting for the answers</li><li><a href='di.html#time'>time</a> to assign a <code>:ts</code> for the query event</li><li><a href='di.html#uuid'>uuid</a> to create a unique ID for this query, and</li><li><a href='#authenticator'>authenticator</a> to make this query private to only the authenticated user.</li></ul></div><div class="code"><pre><code class="clojure">(def declared (async/chan 10))
+ (def published (async/chan 10))
+ (let [$ (di/injector {:publish (fn [ev]
+                                (async/&gt;!! published ev))
+                     :declare-volatile-service
+                     (fn [queue reg]
+                       (async/&gt;!! declared [queue reg]))
+                     :use-dummy-authenticator true
+                     :uuid (fn [] &quot;some-uuid&quot;)
+                     :time (fn [] 1234)})]
+ (module $)
+ (di/startup $)
+ (di/do-with! $ [post-query-handler]
+              (def post-query-handler post-query-handler)))</code></pre></div><div><p><code>post-query-handler</code> is indended to handle <code>POST</code> requests. The URI describes the <em>predicate</em> (the name of the query fact without the <code>?</code>), and the <code>:body</code> contains the query's input paramters, encoded as EDN (assuming content-type of <code>application/edn</code>).</p></div><div class="code"><pre><code class="clojure">(def response (async/chan 2))
+ (post-query-handler {:cookies {&quot;user_identity&quot; &quot;alice&quot;}
+                    :route-params {:ns &quot;tweetlog&quot;
+                                   :name &quot;timeline&quot;}
+                    :body (-&gt; [&quot;alice&quot;]
+                              pr-str .getBytes clojure.java.io/input-stream)}
+                   (fn [res]
+                     (async/&gt;!! response res))
+                   :raise)</code></pre></div><div><p>It first <a href='rabbit-microservices.html#declare-volatile-service'>declares a volatile queue</a> in which responses will be provided.</p></div><div class="code"><pre><code class="clojure">(let [[decl chan] (async/alts!! [declared
+                                (async/timeout 1000)])]
+ chan =&gt; declared
+ decl =&gt; [&quot;some-uuid&quot; {:kind :fact
+                       :name &quot;tweetlog/timeline&quot;
+                       :key &quot;some-uuid&quot;}])</code></pre></div><div><p>In response, <code>post-query-handler</code> publishes a query event.</p></div><div class="code"><pre><code class="clojure">(let [[query chan] (async/alts!! [published
+                                 (async/timeout 1000)])]
+ chan =&gt; published
+ (def query query))</code></pre></div><div><p>The <code>:name</code> field in the published event is derived from the <code>:ns</code> and <code>:name</code> fields in the <code>:route-params</code>.</p></div><div class="code"><pre><code class="clojure">(:kind query) =&gt; :fact
+ (:name query) =&gt; &quot;tweetlog/timeline&quot;</code></pre></div><div><p>The <code>:key</code> is a UUID (as returned by <code>uuid</code>).</p></div><div class="code"><pre><code class="clojure">(:key query) =&gt; &quot;some-uuid&quot;</code></pre></div><div><p>The <code>:data</code> is the vector we read from the <code>:body</code>.</p></div><div class="code"><pre><code class="clojure">(:data query) =&gt; [&quot;alice&quot;]</code></pre></div><div><p>The <code>:ts</code> is the current time in milliseconds (as returned by <code>time</code>).</p></div><div class="code"><pre><code class="clojure">(:ts query) =&gt; 1234</code></pre></div><div><p>The <code>:change</code> is always <code>1</code>.</p></div><div class="code"><pre><code class="clojure">(:change query) =&gt; 1</code></pre></div><div><p>The <code>:readers</code> and <code>:writers</code> contain only the validated user.</p></div><div class="code"><pre><code class="clojure">(:readers query) =&gt; #{&quot;alice&quot;}
+ (:writers query) =&gt; #{&quot;alice&quot;}</code></pre></div><div><p>Instead of providing the results directly, <code>post-query-handler</code> returns a status of <code>303</code> ("See Other"), and redirects the client to a location where answers will be provided. This location contans the obtained UUID that became the <code>:key</code>.</p></div><div class="code"><pre><code class="clojure">(let [[res chan] (async/alts!! [response
+                               (async/timeout 1000)])]
+ chan =&gt; response
+ (:status res) =&gt; 303
+ (get-in res [:headers &quot;Location&quot;]) =&gt; &quot;/.poll/some-uuid&quot;)</code></pre></div>
         </div>
       </div>
     </div>
