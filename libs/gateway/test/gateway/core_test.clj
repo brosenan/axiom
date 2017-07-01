@@ -774,11 +774,11 @@ Query results are events of the same name, only with `!` replacing the `?`, with
 and with `:data` corresponding to the output elements of the same clauses."
 
 "`post-query-handler` is a DI resource based on:
-- `publish`, used to publish the query,
-- `declare-volatile-service` (e.g., [this](rabbit-microservices.html#declare-volatile-service)), to create a queue for waiting for the answers
-- [time](di.html#time) to assign a `:ts` for the query event
-- [uuid](di.html#uuid) to create a unique ID for this query, and
-- [authenticator](#authenticator) to make this query private to only the authenticated user."
+1. `publish`, used to publish the query,
+2. `declare-volatile-service` (e.g., [this](rabbit-microservices.html#declare-volatile-service)), to create a queue for waiting for the answers
+3. [time](di.html#time) to assign a `:ts` for the query event
+4. [uuid](di.html#uuid) to create a unique ID for this query, and
+5. [authenticator](#authenticator) to make this query private to only the authenticated user."
 (fact
  (def declared (async/chan 10))
  (def published (async/chan 10))
@@ -846,7 +846,8 @@ and the `:body` contains the query's input paramters, encoded as EDN (assuming c
 (fact
  (:change query) => 1)
 
-"The `:readers` and `:writers` contain only the validated user."
+"The `:readers` and `:writers` contain only the validated user.
+This makes sure that no one other than the user can even know about this query."
 (fact
  (:readers query) => #{"alice"}
  (:writers query) => #{"alice"})
@@ -860,3 +861,75 @@ This location contans the obtained UUID that became the `:key`."
    chan => response
    (:status res) => 303
    (get-in res [:headers "Location"]) => "/.poll/some-uuid"))
+
+[[:chapter {:title "poll-handler"}]]
+"A [query POST request](#post-query-handler) submits a query and redirects the user to a location under `/.poll`, where results are expected.
+The `poll-handler` handles the redirected `GET` request intended to retreive query results."
+
+"`poll-handler` is a DI resource with the following dependencies:
+1. `wrap-authorization`, used when filtering query results, showing only those results the user may read.
+2. `poll-events` (e.g., for [RabbitMQ](rabbit-microservices.html#poll-events)), used to read the actual results.
+3. [version-selector](#version-selector) and [rule-version-verifier](#rule-version-verifier), used together to filter-out results not contributed by the current version."
+(fact
+ (def mock-poll (atom []))
+ (let [$ (di/injector {:wrap-authorization
+                       (fn [handler]
+                         (fn [req resp raise]
+                           (handler (assoc req :identity-set #{"alice" :other-cred})
+                                    resp raise)))
+                       :poll-events (fn [queue]
+                                      (when-not (= queue "the-queue")
+                                        (throw (Exception. (str "Wrong queue name: " queue))))
+                                      @mock-poll)
+                       :version-selector cookie-version-selector
+                       :rule-version-verifier
+                       (fn [swver permver]
+                         (async/go
+                           (when-not (= swver "ver123")
+                             (throw (Exception. "wrong SW version")))
+                           (= permver "some-hash")))})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [poll-handler]
+                (def poll-handler poll-handler))))
+
+"`poll-handler` receives the name of the queue it is supposed to poll from via the `:queue` route-param.
+If the queue contains events the user is allowed to read, these events are returned (EDN-encoded)."
+(fact
+ (let [response (async/chan 2)]
+   (reset! mock-poll [{:kind :fact
+                       :name "tweetlog/timeline"
+                       :key "alice"
+                       :data ["bob" "hello"]
+                       :ts 1000
+                       :change 1
+                       :writers #{"some-hash"}
+                       :readers #{"alice"}}])
+   (poll-handler {:route-params {:queue "the-queue"}
+                  :cookies {"app-version" "ver123"}}
+                 (fn [res]
+                   (async/>!! response res))
+                 :raise)
+   (let [[res chan] (async/alts!! [response
+                                   (async/timeout 1000)])]
+     chan => response
+     (:status res) => 200
+     (get-in res [:headers "Content-Type"]) => "application/edn"
+     (-> res :body slurp edn/read-string)
+     => [{:data ["bob" "hello"]
+          :ts 1000
+          :change 1
+          :writers #{"some-hash"}
+          :readers #{"alice"}}])))
+
+[[:section {:title "Integrity"}]]
+"Recall that [Axiom uses rule namespaces to assert that results were created by the correct rule](cloudlog.html#integrity).
+We use the cryptographic nature of the `app-version` (originally, a git version hash, which is a SHA1 hash of the content.
+Today SHA1 is not considered secure for new applications, but a second pre-image attack on SHA1 is still not considered feasible,
+and therefore it is acceptable for our use)
+to make it difficult for an attacker to plant query results."
+
+"Each `app-version` [is mapped to a set of permacode versions](migrator.html#push-handler).
+These versions become the `:writers` sets events created by these rules and clauses.
+To protect users against such attacks, we use [rule-version-verifier](#rule-version-verifier) 
+to filter-out results not produced by the current software version."

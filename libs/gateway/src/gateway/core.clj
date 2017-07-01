@@ -151,4 +151,18 @@
                                        :writers #{(:identity req)}}))
                       (resp {:status 303
                              :headers {"Location" (str "/.poll/" key)}})))
-                  authenticator)))
+                  authenticator))
+
+  (di/provide $ poll-handler [wrap-authorization
+                              poll-events]
+              (fn [req resp raise]
+                (let [body (->> (poll-events (-> req :route-params :queue))
+                                (map (comp #(dissoc % :kind)
+                                           #(dissoc % :name)
+                                           #(dissoc % :key))))]
+                  (resp {:status 200
+                         :headers {"Content-Type" "application/edn"}
+                         :body (-> body
+                                   pr-str
+                                   .getBytes
+                                   clojure.java.io/input-stream)})))))
