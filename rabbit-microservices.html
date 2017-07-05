@@ -136,13 +136,14 @@
                                                [..metadata.. ..payload2..]
                                                nil]
 (nippy/thaw ..payload1..) =&gt; ..ev1..
-(nippy/thaw ..payload2..) =&gt; ..ev2..)</code></pre></div><div><span id="event-bridge"></span><h2><b>7 &nbsp;&nbsp; event-bridge</b></h2></div><div><p>An <code>event-bridge</code> is a bidirectional bridge between events flowing globally through Axiom (as AMQP messages), and local events flowing through <code>core.async</code> channels. It is intended to connect Axiom (the server) to an external client.</p></div><div><p>It takes a pair of channels named <code>c2s</code> (client to server) and <code>s2c</code> (server to client). It does the following:</p><ol><li><a href='#publish'>publish</a> <code>:fact</code> events flowing on the <code>c2s</code> channel.</li><li>Handle <code>:reg</code> events by registering to <code>:fact</code> events they refer to, and</li><li>Push all registered events to the <code>s2c</code> channel.</li></ol></div><div><p><code>event-bridge</code> is a DI resource with the following dependencies:</p><ol><li><a href='#publish'>publish</a>, used to publish events coming on <code>c2s</code>.</li><li><a href='#declare-private-queue'>declare-private-queue</a>, used to create a private queue for this session.</li><li><a href='#assign-service'>assign-service</a>, used to assign a function that will push incoming events to the <code>s2c</code> channel.</li><li><a href='#register-events-to-queue'>register-events-to-queue</a>, used to direct events of interest to the session's queue, and</li><li><a href='#delete-queue'>delete-queue</a>, used to close the session queue once the <code>c2s</code> channel closes.</li></ol></div><div class="code"><pre><code class="clojure">(def calls (async/chan 10))
+(nippy/thaw ..payload2..) =&gt; ..ev2..)</code></pre></div><div><span id="event-bridge"></span><h2><b>7 &nbsp;&nbsp; event-bridge</b></h2></div><div><p>An <code>event-bridge</code> is a bidirectional bridge between events flowing globally through Axiom (as AMQP messages), and local events flowing through <code>core.async</code> channels. It is intended to connect Axiom (the server) to an external client.</p></div><div><p>It takes a pair of channels named <code>c2s</code> (client to server) and <code>s2c</code> (server to client). It does the following:</p><ol><li><a href='#publish'>publish</a> <code>:fact</code> events flowing on the <code>c2s</code> channel.</li><li>Handle <code>:reg</code> events by registering to <code>:fact</code> events they refer to, and</li><li>Push all registered events to the <code>s2c</code> channel.</li></ol></div><div><p><code>event-bridge</code> is a DI resource with the following dependencies:</p><ol><li><a href='#publish'>publish</a>, used to publish events coming on <code>c2s</code>.</li><li><a href='#declare-private-queue'>declare-private-queue</a>, used to create a private queue for this session.</li><li><a href='#assign-service'>assign-service</a>, used to assign a function that will push incoming events to the <code>s2c</code> channel.</li><li><code>database-chan</code> (e.g., <a href='dynamo.html#database-chan'>this</a>), to retrieve any existing events, if so requested during registration.</li><li><a href='#register-events-to-queue'>register-events-to-queue</a>, used to direct events of interest to the session's queue, and</li><li><a href='#delete-queue'>delete-queue</a>, used to close the session queue once the <code>c2s</code> channel closes.</li></ol></div><div class="code"><pre><code class="clojure">(def calls (async/chan 10))
  (defn get-call []
  (let [[call chan] (async/alts!! [calls
                                   (async/timeout 1000)])]
    (when (not= chan calls)
      (throw (Exception. &quot;Timed out waiting to read call&quot;)))
    call))
+ (def database-chan (async/chan 10))
  
  (let [$ (di/injector {:publish
                      (fn [ev] (async/&gt;!! calls [:publish ev]))
@@ -151,6 +152,8 @@
                        &quot;some-random-queue&quot;)
                      :assign-service
                      (fn [queue func] (async/&gt;!! calls [:assign-service queue func]))
+                     :database-chan
+                     database-chan
                      :register-events-to-queue
                      (fn [queue reg] (async/&gt;!! calls [:register-events-to-queue queue reg]))
                      :delete-queue
@@ -196,7 +199,42 @@
    pushed =&gt; {:kind :fact
               :name &quot;boo&quot;
               :key &quot;tar&quot;
-              :data [1 2]}))</code></pre></div><div><p>When the <code>c2s</code> channel is closed, <code>event-bridge</code> deletes its queue.</p></div><div class="code"><pre><code class="clojure">(let [[c2s s2c] chan-pair]
+              :data [1 2]}))</code></pre></div><div><p>A <code>:reg</code> event may contain a <code>:get-existing</code> field. If such a field exists and is <code>true</code>, a request is made to the database (through <code>database-chan</code>) to retrieve all existing events matching the registration.</p></div><div class="code"><pre><code class="clojure">(let [[c2s s2c] chan-pair]
+ (async/&gt;!! c2s {:kind :reg
+                 :name &quot;x&quot;
+                 :key &quot;y&quot;
+                 :get-existing true})
+ ;; Registration is the same
+ (get-call) =&gt; [:register-events-to-queue &quot;some-random-queue&quot; {:kind :fact
+                                                               :name &quot;x&quot;
+                                                               :key &quot;y&quot;}]
+ (let [[[query reply-chan] chan] (async/alts!! [database-chan
+                                                (async/timeout 1000)])]
+   chan =&gt; database-chan
+   (def reply-chan reply-chan)))</code></pre></div><div><p>Results returned from the database are pushed to the <code>s2c</code> channel.</p></div><div class="code"><pre><code class="clojure">(let [[c2s s2c] chan-pair]
+ (async/&gt;!! reply-chan {:kind :fact
+                        :name &quot;some&quot;
+                        :key &quot;event&quot;
+                        :data [1 2 3]})
+ (async/&gt;!! reply-chan {:kind :fact
+                        :name &quot;some&quot;
+                        :key &quot;other event&quot;
+                        :data [2 3 4]})
+ (async/close! reply-chan)
+ (let [[ev chan] (async/alts!! [s2c
+                                (async/timeout 1000)])]
+   chan =&gt; s2c
+   ev =&gt; {:kind :fact
+          :name &quot;some&quot;
+          :key &quot;event&quot;
+          :data [1 2 3]})
+ (let [[ev chan] (async/alts!! [s2c
+                                (async/timeout 1000)])]
+   chan =&gt; s2c
+   ev =&gt; {:kind :fact
+          :name &quot;some&quot;
+          :key &quot;other event&quot;
+          :data [2 3 4]}))</code></pre></div><div><p>When the <code>c2s</code> channel is closed, <code>event-bridge</code> deletes its queue.</p></div><div class="code"><pre><code class="clojure">(let [[c2s s2c] chan-pair]
  (async/close! c2s)
  (get-call) =&gt; [:delete-queue &quot;some-random-queue&quot;])</code></pre></div><div><span id="usage-example"></span><h2><b>8 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>To demonstrate how the above functions work together we build a small usage example.</p></div><div><p>In our example we have the following service functions:</p><ol><li>Function <code>sum-foo</code> that sums the values in the data of events of name "foo" and emits events named "foo-sum".</li><li>Function <code>count-ev</code> that counts the events of the different names and emits events of type "count" (it does not count "count" events).</li><li>Function <code>foo-from-count</code> that listens on "count" events and emits corresponding "foo" events with the same value.</li></ol></div><div class="code"><pre><code class="clojure">:integ ; Integration test.  Does not run during continouts integration
  (def foo-sum (atom 0))
