@@ -85,6 +85,13 @@
        clojure.repl/demunge
        (re-find #"[^@]*")))
 
+(defn register-events-to-queue* [rabbitmq-service info queue reg]
+  (let [rk (event-routing-key reg)]
+    (info {:source "rabbit"
+           :desc (str "Binding queue " key " to routing key " rk)})
+    (lq/bind (:chan rabbitmq-service) queue facts-exch {:routing-key rk})
+    nil))
+
 (defn module [$]
   (di/provide $ rabbitmq-service [rabbitmq-config]
               (binding [rmq/*default-config* rabbitmq-config]
@@ -100,12 +107,9 @@
   
   (defn declare-declare-service [rabbitmq-service info options]
     (fn [key reg]
-      (let [chan (:chan rabbitmq-service)
-            routing-key (event-routing-key reg)]
-        (info {:source "rabbit"
-               :desc (str "Declaring queue " key " with routing key " routing-key)})
+      (let [chan (:chan rabbitmq-service)]
         (lq/declare chan key options)
-        (lq/bind chan key facts-exch {:routing-key routing-key}))
+        (register-events-to-queue* rabbitmq-service info key reg))
       nil))
 
   (di/provide $ declare-service [rabbitmq-service info]
@@ -130,5 +134,16 @@
                           :else
                           (let [[metadata payload] resp
                                 ev (nippy/thaw payload)]
-                            (recur (conj res ev)))))))))
+                            (recur (conj res ev))))))))
 
+  (di/provide $ declare-private-queue [rabbitmq-service]
+              (fn []
+                (lq/declare-server-named (:chan rabbitmq-service) {:exclusive true})))
+
+  (di/provide $ delete-queue [rabbitmq-service]
+              (fn [q]
+                (lq/delete (:chan rabbitmq-service) q)
+                nil))
+
+  (di/provide $ register-events-to-queue [rabbitmq-service info]
+              (partial register-events-to-queue* rabbitmq-service info)))

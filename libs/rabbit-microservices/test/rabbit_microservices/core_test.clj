@@ -374,3 +374,58 @@ All fields that are not specified in the event default to their values in the ev
  (provided
   (lb/ack :the-channel "foo") => irrelevant))
 
+[[:section {:title "declare-private-queue"}]]
+"`declare-private-queue` is made to allow the creation of private queues, to be used not for a service, but rather for a specific user session.
+Unlike [declare-service](#declare-service), it does not bind an exchange to this queue."
+
+"It is a DI resource, based on `rabbitmq-service`."
+(fact
+ (let [$ (di/injector {:rabbitmq-service {:chan :some-chan}})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [declare-private-queue]
+                (def declare-private-queue declare-private-queue))))
+
+"It takes no parameters, and calls [lq/declare-server-named](http://reference.clojurerabbitmq.info/langohr.queue.html#var-declare-server-named)
+to create a new queue, named by the AMQP broker, exclusive to this connection, non-durable and auto-deletable."
+(fact
+ (declare-private-queue) => ..queue..
+ (provided
+  (lq/declare-server-named :some-chan {:exclusive true}) => ..queue..))
+
+[[:section {:title "delete-queue"}]]
+"`delete-queue` deletes a queue of a given name."
+
+"It is a DI resource that depends on `rabbitmq-service`."
+(fact
+ (let [$ (di/injector {:rabbitmq-service {:chan :some-chan}})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [delete-queue]
+                (def delete-queue delete-queue))))
+
+"It takes one parameter -- the name of the queue to be deleted, and calls `lq/delete` with that name."
+(fact
+ (delete-queue ..queue..) => nil
+ (provided
+  (lq/delete :some-chan ..queue..) => irrelevant))
+
+[[:section {:title "register-events-to-queue"}]]
+"`register-events-to-queue` takes a queue name and a partial events,
+and makes sure events matching this partial event are sent to this queue."
+
+"It is a DI resource based on `rabbitmq-service`."
+(fact
+ (let [$ (di/injector {:rabbitmq-service {:chan :some-chan}})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [register-events-to-queue]
+                (def register-events-to-queue register-events-to-queue))))
+
+"When called, it calls [event-routing-key](#event-routing-key) to convert the given partial event to an AMQP routing key.
+Then it calls [lq/bind](http://reference.clojurerabbitmq.info/langohr.queue.html#var-bind) to make sure matching events are placed in the given queue."
+(fact
+ (register-events-to-queue ..queue.. ..partial..) => nil
+ (provided
+  (event-routing-key ..partial..) => ..routing-key..
+  (lq/bind :some-chan ..queue.. facts-exch {:routing-key ..routing-key..}) => irrelevant))
