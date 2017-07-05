@@ -170,8 +170,9 @@ It does the following:
 1. [publish](#publish), used to publish events coming on `c2s`.
 2. [declare-private-queue](#declare-private-queue), used to create a private queue for this session.
 3. [assign-service](#assign-service), used to assign a function that will push incoming events to the `s2c` channel.
-4. [register-events-to-queue](#register-events-to-queue), used to direct events of interest to the session's queue, and
-5. [delete-queue](#delete-queue), used to close the session queue once the `c2s` channel closes."
+4. `database-chan` (e.g., [this](dynamo.html#database-chan)), to retrieve any existing events, if so requested during registration.
+5. [register-events-to-queue](#register-events-to-queue), used to direct events of interest to the session's queue, and
+6. [delete-queue](#delete-queue), used to close the session queue once the `c2s` channel closes."
 (fact
  (def calls (async/chan 10))
  (defn get-call []
@@ -180,6 +181,7 @@ It does the following:
      (when (not= chan calls)
        (throw (Exception. "Timed out waiting to read call")))
      call))
+ (def database-chan (async/chan 10))
  
  (let [$ (di/injector {:publish
                        (fn [ev] (async/>!! calls [:publish ev]))
@@ -188,6 +190,8 @@ It does the following:
                          "some-random-queue")
                        :assign-service
                        (fn [queue func] (async/>!! calls [:assign-service queue func]))
+                       :database-chan
+                       database-chan
                        :register-events-to-queue
                        (fn [queue reg] (async/>!! calls [:register-events-to-queue queue reg]))
                        :delete-queue
@@ -254,6 +258,51 @@ It does the following:
                 :name "boo"
                 :key "tar"
                 :data [1 2]})))
+
+"A `:reg` event may contain a `:get-existing` field.
+If such a field exists and is `true`, a request is made to the database (through `database-chan`) to retrieve all existing events matching the registration."
+(fact
+ (let [[c2s s2c] chan-pair]
+   (async/>!! c2s {:kind :reg
+                   :name "x"
+                   :key "y"
+                   :get-existing true})
+   ;; Registration is the same
+   (get-call) => [:register-events-to-queue "some-random-queue" {:kind :fact
+                                                                 :name "x"
+                                                                 :key "y"}]
+   (let [[[query reply-chan] chan] (async/alts!! [database-chan
+                                                  (async/timeout 1000)])]
+     chan => database-chan
+     (def reply-chan reply-chan))))
+
+"Results returned from the database are pushed to the `s2c` channel."
+(fact
+ (let [[c2s s2c] chan-pair]
+   (async/>!! reply-chan {:kind :fact
+                          :name "some"
+                          :key "event"
+                          :data [1 2 3]})
+   (async/>!! reply-chan {:kind :fact
+                          :name "some"
+                          :key "other event"
+                          :data [2 3 4]})
+   (async/close! reply-chan)
+   (let [[ev chan] (async/alts!! [s2c
+                                  (async/timeout 1000)])]
+     chan => s2c
+     ev => {:kind :fact
+            :name "some"
+            :key "event"
+            :data [1 2 3]})
+   (let [[ev chan] (async/alts!! [s2c
+                                  (async/timeout 1000)])]
+     chan => s2c
+     ev => {:kind :fact
+            :name "some"
+            :key "other event"
+            :data [2 3 4]})))
+
 
 "When the `c2s` channel is closed, `event-bridge` deletes its queue."
 (fact

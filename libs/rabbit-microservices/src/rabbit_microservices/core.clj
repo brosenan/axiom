@@ -152,6 +152,7 @@
   (di/provide $ event-bridge [publish
                               declare-private-queue
                               assign-service
+                              database-chan
                               register-events-to-queue
                               delete-queue]
               (fn [[c2s s2c]]
@@ -163,9 +164,20 @@
                       (cond (nil? ev)
                             (delete-queue queue)
                             (= (:kind ev) :fact)
-                            (publish ev)
+                            (do
+                              (publish ev)
+                              (recur))
                             (= (:kind ev) :reg)
-                            (register-events-to-queue queue (-> ev
-                                                                (assoc :kind :fact))))
-                      (recur))))
+                            (let [query (-> ev
+                                            (assoc :kind :fact)
+                                            (dissoc :get-existing))]
+                              (register-events-to-queue queue query)
+                              (when (:get-existing ev)
+                                (let [reply-chan (async/chan 10)]
+                                  (async/>! database-chan [query reply-chan])
+                                  (async/go-loop []
+                                    (when-let [ev (async/<! reply-chan)]
+                                      (async/>! s2c ev)
+                                      (recur)))))
+                              (recur))))))
                 nil)))
