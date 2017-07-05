@@ -198,7 +198,14 @@
 
   (di/provide $ event-gateway [rule-version-verifier]
               (fn [[c-c2s c-s2c] identity-set app-version]
-                (let [s-c2s (async/chan 10 (filter #(interset/subset? identity-set (:writers %))))
+                (let [s-c2s (async/chan 10 (filter #(or
+                                                     (and
+                                                      (= (:kind %) :fact)
+                                                      (interset/subset? identity-set (:writers %)))
+                                                     (and
+                                                      (= (:kind %) :reg)
+                                                      (contains? % :name)
+                                                      (contains? % :key)))))
                       s-s2c (async/chan 10 (filter #(and
                                                      (or
                                                       (interset/subset? identity-set (:writers %))

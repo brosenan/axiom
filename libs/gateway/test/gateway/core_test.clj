@@ -1106,6 +1106,27 @@ in the event's `:readers` set, that is, if all possible users who can identify t
    ;; We expect a timeout...
    chan => to))
 
+[[:section {:title "Registration Events"}]]
+"Valid `:reg`istration events should pass from client to server."
+(fact
+ (async/>!! c-c2s {:kind :reg
+                   :name "foo"
+                   :key "bar"})
+ (let [[ev chan] (async/alts!! [s-c2s
+                                (async/timeout 1000)])]
+   chan => s-c2s))
+
+"However, if a `:reg` event is missing either a `:name` or a `:key`, it is blocked by the `event-gateway`."
+(fact
+ (async/>!! s-c2s {:kind :reg
+                   :name "foo"})
+ (async/>!! s-c2s {:kind :reg
+                   :key "bar"})
+ (let [to (async/timeout 100)
+       [ev chan] (async/alts!! [s-c2s to])]
+   ;; We expect a timeout...
+   chan => to))
+
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "rule-version-verifier"}]]
 "To maintain the [integrity of query results](#integrity-poll), we need to associate the `:writers` set of an event to a version of an application
