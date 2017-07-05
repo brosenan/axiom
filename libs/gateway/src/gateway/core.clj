@@ -177,13 +177,34 @@
                   wrap-authorization))
   
   (di/provide $ rule-version-verifier [database-chan]
-              (fn [app-ver writers]
-                (let [reply-chan (async/chan 10)]
-                  (async/>!! database-chan [{:kind :fact
-                                             :name "axiom/perm-versions"
-                                             :key app-ver}
-                                            reply-chan])
-                  (let [{:keys [data]} (async/<!! reply-chan)
-                        [perms static] data]
-                    (any? (for [perm perms]
-                            (interset/subset? writers #{(str perm)}))))))))
+              (let [cache (atom {})
+                    get-perms-for-version
+                    (fn [app-ver]
+                      (cond (contains? @cache app-ver)
+                            (@cache app-ver)
+                            :else
+                            (let [reply-chan (async/chan 10)]
+                              (async/>!! database-chan [{:kind :fact
+                                                         :name "axiom/perm-versions"
+                                                         :key app-ver}
+                                                        reply-chan])
+                              (let [{:keys [data]} (async/<!! reply-chan)
+                                    [perms static] data]
+                                (swap! cache assoc app-ver perms)
+                                perms))))]
+                (fn [app-ver writers]
+                  (any? (for [perm (get-perms-for-version app-ver)]
+                          (interset/subset? writers #{(str perm)}))))))
+
+  (di/provide $ event-gateway [rule-version-verifier]
+              (fn [[c-c2s c-s2c] identity-set app-version]
+                (let [s-c2s (async/chan 10 (filter #(interset/subset? identity-set (:writers %))))
+                      s-s2c (async/chan 10 (filter #(and
+                                                     (or
+                                                      (interset/subset? identity-set (:writers %))
+                                                      (rule-version-verifier app-version (:writers %))
+                                                      (interset/subset? (:writers %) #{(-> % :name symbol namespace)}))
+                                                     (interset/subset? identity-set (:readers %)))))]
+                  (async/pipe c-c2s s-c2s)
+                  (async/pipe s-s2c c-s2c)
+                  [s-c2s s-s2c]))))

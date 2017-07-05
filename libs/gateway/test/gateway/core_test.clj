@@ -988,6 +988,124 @@ This is true when their `:identity-set` is (conceptually) a subset of the result
      => [] ;; The event is blocked
      )))
 
+[[:chapter {:titile "event-gateway"}]]
+"`event-gateway` is a function that sets up a bidirectional event filter for events flowing between a client and a server.
+It is intended to support confidentiality and integrity, protecting both the connected client and the rest of the users against this client."
+
+"It is a DI resource that depends on [rule-version-verifier](#rule-version-verifier)."
+(let [$ (di/injector {:rule-version-verifier
+                      (fn [ver writers]
+                        (contains? writers (str "hash-in-" ver)))})]
+  (module $)
+  (di/startup $)
+  (di/do-with! $ [event-gateway]
+               (def event-gateway event-gateway)))
+
+"This function works on a bidirectional channel pair of the form `[c2s s2c]`, where `c2s` stands for *client to server*,
+and `s2c` stands for *server to client*.
+`event-gateway` takes such a pair as its first parameter, and returns such a pair.
+The pair it is given is intended to connect the gateway to the client (`[c-c2s c-s2c]`),
+and the returned pair (`[s-c2s s-s2c]`) is intended to connect the gateway to the server (e.g., to [an event bridge](rabbit-microservices.html#event-bridge)).
+Apart for a channel-pair, `event-gateway` takes the [identity set](#identity-set) of the connected user and the `:app-version` of the application the user logged on to."
+(fact
+ (def c-c2s (async/chan 10))
+ (def c-s2c (async/chan 10))
+ (let [[s-c2s s-s2c] (event-gateway [c-c2s c-s2c] #{"alice" :some-cred} "ver123")]
+   (def s-c2s s-c2s)
+   (def s-s2c s-s2c)))
+
+"Once called, events pushed to `c-c2s` flow to `s-c2s`..."
+(fact
+ (async/>!! c-c2s {:kind :fact
+                   :name "foo"
+                   :writers #{"alice"}
+                   :readers #{}})
+ (async/<!! s-c2s) => {:kind :fact
+                       :name "foo"
+                       :writers #{"alice"}
+                       :readers #{}})
+
+"... and from `s-s2c` to `c-s2c`:"
+(fact
+ (async/>!! s-s2c {:kind :fact
+                   :name "foo"
+                   :writers #{"alice"}
+                   :readers #{}})
+ (async/<!! c-s2c) => {:kind :fact
+                       :name "foo"
+                       :writers #{"alice"}
+                       :readers #{}})
+
+[[:section {:title "Integrity Protection for the Client"}]]
+"The `event-gateway` will pass an event from the server to the client if one of three conditions hold for the event's `:writers` set.
+First, an event will pass if the user's `:identity-set` is included in the `:writers` set, that is, the user could have written this event."
+(fact
+ (async/>!! s-s2c {:kind :fact
+                   :name "foo"
+                   :writers #{"alice"}
+                   :readers #{}})
+ (let [[ev chan] (async/alts!! [c-s2c
+                                (async/timeout 1000)])]
+   chan => c-s2c))
+
+"Second, an event will pass if it was written by the application the client logged on to."
+(fact
+ (async/>!! s-s2c {:kind :fact
+                   :name "foo"
+                   :writers #{"hash-in-ver123"}
+                   :readers #{}})
+ (let [[ev chan] (async/alts!! [c-s2c
+                                (async/timeout 1000)])]
+   chan => c-s2c))
+
+"Third, an event will pass if it is self-verified, that is, if its `:writers` set is a subset of `#{ns}`, where `ns` is the event's namespace."
+(fact
+ (async/>!! s-s2c {:kind :fact
+                   :name "some-ns/foo"
+                   :writers #{"some-ns" :some-other-cred}
+                   :readers #{}})
+ (let [[ev chan] (async/alts!! [c-s2c
+                                (async/timeout 1000)])]
+   chan => c-s2c))
+
+"However, it will be blocked in any other case."
+(fact
+ (async/>!! s-s2c {:kind :fact
+                   :name "foo"
+                   :writers #{"unauthorized"}
+                   :readers #{}})
+ (let [to (async/timeout 100)
+       [ev chan] (async/alts!! [c-s2c to])]
+   ;; We expect a timeout...
+   chan => to))
+
+[[:section {:title "Integrity Protection Against Mallicious Clients"}]]
+"A mallicious client may attempt to state a fact on behalf of someone else.
+To protect against that, we block events for which the `:writers` set does not represent a *superset* of the user's `:identity-set`.
+In other words, a user may only publish a fact if he or she belongs to the `:writers` set of that fact."
+(fact
+ (async/>!! c-c2s {:kind :fact
+                   :name "foo"
+                   :writers #{"bob" :some-cred}
+                   :readers #{}})
+ (let [to (async/timeout 100)
+       [ev chan] (async/alts!! [s-c2s to])]
+   ;; We expect a timeout...
+   chan => to))
+
+[[:section {:title "Confidentiality Protection"}]]
+"For confidentiality, we need to make sure that regardless of what the client requested, events from the server only reach it if the client's `identity-set` is included
+in the event's `:readers` set, that is, if all possible users who can identify themselves this way are allowed to see this event."
+(fact
+ (async/>!! s-s2c {:kind :fact
+                   :name "foo"
+                   :writers #{"alice"}
+                   :readers #{"not-alice" :some-cred}})
+ (let [to (async/timeout 100)
+       [ev chan] (async/alts!! [c-s2c to])]
+   ;; We expect a timeout...
+   chan => to))
+
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "rule-version-verifier"}]]
 "To maintain the [integrity of query results](#integrity-poll), we need to associate the `:writers` set of an event to a version of an application
@@ -1038,3 +1156,10 @@ This is true when their `:identity-set` is (conceptually) a subset of the result
                           :data [#{'some-hash 'some-other-hash} {}]})
    (async/close! reply-chan))
  (async/<!! result) => false)
+
+"Database output is cached, so that when we ask about a version we already asked about, the answer is given without involving the database."
+(fact
+ (rule-version-verifier "ver123" #{"some-other-hash" :something-else})
+ => true
+ (rule-version-verifier "ver123" #{"some-hash-that-does-not-exist" :something-else})
+ => false)
