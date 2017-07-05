@@ -6,7 +6,8 @@
             [langohr.basic     :as lb]
             [langohr.exchange  :as le]
             [taoensso.nippy :as nippy]
-            [di.core :as di]))
+            [di.core :as di]
+            [clojure.core.async :as async]))
 
 
 (def facts-exch "facts")
@@ -146,4 +147,25 @@
                 nil))
 
   (di/provide $ register-events-to-queue [rabbitmq-service info]
-              (partial register-events-to-queue* rabbitmq-service info)))
+              (partial register-events-to-queue* rabbitmq-service info))
+
+  (di/provide $ event-bridge [publish
+                              declare-private-queue
+                              assign-service
+                              register-events-to-queue
+                              delete-queue]
+              (fn [[c2s s2c]]
+                (let [queue (declare-private-queue)]
+                  (assign-service queue (fn [ev]
+                                          (async/>!! s2c ev)))
+                  (async/go-loop []
+                    (let [ev (async/<! c2s)]
+                      (cond (nil? ev)
+                            (delete-queue queue)
+                            (= (:kind ev) :fact)
+                            (publish ev)
+                            (= (:kind ev) :reg)
+                            (register-events-to-queue queue (-> ev
+                                                                (assoc :kind :fact))))
+                      (recur))))
+                nil)))

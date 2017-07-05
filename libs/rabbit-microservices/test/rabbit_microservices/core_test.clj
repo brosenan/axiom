@@ -155,6 +155,112 @@ Events are auto-acknowledged."
   (nippy/thaw ..payload1..) => ..ev1..
   (nippy/thaw ..payload2..) => ..ev2..))
 
+[[:chapter {:title "event-bridge"}]]
+"An `event-bridge` is a bidirectional bridge between events flowing globally through Axiom (as AMQP messages),
+and local events flowing through `core.async` channels.
+It is intended to connect Axiom (the server) to an external client."
+
+"It takes a pair of channels named `c2s` (client to server) and `s2c` (server to client).
+It does the following:
+1. [publish](#publish) `:fact` events flowing on the `c2s` channel.
+2. Handle `:reg` events by registering to `:fact` events they refer to, and
+3. Push all registered events to the `s2c` channel."
+
+"`event-bridge` is a DI resource with the following dependencies:
+1. [publish](#publish), used to publish events coming on `c2s`.
+2. [declare-private-queue](#declare-private-queue), used to create a private queue for this session.
+3. [assign-service](#assign-service), used to assign a function that will push incoming events to the `s2c` channel.
+4. [register-events-to-queue](#register-events-to-queue), used to direct events of interest to the session's queue, and
+5. [delete-queue](#delete-queue), used to close the session queue once the `c2s` channel closes."
+(fact
+ (def calls (async/chan 10))
+ (defn get-call []
+   (let [[call chan] (async/alts!! [calls
+                                    (async/timeout 1000)])]
+     (when (not= chan calls)
+       (throw (Exception. "Timed out waiting to read call")))
+     call))
+ 
+ (let [$ (di/injector {:publish
+                       (fn [ev] (async/>!! calls [:publish ev]))
+                       :declare-private-queue
+                       (fn [] (async/>!! calls [:declare-private-queue])
+                         "some-random-queue")
+                       :assign-service
+                       (fn [queue func] (async/>!! calls [:assign-service queue func]))
+                       :register-events-to-queue
+                       (fn [queue reg] (async/>!! calls [:register-events-to-queue queue reg]))
+                       :delete-queue
+                       (fn [queue] (async/>!! calls [:delete-queue queue]))})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [event-bridge]
+                (def event-bridge event-bridge))))
+
+"To create a session, `event-bridge` is called with a pair `[c2s s2c]` of channels."
+(fact
+ (def chan-pair [(async/chan 100) (async/chan 100)])
+ (event-bridge chan-pair) => nil)
+
+"The first thing `event-bridge` does is declare a private queue, and assigns a handler to it."
+(fact
+ (get-call) => [:declare-private-queue]
+ (let [[assign queue func] (get-call)]
+   assign => :assign-service
+   queue => "some-random-queue"
+   (def incoming-handler func)))
+
+"Pushing a `:fact` event to the `c2s` channel will cause it to be published."
+(fact
+ (let [[c2s s2c] chan-pair]
+   (async/>!! c2s {:kind :fact
+                   :name "foo"
+                   :key "bar"
+                   :data [1 2]})
+   (async/>!! c2s {:kind :fact
+                   :name "foo"
+                   :key "baz"
+                   :data [2 3]})
+   (get-call) => [:publish {:kind :fact
+                            :name "foo"
+                            :key "bar"
+                            :data [1 2]}]
+   (get-call) => [:publish {:kind :fact
+                            :name "foo"
+                            :key "baz"
+                            :data [2 3]}]))
+
+"Pushing a `:reg` event will cause it to register to a corresponding `:fact` event."
+(fact
+ (let [[c2s s2c] chan-pair]
+   (async/>!! c2s {:kind :reg
+                   :name "x"
+                   :key "y"})
+   (get-call) => [:register-events-to-queue "some-random-queue" {:kind :fact
+                                                                 :name "x"
+                                                                 :key "y"}]))
+
+"When an event is received, it is pushed to the `s2c` channel."
+(fact
+ (let [[c2s s2c] chan-pair]
+   (incoming-handler {:kind :fact
+                      :name "boo"
+                      :key "tar"
+                      :data [1 2]})
+   (let [[pushed chan] (async/alts!! [s2c
+                                      (async/timeout 1000)])]
+     chan => s2c
+     pushed => {:kind :fact
+                :name "boo"
+                :key "tar"
+                :data [1 2]})))
+
+"When the `c2s` channel is closed, `event-bridge` deletes its queue."
+(fact
+ (let [[c2s s2c] chan-pair]
+   (async/close! c2s)
+   (get-call) => [:delete-queue "some-random-queue"]))
+
 [[:chapter {:title "Usage Example"}]]
 "To demonstrate how the above functions work together we build a small usage example."
 
