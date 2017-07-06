@@ -5,16 +5,28 @@
             [cloudlog.interset :as interset]
             [ring.middleware.content-type :as ctype]
             [ring.util.codec :as codec]
-            [clojure.edn :as edn]))
+            [clojure.edn :as edn]
+            [compojure.core :refer :all]
+            [chord.http-kit :as chord]))
 
 
 (defn any? [list]
   (some? (some identity list)))
 
-(defn cookie-version-selector [handler]
-  (fn [req resp raise]
-    (handler (assoc req :app-version (get-in req [:cookies "app-version"])) resp raise)))
+(defn wrap-websocket-handler [handler]
+  (fn [req]
+    (if (:websocket? req)
+      (chord/with-channel req ws-conn
+        (let [chan-from-ws (async/chan 10 (map :message))
+              chan-to-ws (async/chan 10)]
+          (async/pipe ws-conn chan-from-ws)
+          (async/pipe chan-to-ws ws-conn)
+          (handler (assoc req :ws-channel-pair [chan-from-ws chan-to-ws]))))
+      (handler req))))
 
+(defn cookie-version-selector [handler]
+  (fn [req]
+    (handler (assoc req :app-version (get-in req [:cookies "app-version"])))))
 
 (defn uri-partial-event [req]
   (let [{:keys [ns name key]} (:route-params req)]
@@ -49,133 +61,59 @@
                             (async/<! (async/reduce conj #{user} trans-chan)))))))))
   (di/provide $ authenticator [use-dummy-authenticator]
               (fn [handler]
-                (fn [req res raise]
+                (fn[req]
                   (let [id (or (get-in req [:params "_identity"])
                                (get-in req [:cookies "user_identity"]))]
                     (cond id
-                          (handler (-> req
-                                       (assoc :identity id))
-                                   (fn [resp]
-                                     (-> resp
-                                         (update-in [:cookies] #(assoc % "user_identity" id))
-                                         res)) raise)
+                          (-> (handler (-> req
+                                           (assoc :identity id)))
+                              (update-in [:cookies] #(assoc % "user_identity" id)))
                           :else
-                          (handler req res raise))))))
+                          (handler req))))))
   (di/provide $ version-selector [dummy-version]
               (fn [handler]
                 (let [handler (cookie-version-selector handler)]
-                  (fn [req resp raise]
+                  (fn [req]
                     (let [req (cond (contains? (:cookies req) "app-version")
                                     req
                                     :else
                                     (assoc-in req [:cookies "app-version"] dummy-version))]
-                      (handler req resp raise))))))
+                      (handler req))))))
+  
   (di/provide $ static-handler [version-selector
                                 database-chan
                                 hasher]
-              (-> (fn [req resp raise]
-                    (async/go
-                      (let [resp-chan (async/chan)
-                            [_ unhash] hasher]
-                        (async/>! database-chan [{:kind :fact
-                                                  :name "axiom/perm-versions"
-                                                  :key (:app-version req)} resp-chan])
-                        (let [[ans] (->> resp-chan
-                                          (async/reduce conj [])
-                                          (async/<!))
-                              [perms static] (:data ans)
-                              hashcode (static (:uri req))]
-                          (cond (nil? hashcode)
-                                (resp {:status 404
-                                       :body "Not Found!"})
-                                :else
-                                (let [content (unhash hashcode)]
-                                  (resp {:status 200
-                                         :body (clojure.java.io/input-stream content)})))))))
+              (-> (fn [req]
+                    (let [resp-chan (async/chan)
+                          [_ unhash] hasher]
+                      (async/>!! database-chan [{:kind :fact
+                                                 :name "axiom/perm-versions"
+                                                 :key (:app-version req)} resp-chan])
+                      (let [[ans] (->> resp-chan
+                                       (async/reduce conj [])
+                                       (async/<!!))
+                            [perms static] (:data ans)
+                            hashcode (static (:uri req))]
+                        (cond (nil? hashcode)
+                              {:status 404
+                               :body "Not Found!"}
+                              :else
+                              (let [content (unhash hashcode)]
+                                {:status 200
+                                 :body (clojure.java.io/input-stream content)})))))
                   ctype/wrap-content-type
                   version-selector))
+
   (di/provide $ wrap-authorization [identity-set
                                     authenticator]
               (fn [handler]
-                (-> (fn [req resp raise]
+                (-> (fn [req]
                       (let [rule-list (or (get-in req [:headers "Axiom-Id-Rules"])
-                                          [])]
-                        (async/go
-                          (let [id-set (async/<! (identity-set (:identity req) rule-list))]
-                            (handler (assoc req :identity-set id-set) resp raise)))))
+                                          [])
+                            id-set (async/<!! (identity-set (:identity req) rule-list))]
+                        (handler (assoc req :identity-set id-set))))
                     authenticator)))
-  (di/provide $ get-fact-handler [wrap-authorization
-                                  database-chan]
-              (-> (fn [req resp raise]
-                    (async/go
-                      (let [reply-chan (async/chan 2 (comp
-                                                      (filter (fn [ev] (interset/subset? (:identity-set req) (:readers ev))))
-                                                      (map #(-> %
-                                                                (dissoc :kind)
-                                                                (dissoc :name)
-                                                                (dissoc :key)))))
-                            database-chan (ev/accumulate-db-chan database-chan)]
-                        (async/>! database-chan [(uri-partial-event req) reply-chan])
-                        (let [events (->> reply-chan
-                                          (async/reduce conj nil)
-                                          async/<!)]
-                          (resp {:status 200
-                                 :headers {"Content-Type" "application/edn"}
-                                 :body (pr-str events)})))))
-                  wrap-authorization))
-  (di/provide $ patch-fact-handler [publish
-                                    wrap-authorization]
-              (->
-               (fn [req resp raise]
-                 (let [events (-> req :body slurp edn/read-string)]
-                   (doseq [ev events]
-                     (let [ev (-> ev
-                                  (merge (uri-partial-event req))
-                                  (assoc :writers (:identity-set req)))]
-                       (publish ev)))
-                   (resp {:status 204 :body "No Content"})))
-               wrap-authorization))
 
-  (di/provide $ post-query-handler [publish
-                                    declare-volatile-service
-                                    authenticator
-                                    time
-                                    uuid]
-              (-> (fn [req resp raise]
-                    (let [key (uuid)
-                          reg (-> (uri-partial-event req)
-                                  (assoc :key key))]
-                      (declare-volatile-service key reg)
-                      (publish (merge reg
-                                      {:data (-> req :body slurp edn/read-string)
-                                       :ts (time)
-                                       :change 1
-                                       :readers #{(:identity req)}
-                                       :writers #{(:identity req)}}))
-                      (resp {:status 303
-                             :headers {"Location" (str "/.poll/" key)}})))
-                  authenticator))
-
-  (di/provide $ poll-handler [wrap-authorization
-                              poll-events
-                              version-selector
-                              rule-version-verifier]
-              (-> (fn [req resp raise]
-                    (let [body (->> (poll-events (-> req :route-params :queue))
-                                    (filter #(rule-version-verifier (:app-version req) (:writers %)))
-                                    (filter #(interset/subset? (:identity-set req) (:readers %)))
-                                    (map (comp #(dissoc % :kind)
-                                               #(dissoc % :name)
-                                               #(dissoc % :key))))]
-                      (resp {:status 200
-                             :headers {"Content-Type" "application/edn"}
-                             :body (-> body
-                                       pr-str
-                                       .getBytes
-                                       clojure.java.io/input-stream)})))
-                  version-selector
-                  wrap-authorization))
-  
   (di/provide $ rule-version-verifier [database-chan]
               (let [cache (atom {})
                     get-perms-for-version
@@ -214,4 +152,19 @@
                                                      (interset/subset? identity-set (:readers %)))))]
                   (async/pipe c-c2s s-c2s)
                   (async/pipe s-s2c c-s2c)
-                  [s-c2s s-s2c]))))
+                  [s-c2s s-s2c])))
+
+  (di/provide $ websocket-handler [event-gateway
+                                   event-bridge]
+              (fn [{:keys [ws-channel-pair
+                           identity-set
+                           app-version]}]
+                (-> ws-channel-pair
+                    (event-gateway identity-set app-version)
+                    event-bridge)))
+
+  (di/provide $ ring-handler [static-handler
+                              websocket-handler]
+              (routes
+               (GET "/ws" [] websocket-handler)
+               static-handler)))

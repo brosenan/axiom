@@ -7,7 +7,9 @@
             [cloudlog.core :as clg]
             [cloudlog-events.core :as ev]
             [ring.util.codec :as codec]
-            [clojure.edn :as edn]))
+            [clojure.edn :as edn]
+            [org.httpkit.server :as htsrv]
+            [gniazdo.core :as ws]))
 
 [[:chapter {:title "Introduction"}]]
 "This library implement Axiom's gateway tier.
@@ -365,69 +367,65 @@ middleware should be wrapped around it."
 "If a request contains a cookie named `user_identity`, the dummy authenticator takes its value as the user's identity."
 (fact
  (let [id (atom nil)
-       handler (fn [req res raise]
-                 (reset! id (:identity req)))
+       handler (fn [req]
+                 (reset! id (:identity req))
+                 {:status 200
+                  :body "hi"})
        app (-> handler
                dummy-authenticator)]
    (app {:cookies {"user_identity" "foobar"}
-         :params {}} :res :raise)
+         :params {}})
    @id => "foobar"))
 
 "If a query parameter named `_identity` exists, its value becomes the `:identity`.
 Additionally, the new value is stored in a cookie for future reference."
 (fact
- (let [resp (atom nil)
-       respond (fn [res]
-                 (reset! resp res))
-       handler (fn [req res raise]
-                 (res {:body (str "Hello, " (:identity req))}))
+ (let [handler (fn [req]
+                 {:body (str "Hello, " (:identity req))})
        app (-> handler
                dummy-authenticator)]
    (app {:cookies {}
-         :params {"_identity" "barfoo"}} respond :raise)
-   @resp => {:body "Hello, barfoo"
-             :cookies {"user_identity" "barfoo"}}))
+         :params {"_identity" "barfoo"}})
+   => {:body "Hello, barfoo"
+       :cookies {"user_identity" "barfoo"}}))
 
 "Adding a cookie works in concert with other cookies..."
 (fact
- (let [resp (atom nil)
-       respond (fn [res]
-                 (reset! resp res))
-       handler (fn [req res raise]
-                 (res {:body "Hello"
-                       :cookies {"some" "cookie"}}))
+ (let [handler (fn [req]
+                 {:body "Hello"
+                  :cookies {"some" "cookie"}})
        app (-> handler
                dummy-authenticator)]
    (app {:cookies {}
-         :params {"_identity" "barfoo"}} respond :raise)
-   @resp => {:body "Hello"
-             :cookies {"user_identity" "barfoo"
-                       "some" "cookie"}}))
+         :params {"_identity" "barfoo"}})
+   => {:body "Hello"
+       :cookies {"user_identity" "barfoo"
+                 "some" "cookie"}}))
 
 "If both a cookie and a parameter exist with different identity values, the *parameter wins*."
 (fact
  (let [id (atom nil)
-       handler (fn [req res raise]
-                 (reset! id (:identity req)))
+       handler (fn [req]
+                 (reset! id (:identity req))
+                 {:status 200
+                  :body "hi"})
        app (-> handler
                dummy-authenticator)]
    (app {:cookies {"user_identity" "foobar"}
-         :params {"_identity" "barfoo"}} :res :raise)
+         :params {"_identity" "barfoo"}})
    @id => "barfoo"))
 
 "If none are present, the authenticator does not add an `:identity` entry to the request."
 (fact
- (let [res (atom nil)
-       respond (fn [r] (reset! res r))
-       handler (fn [req res raise]
+ (let [handler (fn [req]
                  (when (contains? req :identity)
                    (throw (Exception. "Request should not have an :identity field")))
-                 (res {:body "Hello"}))
+                 {:body "Hello"})
        app (-> handler
                dummy-authenticator)]
    (app {:cookies {}
-         :params {}} respond :raise)
-   @res => {:body "Hello"}))
+         :params {}})
+   => {:body "Hello"}))
 
 [[:chapter {:title "wrap-authorization"}]]
 "`wrap-authorization` is a DI resource that combines [authenticator](#authenticator) and [identity-set](#identity-set) to one middleware function
@@ -446,10 +444,11 @@ By default, this parameter will be an empty list."
    (di/startup $)
    (di/do-with! $ [wrap-authorization]
                 (let [req-with-id-set (async/chan 10)
-                      handler (fn [req resp raise]
-                                (async/>!! req-with-id-set req))
+                      handler (fn [req]
+                                (async/>!! req-with-id-set req)
+                                {:status 200})
                       app (wrap-authorization handler)]
-                  (app {:cookies {"user_identity" "foo"}} :resp :raise)
+                  (app {:cookies {"user_identity" "foo"}})
                   (let [[result chan] (async/alts!! [req-with-id-set
                                                      (async/timeout 1000)])]
                     chan => req-with-id-set
@@ -465,11 +464,12 @@ By default, this parameter will be an empty list."
    (di/startup $)
    (di/do-with! $ [wrap-authorization]
                 (let [req-with-id-set (async/chan 10)
-                      handler (fn [req resp raise]
-                                (async/>!! req-with-id-set req))
+                      handler (fn [req]
+                                (async/>!! req-with-id-set req)
+                                {:status 200})
                       app (wrap-authorization handler)]
                   (app {:cookies {"user_identity" "foo"}
-                        :headers {"Axiom-Id-Rules" ['foo-rule 'bar-rule]}} :resp :raise)
+                        :headers {"Axiom-Id-Rules" ['foo-rule 'bar-rule]}})
                   (let [[result chan] (async/alts!! [req-with-id-set
                                                      (async/timeout 1000)])]
                     (:identity-set result) => #{"foo" ['foo-rule 'bar-rule]})))))
@@ -490,10 +490,10 @@ and that a cookie named `app-version` is defined.
 It copies its content to the `:app-version` key in the request."
 (fact
  (let [ver (atom nil)
-       handler (fn [req resp raise]
+       handler (fn [req]
                  (reset! ver (:app-version req)))
        app (cookie-version-selector handler)]
-   (app {:cookies {"app-version" "ver123"}} :resp :raise)
+   (app {:cookies {"app-version" "ver123"}})
    @ver => "ver123"))
 
 [[:section {:title "Picking a Version based on Domain"}]]
@@ -535,19 +535,19 @@ It depends on `:dummy-version` -- a string containing a version."
 and allowes the `cookie-version-selector` to expose its value as `:app-version`."
 (fact
  (let [ver (atom nil)
-       handler (fn [req resp raise]
+       handler (fn [req]
                  (reset! ver (:app-version req)))
        app (ver-selector handler)]
-   (app {:cookies {"app-version" "ver123"}} :resp :raise)
+   (app {:cookies {"app-version" "ver123"}})
    @ver => "ver123"))
 
 "If an `app-version` cookie does not exist, `dummy-version-selector` creates one with the value from `:dummy-version`."
 (fact
  (let [ver (atom nil)
-       handler (fn [req resp raise]
+       handler (fn [req]
                  (reset! ver (:app-version req)))
        app (ver-selector handler)]
-   (app {:cookies {}} :resp :raise)
+   (app {:cookies {}})
    @ver => "ver456"))
 
 [[:chapter {:title "static-handler"}]]
@@ -575,9 +575,8 @@ It is depends on the following:
 
 "`static-handler` handles requests by querying the database for the `axiom/perm-versions` for the given version."
 (fact
- (def response (async/chan))
- (static-handler {:cookies {} :uri "/foo.html"} (fn [res]
-                                                  (async/>!! response res)) :raise)
+ (def response (async/thread
+                 (static-handler {:cookies {} :uri "/foo.html"})))
  (let [[query resp-chan] (get-query)]
    query => {:kind :fact
              :name "axiom/perm-versions"
@@ -602,10 +601,10 @@ It is depends on the following:
 "If the path does not exist in that version of the application,
 `static-handler` responds with a status of `404`."
 (fact
- (static-handler {:cookies {}
-                  :uri "/bar.html"}
-                 (fn [res]
-                   (async/>!! response res)) :raise)
+ (def response
+   (async/thread
+     (static-handler {:cookies {}
+                      :uri "/bar.html"})))
  ;; Same response as before...
  (let [[query resp-chan] (get-query)]
    (async/>!! resp-chan {:kind :fact
@@ -618,377 +617,7 @@ It is depends on the following:
    chan => response
    (:status res) => 404))
 
-[[:chapter {:title "get-fact-handler"}]]
-"`get-fact-handler` is a Ring handler that handles `GET` requests for querying facts at a certain key.
-it is a DI resource that depends on:
-1. [wrap-authorization](#wrap-authorization), which is used to determine the user's access rights.
-2. `database-chan`, which is used to query the facts."
-(fact
- (let [$ (di/injector {:wrap-authorization
-                       (fn [handler]
-                         (fn [req resp raise]
-                           (let [req (assoc req :identity-set #{"foo"})]
-                             (handler req resp raise))))
-                       :database-chan db-chan})]
-   (module $)
-   (di/startup $)
-   (di/do-with! $ [get-fact-handler]
-                (def get-fact-handler get-fact-handler))))
-
-"The `get-fact-handler` handler assumes the following fields exist in the `:route-params` field of the request:
-1. `:ns`: the fact's namespace,
-2. `:name`: the fact's name within this namespace, and
-3. `:key`: the key, EDN-encoded, uri-encoded (as with [encodeURIComponent](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent)."
-
-"For example, the following request queries all tweets made by user \"bob\"."
-(fact
- (def response (async/chan 10))
- (get-fact-handler {:route-params {:ns "tweetlog"
-                                   :name "tweeted"
-                                   :key (-> "bob" pr-str codec/url-encode)}}
-                   (fn [res]
-                     (async/>!! response res))
-                   :raise))
-
-"It performs a database query based on these `:route-params`.
-The database is expected to respond with some events."
-(fact
- (let [[query reply-chan] (get-query)]
-   query => {:kind :fact
-             :name "tweetlog/tweeted"
-             :key "bob"}
-   (async/>!! reply-chan {:kind :fact
-                          :name "tweetlog/tweeted"
-                          :key "bob"
-                          :data ["I am Bob!"]
-                          :ts 1000
-                          :change 1
-                          :readers #{}
-                          :writers #{"bob"}})
-   ;; This event will be merged with the previous one...
-   (async/>!! reply-chan {:kind :fact
-                          :name "tweetlog/tweeted"
-                          :key "bob"
-                          :data ["I am Bob!"]
-                          :ts 2000
-                          :change 1
-                          :readers #{}
-                          :writers #{"bob"}})
-   ;; The following event will not show up because user foo is not allowed to see it.
-   (async/>!! reply-chan {:kind :fact
-                          :name "tweetlog/tweeted"
-                          :key "bob"
-                          :data ["Some secret..."]
-                          :ts 2000
-                          :change 1
-                          :readers #{"alice"}
-                          :writers #{"bob"}})
-   (async/close! reply-chan)))
-
-"The response is an [accumulation](cloudlog-events.html#accumulating-events) of the returned events.
-We remove the fields that are common to all event: `:kind`, `:name` and `:key`.
-The events are sent EDN encoded, with the `application/edn` content type."
-(fact
- (let [[resp chan] (async/alts!! [response
-                                  (async/timeout 1000)])]
-   chan => response
-   (:status resp) => 200
-   (:headers resp) => {"Content-Type" "application/edn"}
-   (-> resp :body edn/read-string) => [{:data ["I am Bob!"]
-                                         :ts 2000
-                                         :change 2
-                                         :readers #{}
-                                         :writers #{"bob"}}]))
-
-[[:chapter {:title "patch-fact-handler"}]]
-"`patch-fact-handler` is the handler by which clients can submit new events to Axiom.
-Because events represent change in state, this handler is intended to be associated with the `PATCH` HTTP method
-(rather than `PUT`, which refers to absolute state).
-It is a DI resource based on the following:
-1. [wrap-authorization](#wrap-authorization), to determine the `:writers` set for the generated events, and
-2. `publish` (e.g., for [RabbitMQ](rabbit-microservices.html#publish)), to submit events created using this handler."
-(fact
- (def published (async/chan 10))
- (let [$ (di/injector {:wrap-authorization (fn [handler]
-                                             (fn [req resp raise]
-                                               (let [req (assoc req :identity-set #{"foo" :some-cred})]
-                                                 (handler req resp raise))))
-                       :publish (fn [ev]
-                                  (async/>!! published ev))})]
-   (module $)
-   (di/startup $)
-   (di/do-with! $ [patch-fact-handler]
-                (def patch-fact-handler patch-fact-handler))))
-
-"The URI structure for `patch-fact-handler` is the same as for [get-fact-handler](#get-fact-handler), 
-so the same fields are expected in `:route-params`.
-The body is EDN encoded, and represents a sequence (list or vector) of maps,
-each of which represents one event with `:kind`, `:name`, `:key` and `:writers` removed."
-(fact
- (def response (async/chan 2))
- (patch-fact-handler {:route-params {:ns "tweetlog"
-                                     :name "tweeted"
-                                     :key (-> "foo" pr-str codec/url-encode)}
-                      :body (->
-                             [{:data ["I am foo!"]
-                               :ts 1000
-                               :change 1
-                               :readers #{"alice"}}]
-                             pr-str
-                             .getBytes
-                             clojure.java.io/input-stream)}
-                     (fn [res]
-                       (async/>!! response res))
-                     :raise))
-
-"Once called, `patch-fact-handler` `publish`es the given events, after adding the missing fields.
-The fields `:kind`, `:name` and `:key` are completed based on the URI,
-and `:writers` is taken from the `:identity-set`."
-(fact
- (let [[pub chan] (async/alts!! [published
-                                 (async/timeout 1000)])]
-   chan => published
-   pub => {:kind :fact
-           :name "tweetlog/tweeted"
-           :key "foo"
-           :data ["I am foo!"]
-           :ts 1000
-           :change 1
-           :writers #{"foo" :some-cred}
-           :readers #{"alice"}}))
-
-"Response should be a `204` *No Content*."
-(fact
- (let [[res chan] (async/alts!! [response
-                                 (async/timeout 1000)])]
-   chan => response
-   (:status res) => 204))
-
-[[:chapter {:title "post-query-handler"}]]
-"`post-query-handler` is the handler that allows clients to execute *queries*.
-A query starts by publishing a fact which `:name` ends with a `?`.
-The `:key` to this fact is a unique identifier selected by this handler, 
-and the `:data` correspond to the input fields in all the [clauses](cloudlog.html#defclause)
-meant to answer this query.
-Query results are events of the same name, only with `!` replacing the `?`, with the same `:key`,
-and with `:data` corresponding to the output elements of the same clauses."
-
-"`post-query-handler` is a DI resource based on:
-1. `publish`, used to publish the query,
-2. `declare-volatile-service` (e.g., [this](rabbit-microservices.html#declare-volatile-service)), to create a queue for waiting for the answers
-3. [time](di.html#time) to assign a `:ts` for the query event
-4. [uuid](di.html#uuid) to create a unique ID for this query, and
-5. [authenticator](#authenticator) to make this query private to only the authenticated user."
-(fact
- (def declared (async/chan 10))
- (def published (async/chan 10))
- (let [$ (di/injector {:publish (fn [ev]
-                                  (async/>!! published ev))
-                       :declare-volatile-service
-                       (fn [queue reg]
-                         (async/>!! declared [queue reg]))
-                       :use-dummy-authenticator true
-                       :uuid (fn [] "some-uuid")
-                       :time (fn [] 1234)})]
-   (module $)
-   (di/startup $)
-   (di/do-with! $ [post-query-handler]
-                (def post-query-handler post-query-handler))))
-
-"`post-query-handler` is indended to handle `POST` requests.
-The URI describes the *predicate* (the name of the query fact without the `?`),
-and the `:body` contains the query's input paramters, encoded as EDN (assuming content-type of `application/edn`)."
-(fact
- (def response (async/chan 2))
- (post-query-handler {:cookies {"user_identity" "alice"}
-                      :route-params {:ns "tweetlog"
-                                     :name "timeline"}
-                      :body (-> ["alice"]
-                                pr-str .getBytes clojure.java.io/input-stream)}
-                     (fn [res]
-                       (async/>!! response res))
-                     :raise))
-
-"It first [declares a volatile queue](rabbit-microservices.html#declare-volatile-service) in which responses will be provided."
-(fact
- (let [[decl chan] (async/alts!! [declared
-                                  (async/timeout 1000)])]
-   chan => declared
-   decl => ["some-uuid" {:kind :fact
-                         :name "tweetlog/timeline"
-                         :key "some-uuid"}]))
-
-"In response, `post-query-handler` publishes a query event."
-(fact
- (let [[query chan] (async/alts!! [published
-                                   (async/timeout 1000)])]
-   chan => published
-   (def query query)))
-
-"The `:name` field in the published event is derived from the `:ns` and `:name` fields in the `:route-params`."
-(fact
- (:kind query) => :fact
- (:name query) => "tweetlog/timeline")
-
-"The `:key` is a UUID (as returned by `uuid`)."
-(fact
- (:key query) => "some-uuid")
-
-"The `:data` is the vector we read from the `:body`."
-(fact
- (:data query) => ["alice"])
-
-"The `:ts` is the current time in milliseconds (as returned by `time`)."
-(fact
- (:ts query) => 1234)
-
-"The `:change` is always `1`."
-(fact
- (:change query) => 1)
-
-"The `:readers` and `:writers` contain only the validated user.
-This makes sure that no one other than the user can even know about this query."
-(fact
- (:readers query) => #{"alice"}
- (:writers query) => #{"alice"})
-
-"Instead of providing the results directly, `post-query-handler` returns a status of `303` (\"See Other\"),
-and redirects the client to a location where answers will be provided.
-This location contans the obtained UUID that became the `:key`."
-(fact
- (let [[res chan] (async/alts!! [response
-                                 (async/timeout 1000)])]
-   chan => response
-   (:status res) => 303
-   (get-in res [:headers "Location"]) => "/.poll/some-uuid"))
-
-[[:chapter {:title "poll-handler"}]]
-"A [query POST request](#post-query-handler) submits a query and redirects the user to a location under `/.poll`, where results are expected.
-The `poll-handler` handles the redirected `GET` request intended to retreive query results."
-
-"`poll-handler` is a DI resource with the following dependencies:
-1. `wrap-authorization`, used when filtering query results, showing only those results the user may read.
-2. `poll-events` (e.g., for [RabbitMQ](rabbit-microservices.html#poll-events)), used to read the actual results.
-3. [version-selector](#version-selector) and [rule-version-verifier](#rule-version-verifier), used together to filter-out results not contributed by the current version."
-(fact
- (def mock-poll (atom []))
- (let [$ (di/injector {:wrap-authorization
-                       (fn [handler]
-                         (fn [req resp raise]
-                           (handler (assoc req :identity-set #{"alice" :other-cred})
-                                    resp raise)))
-                       :poll-events (fn [queue]
-                                      (when-not (= queue "the-queue")
-                                        (throw (Exception. (str "Wrong queue name: " queue))))
-                                      @mock-poll)
-                       :version-selector cookie-version-selector
-                       :rule-version-verifier
-                       (fn [swver writers]
-                         (when-not (= swver "ver123")
-                           (throw (Exception. "wrong SW version")))
-                         (= writers #{"some-hash"}))})]
-   (module $)
-   (di/startup $)
-   (di/do-with! $ [poll-handler]
-                (def poll-handler poll-handler))))
-
-"`poll-handler` receives the name of the queue it is supposed to poll from via the `:queue` route-param.
-If the queue contains events the user is allowed to read, these events are returned (EDN-encoded)."
-(fact
- (let [response (async/chan 2)]
-   (reset! mock-poll [{:kind :fact
-                       :name "tweetlog/timeline"
-                       :key "alice"
-                       :data ["bob" "hello"]
-                       :ts 1000
-                       :change 1
-                       :writers #{"some-hash"}
-                       :readers #{"alice"}}])
-   (poll-handler {:route-params {:queue "the-queue"}
-                  :cookies {"app-version" "ver123"}}
-                 (fn [res]
-                   (async/>!! response res))
-                 :raise)
-   (let [[res chan] (async/alts!! [response
-                                   (async/timeout 1000)])]
-     chan => response
-     (:status res) => 200
-     (get-in res [:headers "Content-Type"]) => "application/edn"
-     (-> res :body slurp edn/read-string)
-     => [{:data ["bob" "hello"]
-          :ts 1000
-          :change 1
-          :writers #{"some-hash"}
-          :readers #{"alice"}}])))
-
-[[:section {:title "Integrity" :tag "integrity-poll"}]]
-"Recall that [Axiom uses rule namespaces to assert that results were created by the correct rule](cloudlog.html#integrity).
-We use the cryptographic nature of the `app-version` (originally, a git version hash, which is a SHA1 hash of the content.
-Today SHA1 is not considered secure for new applications, but a second pre-image attack on SHA1 is still not considered feasible,
-and therefore it is acceptable for our use)
-to make it difficult for an attacker to plant query results."
-
-"Each `app-version` [is mapped to a set of permacode versions](migrator.html#push-handler).
-These versions become the `:writers` sets events created by these rules and clauses.
-To protect users against such attacks, we use [rule-version-verifier](#rule-version-verifier) 
-to filter-out results not produced by the current software version."
-
-"Imagine an attacker who wishes to add some unwanted content to users' timelines.
-Such an attacker can create an application and add clauses that emit `tweetlog/timeline` entries.
-Since there is nothing special in the name `tweetlog/timeline`, there is nothing to restrict any application from providing content to this query.
-However, the permacode hash provided as the `:writers` set will not be in the list of hashes associated with `app-version`.
-As result, `rule-version-verifier` will indicate that results provided by the attacker's clause are not part of this application,
-and they will be blocked."
-(fact
- (let [response (async/chan 2)]
-   (reset! mock-poll [{:kind :fact
-                       :name "tweetlog/timeline"
-                       :key "alice"
-                       :data ["bob" "hello"]
-                       :ts 1000
-                       :change 1
-                       ;; The attacker's permacode hash...
-                       :writers #{"some-other-hash"}
-                       :readers #{"alice"}}])
-   (poll-handler {:route-params {:queue "the-queue"}
-                  :cookies {"app-version" "ver123"}}
-                 (fn [res]
-                   (async/>!! response res))
-                 :raise)
-   (let [[res chan] (async/alts!! [response
-                                   (async/timeout 1000)])]
-     (-> res :body slurp edn/read-string)
-     => [] ;; The event is blocked
-     )))
-
-[[:section {:title "Confidentiality" :tag "confidentiality-poll"}]]
-"The `poll-handler` also need to protect user-data against unauthorized reads.
-A user making a query should only be able to access events he or she are allowed to read.
-This is true when their `:identity-set` is (conceptually) a subset of the result's `:reders` set.
-(By *conceptually* we mean the mathematical set that the Clojure set represents, and not the Clojure set itself)."
-(fact
- (let [response (async/chan 2)]
-   (reset! mock-poll [{:kind :fact
-                       :name "tweetlog/timeline"
-                       :key "alice"
-                       :data ["bob" "hello"]
-                       :ts 1000
-                       :change 1
-                       :writers #{"some-hash"}
-                       :readers #{"not-alice"}}])
-   (poll-handler {:route-params {:queue "the-queue"}
-                  :cookies {"app-version" "ver123"}}
-                 (fn [res]
-                   (async/>!! response res))
-                 :raise)
-   (let [[res chan] (async/alts!! [response
-                                   (async/timeout 1000)])]
-     chan => response
-     (-> res :body slurp edn/read-string)
-     => [] ;; The event is blocked
-     )))
-
-[[:chapter {:titile "event-gateway"}]]
+[[:chapter {:title "event-gateway"}]]
 "`event-gateway` is a function that sets up a bidirectional event filter for events flowing between a client and a server.
 It is intended to support confidentiality and integrity, protecting both the connected client and the rest of the users against this client."
 
@@ -1127,6 +756,95 @@ in the event's `:readers` set, that is, if all possible users who can identify t
    ;; We expect a timeout...
    chan => to))
 
+[[:chapter {:title "websocket-handler"}]]
+"The gateway tier exposes Axiom's information tier through [WebSockets](https://en.wikipedia.org/wiki/WebSocket).
+The `websocket-handler` is a RING handler that provides this functionality.
+It assumes it is wrapped with [chord](https://github.com/jarohen/chord)'s `wrap-websocket-handler` or something equivalent,
+which translates WebSockets to `core.async` channels."
+
+"`websocket-handler` is a DI resource that depends on [event-gateway](#event-gateway) to filter events,
+and `event-bridge` (e.g., [this](rabbit-microservices.html#event-bridge)) to interact with the information tier."
+(fact
+ (def pair [(async/chan 10) (async/chan 10)])
+ (let [$ (di/injector {:event-gateway
+                       (fn [[c-c2s c-s2c] id-set app-ver]
+                         (let [s-c2s (async/chan 10 (comp
+                                                     (map #(assoc % :id-set id-set))
+                                                     (map #(assoc % :app-ver app-ver))))
+                               s-s2c (async/chan 10 (comp
+                                                     (map #(assoc % :id-set id-set))
+                                                     (map #(assoc % :app-ver app-ver))))]
+                           (async/pipe c-c2s s-c2s)
+                           (async/pipe s-s2c c-s2c)
+                           [s-c2s s-s2c]))
+                       :event-bridge
+                       (fn [[c2s s2c]]
+                         (async/pipe c2s (first pair))
+                         (async/pipe (second pair) s2c))})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [websocket-handler]
+                (def websocket-handler websocket-handler))))
+
+"`websocket-handler` is a RING handler function that assumes a `:ws-channel-pair` field exists in the request,
+which has the form `[c2s s2c]`, where `c2s` contains messages went from the client to the server,
+and `s2c` can take messages from the server to the client.
+(Please not that chord's `wrap-websocket-handler` provides only one channel (`:ws-channel`), which is bidirectional.
+We use our own `wrap-websocket-handler` middleware similar to chord's, which supports a 3-parameter handler and provides the channel as a pair).
+To use `websocket-handler` with `wrap-websocket-handler` one needs to add a wrapper that converts `:ws-channel` to `:ws-channel-pair`.)"
+(fact
+ (let [c2s (async/chan 10)
+       s2c (async/chan 10)]
+   (websocket-handler {:ws-channel-pair [c2s s2c]
+                       :identity-set :the-id-set
+                       :app-version :the-app-ver})
+   (async/>!! c2s {:foo :bar})
+   (let [[ev chan] (async/alts!! [(first pair) (async/timeout 1000)])]
+     chan => (first pair)
+     (:foo ev) => :bar
+     (:id-set ev) => :the-id-set
+     (:app-ver ev) => :the-app-ver)
+   (async/>!! (second pair) {:bar :foo})
+   (let [[ev chan] (async/alts!! [s2c (async/timeout 1000)])]
+     chan => s2c
+     (:bar ev) => :foo
+     (:id-set ev) => :the-id-set
+     (:app-ver ev) => :the-app-ver)))
+
+[[:section {:title "ring-handler"}]]
+"`ring-handler` is the main entry-point for the gateway tier."
+
+"It is a DI resource that depends on [websocket-handler](#websocket-handler) and [static-handler](#static-handler) -- the two handlers it serves."
+(fact
+ (def the-handler (atom nil))
+ (let [$ (di/injector {:static-handler (fn [req]
+                                         (reset! the-handler :static)
+                                         {:status 200
+                                          :body "foo bar"})
+                       :websocket-handler (fn [req]
+                                            (reset! the-handler :ws)
+                                            {:status :200
+                                             :body "bar foo"})})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [ring-handler]
+                (def ring-handler ring-handler))))
+
+"The location `/ws` is handled by the [websocket-handler](#websocket-handler)."
+(fact
+ (ring-handler {:request-method :get
+                :uri "/ws"})
+ @the-handler => :ws)
+
+"Any other location is handled by the `/static` handler."
+(fact
+ (ring-handler {:request-method :get
+                :uri "/something/else"})
+ @the-handler => :static)
+
+[[:chapter {:title "http-server"}]]
+"The `http-server` is the essence of the gateway."
+
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "rule-version-verifier"}]]
 "To maintain the [integrity of query results](#integrity-poll), we need to associate the `:writers` set of an event to a version of an application
@@ -1184,3 +902,47 @@ in the event's `:readers` set, that is, if all possible users who can identify t
  => true
  (rule-version-verifier "ver123" #{"some-hash-that-does-not-exist" :something-else})
  => false)
+
+[[:chapter {:title "wrap-websocket-handler"}]]
+"`wrap-websocket-handler` is based on [chord](https://github.com/jarohen/chord)'s implementation of middleware of the same name.
+It does the same, i.e., exposes WebSockets as `core.async` channels, but with the following differences:
+1. Instead of providing one bidirectional channel in `:ws-channel`, it provides two unidirectional channels in `:ws-channel-pair`.
+2. It extracts the `:message` packaging, and provides raw content on the channels."
+
+"To demonstrate how it works we will create a handler that receives maps, 
+and replies to each such event with a similar event, with the `:data` field (a number) incremented."
+(fact
+ (defn handler [req]
+   (if-let [[ws-in ws-out] (:ws-channel-pair req)]
+     (async/go-loop []
+       (let [input (async/<! ws-in)
+             output (update-in input [:data] inc)]
+         (async/>! ws-out output)))
+     ;; else
+     {:status 200
+      :body "No WebSockets..."})))
+
+"Now we launch a web server based on this handler with the `wrap-websocket-handler` middleware."
+(fact
+  (def srv (htsrv/run-server (-> handler
+                                 wrap-websocket-handler) {:port 33333})))
+
+"Now let's connect a client to that server and send a map."
+(fact
+ (def client-resp (async/chan 2))
+ (def socket (ws/connect
+               "ws://localhost:33333"
+               :on-receive #(async/>!! client-resp %)))
+ (ws/send-msg socket "{:data 1 :foo :bar}"))
+
+
+"Now we wait for the response."
+(fact
+ (let [[resp chan] (async/alts!! [client-resp (async/timeout 1000)])]
+   chan => client-resp
+   resp  => "{:data 2, :foo :bar}")
+ (ws/close socket))
+
+
+(fact
+ (srv))
