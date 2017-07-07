@@ -110,12 +110,15 @@ Then `permacode.publish/hash-all` and `hash-static-files` are called on the loca
  @staticdir => ..staticdir..)
 
 "The handler publishes an `:axiom/perm-versions` event, for which the key is the new version, 
-and the data consists of the set of permacode hashes for the logic, and a map of static assets with their hashes."
+and the data consists of two maps:
+1. A mapping between namespaces in the logic code to their permacode hashes, and
+2. A mapping between static resouce paths to their permacode hashes."
 (fact
  (persistent! published) => [{:kind :fact
                               :name "axiom/perm-versions"
                               :key "ABCD1234"
-                              :data [#{'perm.ABCD123 'perm.EFGH456}
+                              :data [{'foo 'perm.ABCD123
+                                      'bar 'perm.EFGH456}
                                      {"/a.html" "hash1"
                                       "/b.css" "hash2"
                                       "/c.js" "hash3"}]}])
@@ -152,7 +155,7 @@ and the data consists of the set of permacode hashes for the logic, and a map of
  (rule-tracker {:kind :fact
                 :name "axiom/perm-versions"
                 :key "ABCD1234"
-                :data [#{'perm.ABCD123} {}]
+                :data [{'foo 'perm.ABCD123} {}]
                 :change 3}
                (fn publish [ev]
                  (throw (Exception. "This should not be called")))) => nil)
@@ -166,8 +169,8 @@ and the data consists of the set of permacode hashes for the logic, and a map of
  (rule-tracker {:kind :fact
                 :name "axiom/perm-versions"
                 :key "ABCD1234"
-                :data [#{'perm.ABCD123
-                         'perm.EFGH456} {}]
+                :data [{'foo 'perm.ABCD123
+                        'bar 'perm.EFGH456} {}]
                 :change 3} ..pub..) => nil
  (provided
   (..pub.. {:kind :fact
@@ -181,7 +184,7 @@ and the data consists of the set of permacode hashes for the logic, and a map of
  (rule-tracker {:kind :fact
                 :name "axiom/perm-versions"
                 :key "ABCD1234"
-                :data [#{'perm.FOOBAR} {}]
+                :data [{'foobar 'perm.FOOBAR} {}]
                 :change -3} (fn publish [ev]
                               (throw (Exception. "This should not be called")))) => nil)
 
@@ -190,8 +193,8 @@ and the data consists of the set of permacode hashes for the logic, and a map of
  (rule-tracker {:kind :fact
                 :name "axiom/perm-versions"
                 :key "ABCD1234"
-                :data [#{'perm.ABCD123
-                         'perm.EFGH456} {}]
+                :data [{'foo 'perm.ABCD123
+                        'bar 'perm.EFGH456} {}]
                 :change -3} ..pub..) => nil
  (provided
   (..pub.. {:kind :fact

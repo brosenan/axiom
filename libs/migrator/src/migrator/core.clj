@@ -130,7 +130,7 @@
                               (fn perm-tracker
                                 [ev publish]
                                 (let [ver (-> ev :key)
-                                      perms (-> ev :data first)]
+                                      perms (-> ev :data first vals set)]
                                   (loop [perms (seq perms)
                                          new-perms #{}
                                          removed-perms #{}]
@@ -226,7 +226,7 @@
                                     (publish {:kind :fact
                                               :name "axiom/perm-versions"
                                               :key version
-                                              :data [(set (vals hashes))
+                                              :data [hashes
                                                      static-hashes]}))
                                   (sh "rm" "-rf" dir))
                                 nil)))

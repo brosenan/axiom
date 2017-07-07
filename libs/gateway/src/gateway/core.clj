@@ -62,6 +62,7 @@
                                 trans-chan (async/chan 1 xform)]
                             (async/pipe (async/merge (vals chanmap)) trans-chan)
                             (async/<! (async/reduce conj #{user} trans-chan)))))))))
+
   (di/provide $ authenticator [use-dummy-authenticator]
               (fn [handler]
                 (fn[req]
@@ -73,6 +74,7 @@
                               (update-in [:cookies] #(assoc % "user_identity" {:value id})))
                           :else
                           (handler req))))))
+
   (di/provide $ version-selector [dummy-version]
               (fn [handler]
                 (let [handler (cookie-version-selector handler)]
@@ -130,7 +132,8 @@
                                                          :key app-ver}
                                                         reply-chan])
                               (let [{:keys [data]} (async/<!! reply-chan)
-                                    [perms static] data]
+                                    [perm-map static] data
+                                    perms (-> perm-map vals set)]
                                 (swap! cache assoc app-ver perms)
                                 perms))))]
                 (fn [app-ver writers]

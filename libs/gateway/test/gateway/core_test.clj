@@ -585,7 +585,7 @@ It is depends on the following:
    (async/>!! resp-chan {:kind :fact
                          :name "axiom/perm-versions"
                          :key "ver123"
-                         :data [#{} {"/foo.html" "the-hash-code"}]})
+                         :data [{} {"/foo.html" "the-hash-code"}]})
    (async/close! resp-chan)))
 
 "Upon receiving the response, `static-handler` gets the file's content from the hasher, and creates a `200` response."
@@ -611,7 +611,7 @@ It is depends on the following:
    (async/>!! resp-chan {:kind :fact
                          :name "axiom/perm-versions"
                          :key "ver123"
-                         :data [#{} {"/foo.html" "the-hash-code"}]})
+                         :data [{} {"/foo.html" "the-hash-code"}]})
    (async/close! resp-chan))
  (let [[res chan] (async/alts!! [response
                                  (async/timeout 1000)])]
@@ -965,7 +965,8 @@ so query params are parsed into the `:params` field of the request."
    (async/>!! reply-chan {:kind :fact
                           :name "axiom/perm-versions"
                           :key "ver123"
-                          :data [#{'some-hash 'some-other-hash} {}]})
+                          :data [{'foo 'some-hash
+                                  'bar 'some-other-hash} {}]})
    (async/close! reply-chan)))
 
 "Because `some-hash` exists in the `axiom/perm-versions` for this version, the function should return `true`."
@@ -983,7 +984,8 @@ so query params are parsed into the `:params` field of the request."
    (async/>!! reply-chan {:kind :fact
                           :name "axiom/perm-versions"
                           :key "ver234"
-                          :data [#{'some-hash 'some-other-hash} {}]})
+                          :data [{'foo 'some-hash
+                                  'bar 'some-other-hash} {}]})
    (async/close! reply-chan))
  (async/<!! result) => false)
 
