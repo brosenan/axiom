@@ -132,10 +132,11 @@
  (persistent! cmds) =&gt; [[&quot;git&quot; &quot;clone&quot; &quot;--depth&quot; &quot;12&quot; &quot;https://example.com/some/repo&quot; &quot;/my/clone/location/repo12345&quot;]
                       [&quot;git&quot; &quot;checkout&quot; &quot;ABCD1234&quot; :dir &quot;/my/clone/location/repo12345&quot;]
                       [&quot;rm&quot; &quot;-rf&quot; &quot;/my/clone/location/repo12345&quot;]]
- @staticdir =&gt; ..staticdir..</code></pre></div><div><p>The handler publishes an <code>:axiom/perm-versions</code> event, for which the key is the new version,  and the data consists of the set of permacode hashes for the logic, and a map of static assets with their hashes.</p></div><div class="code"><pre><code class="clojure">(persistent! published) =&gt; [{:kind :fact
+ @staticdir =&gt; ..staticdir..</code></pre></div><div><p>The handler publishes an <code>:axiom/perm-versions</code> event, for which the key is the new version,  and the data consists of two maps:</p><ol><li>A mapping between namespaces in the logic code to their permacode hashes, and</li><li>A mapping between static resouce paths to their permacode hashes.</li></ol></div><div class="code"><pre><code class="clojure">(persistent! published) =&gt; [{:kind :fact
                             :name &quot;axiom/perm-versions&quot;
                             :key &quot;ABCD1234&quot;
-                            :data [#{'perm.ABCD123 'perm.EFGH456}
+                            :data [{'foo 'perm.ABCD123
+                                    'bar 'perm.EFGH456}
                                    {&quot;/a.html&quot; &quot;hash1&quot;
                                     &quot;/b.css&quot; &quot;hash2&quot;
                                     &quot;/c.js&quot; &quot;hash3&quot;}]}]</code></pre></div><div><span id="perm-tracker"></span><h2><b>3 &nbsp;&nbsp; perm-tracker</b></h2></div><div><p><code>perm-tracker</code> registers to <code>:axiom/perm-versions</code> and tracks the quantity of each <a href='permacode.html'>permacode module</a> by summing the <code>:change</code> <a href='cloudlog-events.html#introduction'>field of the event</a>.</p></div><div><p>It depends on the resources <a href='#zookeeper-counter-add'>zookeeper-counter-add</a> <code>declare-service</code> and <code>assign-service</code>, which we will mock.</p></div><div class="code"><pre><code class="clojure">(def mock-counters (transient {&quot;/perms/perm.ABCD123&quot; 2}))
@@ -156,14 +157,14 @@
  (def rule-tracker (call 2)))</code></pre></div><div><p>The <code>perm-tracker</code> service function is given an <code>:axiom/perm-versions</code> event and a <code>publish</code> function.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
               :name &quot;axiom/perm-versions&quot;
               :key &quot;ABCD1234&quot;
-              :data [#{'perm.ABCD123} {}]
+              :data [{'foo 'perm.ABCD123} {}]
               :change 3}
              (fn publish [ev]
                (throw (Exception. &quot;This should not be called&quot;)))) =&gt; nil</code></pre></div><div><p>It calls <code>zookeeper-counter-add</code> to increment the counter corresponding to the rule.</p></div><div class="code"><pre><code class="clojure">(mock-counters &quot;/perms/perm.ABCD123&quot;) =&gt; 5</code></pre></div><div><p>If one or more perms go from 0 to a positive count, an <code>:axiom/perms-exist</code> event with <code>:change = 1</code> is published.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
               :name &quot;axiom/perm-versions&quot;
               :key &quot;ABCD1234&quot;
-              :data [#{'perm.ABCD123
-                       'perm.EFGH456} {}]
+              :data [{'foo 'perm.ABCD123
+                      'bar 'perm.EFGH456} {}]
               :change 3} ..pub..) =&gt; nil
  (provided
 (..pub.. {:kind :fact
@@ -173,13 +174,13 @@
           :change 1}) =&gt; irrelevant)</code></pre></div><div><p>This of-course only happens when the change is positive.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
               :name &quot;axiom/perm-versions&quot;
               :key &quot;ABCD1234&quot;
-              :data [#{'perm.FOOBAR} {}]
+              :data [{'foobar 'perm.FOOBAR} {}]
               :change -3} (fn publish [ev]
                             (throw (Exception. &quot;This should not be called&quot;)))) =&gt; nil</code></pre></div><div><p>If the aggregated value of the rule goes down to 0, an <code>:axiom/perms-exist</code> event with <code>:change = -1</code> is published.</p></div><div class="code"><pre><code class="clojure">(rule-tracker {:kind :fact
               :name &quot;axiom/perm-versions&quot;
               :key &quot;ABCD1234&quot;
-              :data [#{'perm.ABCD123
-                       'perm.EFGH456} {}]
+              :data [{'foo 'perm.ABCD123
+                      'bar 'perm.EFGH456} {}]
               :change -3} ..pub..) =&gt; nil
  (provided
 (..pub.. {:kind :fact

@@ -338,7 +338,7 @@
  (async/&gt;!! resp-chan {:kind :fact
                        :name &quot;axiom/perm-versions&quot;
                        :key &quot;ver123&quot;
-                       :data [#{} {&quot;/foo.html&quot; &quot;the-hash-code&quot;}]})
+                       :data [{} {&quot;/foo.html&quot; &quot;the-hash-code&quot;}]})
  (async/close! resp-chan))</code></pre></div><div><p>Upon receiving the response, <code>static-handler</code> gets the file's content from the hasher, and creates a <code>200</code> response.</p></div><div class="code"><pre><code class="clojure">(let [[res chan] (async/alts!! [response
                                (async/timeout 1000)])]
  chan =&gt; response
@@ -355,7 +355,7 @@
  (async/&gt;!! resp-chan {:kind :fact
                        :name &quot;axiom/perm-versions&quot;
                        :key &quot;ver123&quot;
-                       :data [#{} {&quot;/foo.html&quot; &quot;the-hash-code&quot;}]})
+                       :data [{} {&quot;/foo.html&quot; &quot;the-hash-code&quot;}]})
  (async/close! resp-chan))
  (let [[res chan] (async/alts!! [response
                                (async/timeout 1000)])]
@@ -567,7 +567,8 @@
  (async/&gt;!! reply-chan {:kind :fact
                         :name &quot;axiom/perm-versions&quot;
                         :key &quot;ver123&quot;
-                        :data [#{'some-hash 'some-other-hash} {}]})
+                        :data [{'foo 'some-hash
+                                'bar 'some-other-hash} {}]})
  (async/close! reply-chan))</code></pre></div><div><p>Because <code>some-hash</code> exists in the <code>axiom/perm-versions</code> for this version, the function should return <code>true</code>.</p></div><div class="code"><pre><code class="clojure">(async/&lt;!! result) =&gt; true</code></pre></div><div><p>If the <code>:writers</code> set does not mention a hash that exists, we return <code>false</code>.</p></div><div class="code"><pre><code class="clojure">(def result (async/thread
              (rule-version-verifier &quot;ver234&quot; #{&quot;some-hash-that-does-not-exist&quot; :something-else})))
  (let [[q reply-chan] (get-query)]
@@ -577,7 +578,8 @@
  (async/&gt;!! reply-chan {:kind :fact
                         :name &quot;axiom/perm-versions&quot;
                         :key &quot;ver234&quot;
-                        :data [#{'some-hash 'some-other-hash} {}]})
+                        :data [{'foo 'some-hash
+                                'bar 'some-other-hash} {}]})
  (async/close! reply-chan))
  (async/&lt;!! result) =&gt; false</code></pre></div><div><p>Database output is cached, so that when we ask about a version we already asked about, the answer is given without involving the database.</p></div><div class="code"><pre><code class="clojure">(rule-version-verifier &quot;ver123&quot; #{&quot;some-other-hash&quot; :something-else})
  =&gt; true
