@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 06 July 2017</h5>
+              <h5>Date: 07 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -233,7 +233,7 @@
                 :body &quot;hi&quot;})
      app (-&gt; handler
              dummy-authenticator)]
- (app {:cookies {&quot;user_identity&quot; &quot;foobar&quot;}
+ (app {:cookies {&quot;user_identity&quot; {:value &quot;foobar&quot;}}
        :params {}})
  @id =&gt; &quot;foobar&quot;)</code></pre></div><div><p>If a query parameter named <code>&#95;identity</code> exists, its value becomes the <code>:identity</code>. Additionally, the new value is stored in a cookie for future reference.</p></div><div class="code"><pre><code class="clojure">(let [handler (fn [req]
                {:body (str &quot;Hello, &quot; (:identity req))})
@@ -242,23 +242,23 @@
  (app {:cookies {}
        :params {&quot;_identity&quot; &quot;barfoo&quot;}})
  =&gt; {:body &quot;Hello, barfoo&quot;
-     :cookies {&quot;user_identity&quot; &quot;barfoo&quot;}})</code></pre></div><div><p>Adding a cookie works in concert with other cookies...</p></div><div class="code"><pre><code class="clojure">(let [handler (fn [req]
+     :cookies {&quot;user_identity&quot; {:value &quot;barfoo&quot;}}})</code></pre></div><div><p>Adding a cookie works in concert with other cookies...</p></div><div class="code"><pre><code class="clojure">(let [handler (fn [req]
                {:body &quot;Hello&quot;
-                :cookies {&quot;some&quot; &quot;cookie&quot;}})
+                :cookies {&quot;some&quot; {:value &quot;cookie&quot;}}})
      app (-&gt; handler
              dummy-authenticator)]
  (app {:cookies {}
        :params {&quot;_identity&quot; &quot;barfoo&quot;}})
  =&gt; {:body &quot;Hello&quot;
-     :cookies {&quot;user_identity&quot; &quot;barfoo&quot;
-               &quot;some&quot; &quot;cookie&quot;}})</code></pre></div><div><p>If both a cookie and a parameter exist with different identity values, the <em>parameter wins</em>.</p></div><div class="code"><pre><code class="clojure">(let [id (atom nil)
+     :cookies {&quot;user_identity&quot; {:value &quot;barfoo&quot;}
+               &quot;some&quot; {:value &quot;cookie&quot;}}})</code></pre></div><div><p>If both a cookie and a parameter exist with different identity values, the <em>parameter wins</em>.</p></div><div class="code"><pre><code class="clojure">(let [id (atom nil)
      handler (fn [req]
                (reset! id (:identity req))
                {:status 200
                 :body &quot;hi&quot;})
      app (-&gt; handler
              dummy-authenticator)]
- (app {:cookies {&quot;user_identity&quot; &quot;foobar&quot;}
+ (app {:cookies {&quot;user_identity&quot; {:value &quot;foobar&quot;}}
        :params {&quot;_identity&quot; &quot;barfoo&quot;}})
  @id =&gt; &quot;barfoo&quot;)</code></pre></div><div><p>If none are present, the authenticator does not add an <code>:identity</code> entry to the request.</p></div><div class="code"><pre><code class="clojure">(let [handler (fn [req]
                (when (contains? req :identity)
@@ -280,7 +280,7 @@
                               (async/&gt;!! req-with-id-set req)
                               {:status 200})
                     app (wrap-authorization handler)]
-                (app {:cookies {&quot;user_identity&quot; &quot;foo&quot;}})
+                (app {:cookies {&quot;user_identity&quot; {:value &quot;foo&quot;}}})
                 (let [[result chan] (async/alts!! [req-with-id-set
                                                    (async/timeout 1000)])]
                   chan =&gt; req-with-id-set
@@ -296,7 +296,7 @@
                               (async/&gt;!! req-with-id-set req)
                               {:status 200})
                     app (wrap-authorization handler)]
-                (app {:cookies {&quot;user_identity&quot; &quot;foo&quot;}
+                (app {:cookies {&quot;user_identity&quot; {:value &quot;foo&quot;}}
                       :headers {&quot;Axiom-Id-Rules&quot; ['foo-rule 'bar-rule]}})
                 (let [[result chan] (async/alts!! [req-with-id-set
                                                    (async/timeout 1000)])]
@@ -304,7 +304,7 @@
      handler (fn [req]
                (reset! ver (:app-version req)))
      app (cookie-version-selector handler)]
- (app {:cookies {&quot;app-version&quot; &quot;ver123&quot;}})
+ (app {:cookies {&quot;app-version&quot; {:value &quot;ver123&quot;}}})
  @ver =&gt; &quot;ver123&quot;)</code></pre></div><div><span id="picking-a-version-based-on-domain"></span><h3>5.2 &nbsp;&nbsp; Picking a Version based on Domain</h3></div><div><p>But how do we get the initial version value? The complete answer is complicated and involves a few factors. The best way to determine a version starts with the domain name. Since Axiom is multi-tenant, different applications are expected to have different domain names. The application provides own their domains, and direct traffic to an instance of Axiom by managing DNS records. The <code>HOST</code> HTTP header conveys the domain name used by the user when accessing the application, and can be used to determine which application needs to run. But how do we determine the version?</p></div><div><p>First, we need to know who to trust. We want to take the domain owner's word for it. A common way to establish this kind of trust is by asking the domain owner to set up some <code>TXT</code> DNS record, with some fixed text and his or her identity, Something like: <code>TXT: Axiom Identity: foo@example.com</code>, where <code>foo@example.com</code> is an identity verifyable by the <a href='#authenticator'>authenticator</a> we use. This tells Axiom the the owner of the domain trusts the mentioned user to manage content in Axiom for that domain.</p></div><div><p>The mapping between domain names and user identities should be queried using a DNS lookup and cached. Then a query should be made for a fact stated by that user, connecting the domain to a version. If more than one such version exists, one of them should be picked at random. Javascript code that runs on behalf of the application can update the <code>app-version</code> cookie with another version if a random choice is not the correct one for this application.</p></div><div><p>At this point we do not implement this selector.</p></div><div><span id="dummy-version-selector"></span><h3>5.3 &nbsp;&nbsp; dummy-version-selector</h3></div><div><p>To support development, we provide <code>dummy-version-selector</code>. It is a provider of the <code>version-selector</code> resource. It depends on <code>:dummy-version</code> &ndash; a string containing a version.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:dummy-version &quot;ver456&quot;})]
  (module $)
  (di/startup $)
@@ -313,7 +313,7 @@
      handler (fn [req]
                (reset! ver (:app-version req)))
      app (ver-selector handler)]
- (app {:cookies {&quot;app-version&quot; &quot;ver123&quot;}})
+ (app {:cookies {&quot;app-version&quot; {:value &quot;ver123&quot;}}})
  @ver =&gt; &quot;ver123&quot;)</code></pre></div><div><p>If an <code>app-version</code> cookie does not exist, <code>dummy-version-selector</code> creates one with the value from <code>:dummy-version</code>.</p></div><div class="code"><pre><code class="clojure">(let [ver (atom nil)
      handler (fn [req]
                (reset! ver (:app-version req)))
@@ -435,7 +435,8 @@
  (let [to (async/timeout 100)
      [ev chan] (async/alts!! [s-c2s to])]
  ;; We expect a timeout...
- chan =&gt; to)</code></pre></div><div><span id="websocket-handler"></span><h2><b>8 &nbsp;&nbsp; websocket-handler</b></h2></div><div><p>The gateway tier exposes Axiom's information tier through <a href='https://en.wikipedia.org/wiki/WebSocket'>WebSockets</a>. The <code>websocket-handler</code> is a RING handler that provides this functionality. It assumes it is wrapped with <a href='https://github.com/jarohen/chord'>chord</a>'s <code>wrap-websocket-handler</code> or something equivalent, which translates WebSockets to <code>core.async</code> channels.</p></div><div><p><code>websocket-handler</code> is a DI resource that depends on <a href='#event-gateway'>event-gateway</a> to filter events, and <code>event-bridge</code> (e.g., <a href='rabbit-microservices.html#event-bridge'>this</a>) to interact with the information tier.</p></div><div class="code"><pre><code class="clojure">(def pair [(async/chan 10) (async/chan 10)])
+ chan =&gt; to)</code></pre></div><div><span id="websocket-handler"></span><h2><b>8 &nbsp;&nbsp; websocket-handler</b></h2></div><div><p>The gateway tier exposes Axiom's information tier through <a href='https://en.wikipedia.org/wiki/WebSocket'>WebSockets</a>. The <code>websocket-handler</code> is a RING handler that provides this functionality. It assumes it is wrapped with <a href='https://github.com/jarohen/chord'>chord</a>'s <code>wrap-websocket-handler</code> or something equivalent, which translates WebSockets to <code>core.async</code> channels.</p></div><div><p><code>websocket-handler</code> is a DI resource that depends on <a href='#event-gateway'>event-gateway</a> to filter events, and <code>event-bridge</code> (e.g., <a href='rabbit-microservices.html#event-bridge'>this</a>) to interact with the information tier. It also depends on the middleware resources <a href='#wrap-websocket-handler'>wrap-websocket-handler</a>, <a href='#wrap-authorization'>wrap-authorization</a> and <a href='#version-selector'>version-selector</a>.</p></div><div class="code"><pre><code class="clojure">(def pair [(async/chan 10) (async/chan 10)])
+ (def ws-pair [(async/chan 10) (async/chan 10)])
  (let [$ (di/injector {:event-gateway
                      (fn [[c-c2s c-s2c] id-set app-ver]
                        (let [s-c2s (async/chan 10 (comp
@@ -450,15 +451,30 @@
                      :event-bridge
                      (fn [[c2s s2c]]
                        (async/pipe c2s (first pair))
-                       (async/pipe (second pair) s2c))})]
+                       (async/pipe (second pair) s2c))
+                     :wrap-authorization
+                     (fn [handler]
+                       (fn [req]
+                         (-&gt; req
+                             (assoc :identity-set :the-id-set)
+                             handler)))
+                     :version-selector
+                     (fn [handler]
+                       (fn [req]
+                         (-&gt; req
+                             (assoc :app-version :the-app-ver)
+                             handler)))
+                     :wrap-websocket-handler
+                     (fn [handler]
+                       (fn [req]
+                         (-&gt; req
+                             (assoc :ws-channel-pair ws-pair)
+                             handler)))})]
  (module $)
  (di/startup $)
  (di/do-with! $ [websocket-handler]
-              (def websocket-handler websocket-handler)))</code></pre></div><div><p><code>websocket-handler</code> is a RING handler function that assumes a <code>:ws-channel-pair</code> field exists in the request, which has the form <code>&#91;c2s s2c&#93;</code>, where <code>c2s</code> contains messages went from the client to the server, and <code>s2c</code> can take messages from the server to the client. (Please not that chord's <code>wrap-websocket-handler</code> provides only one channel (<code>:ws-channel</code>), which is bidirectional. We use our own <code>wrap-websocket-handler</code> middleware similar to chord's, which supports a 3-parameter handler and provides the channel as a pair). To use <code>websocket-handler</code> with <code>wrap-websocket-handler</code> one needs to add a wrapper that converts <code>:ws-channel</code> to <code>:ws-channel-pair</code>.)</p></div><div class="code"><pre><code class="clojure">(let [c2s (async/chan 10)
-     s2c (async/chan 10)]
- (websocket-handler {:ws-channel-pair [c2s s2c]
-                     :identity-set :the-id-set
-                     :app-version :the-app-ver})
+              (def websocket-handler websocket-handler)))</code></pre></div><div><p><code>websocket-handler</code> is a RING handler function that assumes a <code>:ws-channel-pair</code> field exists in the request, which has the form <code>&#91;c2s s2c&#93;</code>, where <code>c2s</code> contains messages went from the client to the server, and <code>s2c</code> can take messages from the server to the client. (Please not that chord's <code>wrap-websocket-handler</code> provides only one channel (<code>:ws-channel</code>), which is bidirectional. We use our own <code>wrap-websocket-handler</code> middleware similar to chord's, which supports a 3-parameter handler and provides the channel as a pair). To use <code>websocket-handler</code> with <code>wrap-websocket-handler</code> one needs to add a wrapper that converts <code>:ws-channel</code> to <code>:ws-channel-pair</code>.)</p></div><div class="code"><pre><code class="clojure">(let [[c2s s2c] ws-pair]
+ (websocket-handler {})
  (async/&gt;!! c2s {:foo :bar})
  (let [[ev chan] (async/alts!! [(first pair) (async/timeout 1000)])]
    chan =&gt; (first pair)
@@ -486,7 +502,60 @@
               :uri &quot;/ws&quot;})
  @the-handler =&gt; :ws</code></pre></div><div><p>Any other location is handled by the <code>/static</code> handler.</p></div><div class="code"><pre><code class="clojure">(ring-handler {:request-method :get
               :uri &quot;/something/else&quot;})
- @the-handler =&gt; :static</code></pre></div><div><span id="http-server"></span><h2><b>9 &nbsp;&nbsp; http-server</b></h2></div><div><p>The <code>http-server</code> is the essence of the gateway.</p></div><div><span id="under-the-hood"></span><h2><b>10 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="rule-version-verifier"></span><h3>10.1 &nbsp;&nbsp; rule-version-verifier</h3></div><div><p>To maintain the <a href='#integrity-poll'>integrity of query results</a>, we need to associate the <code>:writers</code> set of an event to a version of an application (given as the <code>:app-version</code> key in the request).</p></div><div><p><code>rule-version-verifier</code> is a DI resource that depends on <code>database-chan</code>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-chan db-chan})]
+ @the-handler =&gt; :static</code></pre></div><div><span id="http-server"></span><h2><b>9 &nbsp;&nbsp; http-server</b></h2></div><div><p>At its essence, the gateway tier is an HTTP server, represented by the <code>http-server</code> resource.</p></div><div><p>As a DI resource, it depends on <a href='#ring-handler'>ring-handler</a> to provide content, and <code>http-config</code> to provide parameters such as <code>:ip</code> and <code>:port</code>. See <a href='http://www.http-kit.org/server.html#options'>http-kit's documentation</a> for the complete list.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:http-config {:port 44444}
+                     :ring-handler (fn [req]
+                                     {:status 200
+                                      :body &quot;hello&quot;})})]
+ (module $)
+ (di/startup $)
+ (di/do-with! $ [http-server]
+              (let [resp @(http/get &quot;http://localhost:44444&quot;)
+                    {:keys [status headers body error]} resp]
+                (when error
+                  (throw error))
+                status =&gt; 200
+                (slurp body) =&gt; &quot;hello&quot;))
+ (di/shutdown $))</code></pre></div><div><p>The server resource contains information about the server, such as its <code>:local-port</code> &ndash; the actual port that was allocated to it on the local machine (as in the case where we provided <code>:port 0</code>, requesting it to choose a random available port).</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:http-config {:port 0}
+                     :ring-handler (fn [req]
+                                     {:status 200
+                                      :body &quot;hello&quot;})})]
+ (module $)
+ (di/startup $)
+ (di/do-with! $ [http-server]
+              (let [resp @(http/get (str &quot;http://localhost:&quot; (:local-port http-server)))
+                    {:keys [status headers body error]} resp]
+                (when error
+                  (throw error))
+                status =&gt; 200))
+ (di/shutdown $))</code></pre></div><div><p>The <code>ring-handler</code> is wrapped with a <a href='https://github.com/ring-clojure/ring/wiki/Parameters'>parameters middleware</a>, so query params are parsed into the <code>:params</code> field of the request.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:http-config {:port 44444}
+                     :ring-handler (fn [req]
+                                     {:status 200
+                                      :body (str &quot;hello, &quot; (get-in req [:params &quot;name&quot;]))})})]
+ (module $)
+ (di/startup $)
+ (di/do-with! $ [http-server]
+              (let [resp @(http/get &quot;http://localhost:44444?name=foo&quot;)
+                    {:keys [status headers body error]} resp]
+                (when error
+                  (throw error))
+                status =&gt; 200
+                (slurp body) =&gt; &quot;hello, foo&quot;))
+ (di/shutdown $))</code></pre></div><div><p>It is also wrapped with the <a href='https://github.com/ring-clojure/ring/wiki/Cookies'>cookies middleware</a>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:http-config {:port 44444}
+                     :ring-handler
+                     (fn [req]
+                       {:status 200
+                        :body (str &quot;hello, &quot; (get-in req [:cookies &quot;name&quot; :value]))})})]
+ (module $)
+ (di/startup $)
+ (di/do-with! $ [http-server]
+              (let [resp @(http/get &quot;http://localhost:44444&quot;
+                                    {:headers {&quot;Cookie&quot; &quot;name=foo&quot;}})
+                    {:keys [status headers body error]} resp]
+                (when error
+                  (throw error))
+                status =&gt; 200
+                (slurp body) =&gt; &quot;hello, foo&quot;))
+ (di/shutdown $))</code></pre></div><div><span id="under-the-hood"></span><h2><b>10 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="rule-version-verifier"></span><h3>10.1 &nbsp;&nbsp; rule-version-verifier</h3></div><div><p>To maintain the <a href='#integrity-poll'>integrity of query results</a>, we need to associate the <code>:writers</code> set of an event to a version of an application (given as the <code>:app-version</code> key in the request).</p></div><div><p><code>rule-version-verifier</code> is a DI resource that depends on <code>database-chan</code>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:database-chan db-chan})]
  (module $)
  (di/startup $)
  (di/do-with! $ [rule-version-verifier]
@@ -528,8 +597,8 @@
              :on-receive #(async/&gt;!! client-resp %)))
  (ws/send-msg socket &quot;{:data 1 :foo :bar}&quot;)</code></pre></div><div><p>Now we wait for the response.</p></div><div class="code"><pre><code class="clojure">(let [[resp chan] (async/alts!! [client-resp (async/timeout 1000)])]
  chan =&gt; client-resp
- resp  =&gt; &quot;{:data 2, :foo :bar}&quot;)
- (ws/close socket)</code></pre></div><div class="code"><pre><code class="clojure">(srv)</code></pre></div>
+ resp  =&gt; &quot;{:data 2, :foo :bar}&quot;)</code></pre></div><div><p>Finally, let's close both server and client connections.</p></div><div class="code"><pre><code class="clojure">(ws/close socket)
+ (srv)</code></pre></div>
         </div>
       </div>
     </div>
