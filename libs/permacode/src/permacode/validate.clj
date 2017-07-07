@@ -87,8 +87,8 @@
                'class 'name 'namespace
                'subs 're-find 're-matches 're-seq
                'list 'seq 'cons 'vector 'vec 'str 'set 'keyword 'symbol
-               'empty? 'contains? 'pos? 'neg? 'identical? 'some?
-               'vector? 'seq? 'sequential? 'list? 'nil? 'string? 'keyword? 'symbol? 'map?
+               'empty? 'contains? 'pos? 'neg? 'identical? 'some? 'every?
+               'vector? 'seq? 'sequential? 'list? 'nil? 'string? 'keyword? 'symbol? 'map? 'set?
                'meta 'with-meta
                'assoc 'assoc-in 'merge 'merge-with 'keys 'key 'vals 'val 'get 'update
                'identity 'partial 'constantly 'fnil

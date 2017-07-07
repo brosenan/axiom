@@ -148,10 +148,11 @@ Now consider we query for user `alice`'s identity set with respect to these two 
 "`alice`'s identity set is now the intersection between her own singleton set (`\"alice\"`),
 and the groups of `bob`'s and `charlie`'s friends, as well as the owners of `cats for free wifi`."
 (fact
- (async/<!! res) => (interset/intersection #{"alice"}
-                                           #{[:perm.AAA/friend "bob"]}
-                                           #{[:perm.AAA/friend "charlie"]}
-                                           #{[:perm.BBB/group-owner "cats for free wifi"]}))
+ (async/<!! res) => (reduce interset/intersection interset/universe
+                            [#{"alice"}
+                             #{[:perm.AAA/friend "bob"]}
+                             #{[:perm.AAA/friend "charlie"]}
+                             #{[:perm.BBB/group-owner "cats for free wifi"]}]))
 
 [[:section {:title "Accumulation"}]]
 "Axiom is an [event sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) system.

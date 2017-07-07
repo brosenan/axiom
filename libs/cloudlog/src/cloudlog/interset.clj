@@ -6,33 +6,38 @@
  (def orig-empty? empty?)
 
  (def universe #{})
+ (def empty-set [])
 
- (defn intersection [& sets]
-   (apply set/union sets))
+ (defn canonical [s]
+   (cond (vector? s)
+         s
+         :else
+         [s]))
+
+ (defn uncanonical [s]
+   (cond (and (vector? s) (= (count s) 1))
+         (first s)
+         :else s))
+
+ (defn disjoint? [a b]
+   (let [a' (first (filter string? a))
+         b' (first (filter string? b))]
+     (and (some? a') (some? b')
+          (not= a' b'))))
+
+ (defn intersection [a b]
+   (uncanonical (vec (for [a' (canonical a)
+                           b' (canonical b)
+                           :when (not (disjoint? a' b'))]
+                       (set/union a' b')))))
 
  (defn subset? [a b]
-   (set/subset? b a))
-
- (defn super-union [a b]
-   (set/intersection a b))
-
- (defn partition? [named]
-   (and (vector? named)
-        (= (count named) 2)
-        (clojure.string/ends-with? (named 0) "=")))
-
- (defn empty? [set]
-   (or (contains? set :empty)
-       (loop [members (seq set)
-              partitions #{}]
-         (if (orig-empty? members)
-           false
-                                        ; else
-           (let [member (first members)]
-             (if (partition? member)
-               (if (partitions (member 0))
-                 true
-                                        ; else
-                 (recur (rest members) (set/union partitions #{(member 0)})))
-                                        ; else
-               (recur (rest members) partitions))))))))
+   (let [a (canonical a)
+         b (canonical b)]
+     (every?
+      (fn [a]
+        (some? (some
+                (fn [b]
+                  (set/subset? b a))
+                b)))
+      a))))

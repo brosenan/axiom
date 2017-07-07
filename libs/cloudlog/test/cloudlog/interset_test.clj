@@ -4,90 +4,161 @@
 
 
 [[:chapter {:title "Introduction"}]]
-"Intersets (intersection sets) are a representation of mathematical sets.
-Each interset is represented as a Clojure set of *components*, each representing a *named set*, which is an
-opaque set.  The interset is then an intersection of all these sets.
+"In Axiom, *mathematical sets* are at the base of how we provide integrity and confidentiality.
+Each fact is assigned a *writers set* and a *readers set*, representing the set of users who may have stated this fact,
+and the set of users allowed to know about it."
 
-For example, when considering the Clojure set"
-(comment #{:a :b :c})
-"as an interset, it actually represents the intersection of sets `:a`, `:b` and `:c`, where `:a`, `:b` and `:c`
-are names of sets.
+"To be able to efficiently reason upon theses sets, we need to find a Clojure representation that is both expressive enough,
+and efficient enough to represent and reason upon."
 
-This method is useful for representing *user sets*, an important notion in *secure cloudlog*.
-The named sets (or named user groups) are opaque.  We do not want to actually list all users in each group.
-Instead, we just name the group.  A user who is a member of groups `:a`, `:b` and `:c` can be represented
-as the interset `#{:a :b :c}`.  All users in group `:a` are represented by interset `#{:a}`."
+"Intersets (intersection sets) are the representation we chose for Axiom.
+Each interset is represented as either a Clojure set (a *simple interset*), or a vector of such set (a *canonical interset*).
+The Clojure sets represent *intersection*, and the vectors represent *union*,
+so together we have a set expression that represents *a union of intersections* of basic components.
+The basic components of these sets are either *strings* or *vectors*, each representing an opaque set,
+i.e., a set one cannot further reason upon using interset operations.
+Strings represent identities (e.g., user-IDs), and vectors represent logic terms that are true for a set of users,
+such as *a friend of some user X*."
 
-[[:chapter {:title "universe"}]]
+"The following example interset may represent the friends of user `alice` in some application:"
+(comment #{[:some-app/friend "alice"]})
+
+"The following interset represents the exclusive group of users who are friends with both `alice` and `bob`:"
+(comment #{[:some-app/friend "alice"]
+           [:some-app/friend "bob"]})
+
+"The following interset represents `alice`, but only if she's friends with `bob` (otherwise the sent is considered empty):"
+(comment #{"alice" [:some-app/friend "bob"]})
+
+"The following interset includes both `alice` and all of `alice`'s friends:"
+(comment [#{"alice"} #{[:some-app/friend "alice"]}])
+
+"The following inteset is empty, because `alice` and `bob` are two seperate identities:"
+(comment #{"alice" "bob"})
+
+[[:chapter {:title "universe and empty-set" :tag "universe"}]]
 "The universal set is the intersection of no sets.  It is therefore:"
 (fact
  interset/universe => #{})
 
-[[:chapter {:title "intersection"}]]
-"Intersecting two intersets is a union of their underlying sets:"
+"Similarly, the empty set is a union of no sets:"
 (fact
- (interset/intersection #{:a :b} #{:a :c}) => #{:a :b :c})
+ interset/empty-set => [])
+
+[[:chapter {:title "intersection"}]]
+"Intersecting two simple intersets is a union of their underlying sets:"
+(fact
+ (interset/intersection #{[:some-app/friend "alice"]
+                          [:some-app/friend "bob"]}
+                        #{[:some-app/friend "alice"]
+                          [:some-app/friend "charlie"]})
+ => #{[:some-app/friend "alice"]
+      [:some-app/friend "bob"]
+      [:some-app/friend "charlie"]})
+
 "This is true because element `x` is a member of the intersection of intersets `A` and `B`
 if and only if it is a member of the both `A` and `B`.  To be a member of `A` it needs
 to be a member of all the named sets composing `A`, and to be a member of `B`
 it needs to be a member of all of `B`'s components.  Therefore, `x` needs to be a member of
 all the named sets composing both `A` and `B` -- their union (as Clojure sets)."
 
-"We allow any number of sets to be intersected"
+"For canonical intersets we return a union of the intersections of all simple intersets on one side, with all intersets on the other side,
+as long as they are not disjoint."
+
+"Consider for example two intersets containing, for `alice` and `bob` respectively, the user *and* his or her friends.
+Intersecting these two sets will result in a 3-component canonical set:
+1. Friends of both `alice` and `bob`.
+2. `alice`, as long as she's friends with `bob`, and
+3. `bob`, as long as he's friends with `alice`.
+The fourth combination -- the intersection of `alice` and `bob` is omitted, because the set of *all `alice`s who are also `bob`s* is empty."
 (fact
- (interset/intersection #{:a :b} #{:b :c} #{:c :d}) => #{:a :b :c :d})
+ (interset/intersection [#{[:some-app/friend "alice"]} #{"alice"}]
+                        [#{[:some-app/friend "bob"]} #{"bob"}])
+ => [#{[:some-app/friend "alice"]
+       [:some-app/friend "bob"]}
+     #{"bob" [:some-app/friend "alice"]}
+     #{"alice" [:some-app/friend "bob"]}])
 
 [[:chapter {:title "subset?"}]]
 "The `subset?` predicate checks if one interset is a subset of the other.  For example:"
 (fact
  (interset/subset? #{:a} interset/universe) => true
  (interset/subset? interset/universe #{:a}) => false
+ (interset/subset? #{:a} interset/empty-set) => false
+ (interset/subset? interset/empty-set #{:a}) => true
  (interset/subset? (interset/intersection #{:a} #{:b}) #{:a}) => true
  (interset/subset? (interset/intersection #{:a} #{:b}) #{:c}) => false)
+
 "In particular, a set is considered a subset of itself."
 (fact
  (interset/subset? #{:a} #{:a}) => true)
-"Interset `A` is a subset of interset `B` if and only if every member `x` of `A` is also a member of `B`.
-If `x` is a member of `A` it is a member of all `A`'s components.
-To be a member of `B` it needs to also be a member of all `B`'s components.
-This means that every component of `B` must also be a component of `A`, or in other words,
-Clojure set `B` must be a subset of Clojure set `A`."
-[[:reference {:refer "cloudlog.interset/subset?"}]]
 
-[[:chapter {:title "super-union"}]]
-"The main disadvantage of intersets is the fact that intersets are not closed for the union operation.
-This means that given two intersets `A` and `B`, their union is not necessarily an interset by itself.
-
-The thing that can be provided is a `super-union` -- an interset that is guaranteed to contain both (or all)
-intersets joined by this operator, and by that be a superset of their union."
-(let [AB #{:a :b}
-      BC #{:b :c}
-      union (interset/super-union AB BC)]
-  (fact
-   union =not=> empty? ; The super-union is still not the universal set
-   (interset/subset? AB union) => true
-   (interset/subset? BC union) => true))
-
-
-[[:chapter {:title "empty?"}]]
-"It is sometimes useful to test if an interset is empty.  For example, a Cloudlog fact designated for an empty audience
-can be dropped.
-By default we consider intersets to be non-empty, i.e., we consider named sets to be intersecting, unless otherwise specified."
+"For simple intersets, interset `A` is subset of interset `B` if and only if
+Clojure set `B` is a subset of Clojure set `A`."
 (fact
- (interset/empty? #{:a :b}) => false)
+ (interset/subset? #{"alice" [:some-app/friend "bob"]}
+                   #{[:some-app/friend "bob"]}) => true
+ ;; but...
+  (interset/subset? #{[:some-app/friend "bob"]}
+                    #{"alice" [:some-app/friend "bob"]}) => false)
 
-"An interset is empty if it is intersected with the `:empty` set."
-(fact
- (interset/empty? #{:a :empty :b}) => true)
+"This is true because the set containing `alice` only if `alice` is friends with `bob` is a subset of `bob`'s friends."
 
-"Another case in which an interset is considered empty is when it contains two disjoined named sets.
-A named set is considered a *partition* if it has the form `[:some-key= \"some-value\"]`."
+"If the right-hand argument is a canonical interset, `subset?` returns `true` if it is true for *at least one* of the right-hand argument's components."
 (fact
- (interset/partition? [:something= 123]) => true
- (interset/partition? :something) => false
- (interset/partition? [:something 123]) => false)
-"An interset is considered empty if it is an intersection of two partitions of the same key, with different values."
-(fact
- (interset/empty? #{:a [:foo= "foo"] [:foo= "bar"]}) => true
- (interset/empty? #{:a [:foo= "foo"]}) => false)
+ (interset/subset? #{"alice" [:some-app/friend "bob"]}
+                   [#{[:some-app/friend "bob"]} #{[:some-app/friend "charlie"]}]) => true)
 
+"If the left-hand argument is canonical, `subset?` returns `true` only if *all* components are subsets."
+(fact
+ (interset/subset? [#{"alice" [:some-app/friend "bob"]} #{[:some-app/friend "charlie"]}]
+                   [#{[:some-app/friend "bob"]} #{[:some-app/friend "charlie"]}]) => true
+ ;; but...
+  (interset/subset? [#{"alice" [:some-app/friend "bob"]} #{[:some-app/friend "charlie"]}]
+                    #{[:some-app/friend "bob"]}) => false)
+
+[[:chapter {:title "Under the Hood"}]]
+[[:section {:title "canonical"}]]
+"`canonical` takes an interset of any kind, and returns a canonical interset."
+
+"If the given interset is already canonical, it returns the interset as-is."
+(fact
+ (interset/canonical [#{"foo"} #{"bar"}]) => [#{"foo"} #{"bar"}])
+
+"If the given interset is a simple one, it wraps it in a vector."
+(fact
+ (interset/canonical #{"foo"}) => [#{"foo"}])
+
+[[:section {:title "uncanonical"}]]
+"`uncanonical` inverts the effect of `canonical`, if it is possible."
+
+"When given a canonical interset of size 1, it returns the underlying set."
+(fact
+ (interset/uncanonical [#{"foo"}]) => #{"foo"})
+
+"When given a canonical interset with more elements, it returns the canonical interset."
+(fact
+ (interset/uncanonical [#{"foo"} #{"bar"}]) => [#{"foo"} #{"bar"}])
+
+"`uncanonical` is idempotent in the sense that calling it on a simple interset will result in the same interset."
+(fact
+ (interset/uncanonical #{"foo"}) => #{"foo"})
+
+[[:section {:title "disjoint?"}]]
+"Two simple intersets are (definitely) disjoint when each of them references a concrete user identity (a string), and these identities are different."
+
+"The `disjoint?` function takes two *simple* intersets and returns whether they are disjoint."
+
+"It will return `false` if at least one of the two sets does not have an identity."
+(fact
+ (interset/disjoint? #{"foo"} #{[:some-app/friend "bar"]}) => false)
+
+"In this case, `disjoint?` does not know for sure whether or not `foo` is a friend of `bar`, so it returns the safe answer `false`."
+
+"In case each inteset has a different identity we know for sure these sets are disjoint."
+(fact
+ (interset/disjoint? #{"foo"} #{[:some-app/friend "bar"] "baz"}) => true)
+
+"However, if both sets reference the same identity, they are not disjoint."
+(fact
+ (interset/disjoint? #{"foo"} #{[:some-app/friend "bar"] "foo"}) => false)
