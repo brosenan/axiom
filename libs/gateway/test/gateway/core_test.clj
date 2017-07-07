@@ -8,8 +8,9 @@
             [cloudlog-events.core :as ev]
             [ring.util.codec :as codec]
             [clojure.edn :as edn]
+            [gniazdo.core :as ws]
             [org.httpkit.server :as htsrv]
-            [gniazdo.core :as ws]))
+            [org.httpkit.client :as http]))
 
 [[:chapter {:title "Introduction"}]]
 "This library implement Axiom's gateway tier.
@@ -373,7 +374,7 @@ middleware should be wrapped around it."
                   :body "hi"})
        app (-> handler
                dummy-authenticator)]
-   (app {:cookies {"user_identity" "foobar"}
+   (app {:cookies {"user_identity" {:value "foobar"}}
          :params {}})
    @id => "foobar"))
 
@@ -387,20 +388,20 @@ Additionally, the new value is stored in a cookie for future reference."
    (app {:cookies {}
          :params {"_identity" "barfoo"}})
    => {:body "Hello, barfoo"
-       :cookies {"user_identity" "barfoo"}}))
+       :cookies {"user_identity" {:value "barfoo"}}}))
 
 "Adding a cookie works in concert with other cookies..."
 (fact
  (let [handler (fn [req]
                  {:body "Hello"
-                  :cookies {"some" "cookie"}})
+                  :cookies {"some" {:value "cookie"}}})
        app (-> handler
                dummy-authenticator)]
    (app {:cookies {}
          :params {"_identity" "barfoo"}})
    => {:body "Hello"
-       :cookies {"user_identity" "barfoo"
-                 "some" "cookie"}}))
+       :cookies {"user_identity" {:value "barfoo"}
+                 "some" {:value "cookie"}}}))
 
 "If both a cookie and a parameter exist with different identity values, the *parameter wins*."
 (fact
@@ -411,7 +412,7 @@ Additionally, the new value is stored in a cookie for future reference."
                   :body "hi"})
        app (-> handler
                dummy-authenticator)]
-   (app {:cookies {"user_identity" "foobar"}
+   (app {:cookies {"user_identity" {:value "foobar"}}
          :params {"_identity" "barfoo"}})
    @id => "barfoo"))
 
@@ -448,7 +449,7 @@ By default, this parameter will be an empty list."
                                 (async/>!! req-with-id-set req)
                                 {:status 200})
                       app (wrap-authorization handler)]
-                  (app {:cookies {"user_identity" "foo"}})
+                  (app {:cookies {"user_identity" {:value "foo"}}})
                   (let [[result chan] (async/alts!! [req-with-id-set
                                                      (async/timeout 1000)])]
                     chan => req-with-id-set
@@ -468,7 +469,7 @@ By default, this parameter will be an empty list."
                                 (async/>!! req-with-id-set req)
                                 {:status 200})
                       app (wrap-authorization handler)]
-                  (app {:cookies {"user_identity" "foo"}
+                  (app {:cookies {"user_identity" {:value "foo"}}
                         :headers {"Axiom-Id-Rules" ['foo-rule 'bar-rule]}})
                   (let [[result chan] (async/alts!! [req-with-id-set
                                                      (async/timeout 1000)])]
@@ -493,7 +494,7 @@ It copies its content to the `:app-version` key in the request."
        handler (fn [req]
                  (reset! ver (:app-version req)))
        app (cookie-version-selector handler)]
-   (app {:cookies {"app-version" "ver123"}})
+   (app {:cookies {"app-version" {:value "ver123"}}})
    @ver => "ver123"))
 
 [[:section {:title "Picking a Version based on Domain"}]]
@@ -538,7 +539,7 @@ and allowes the `cookie-version-selector` to expose its value as `:app-version`.
        handler (fn [req]
                  (reset! ver (:app-version req)))
        app (ver-selector handler)]
-   (app {:cookies {"app-version" "ver123"}})
+   (app {:cookies {"app-version" {:value "ver123"}}})
    @ver => "ver123"))
 
 "If an `app-version` cookie does not exist, `dummy-version-selector` creates one with the value from `:dummy-version`."
@@ -763,9 +764,12 @@ It assumes it is wrapped with [chord](https://github.com/jarohen/chord)'s `wrap-
 which translates WebSockets to `core.async` channels."
 
 "`websocket-handler` is a DI resource that depends on [event-gateway](#event-gateway) to filter events,
-and `event-bridge` (e.g., [this](rabbit-microservices.html#event-bridge)) to interact with the information tier."
+and `event-bridge` (e.g., [this](rabbit-microservices.html#event-bridge)) to interact with the information tier.
+It also depends on the middleware resources [wrap-websocket-handler](#wrap-websocket-handler), [wrap-authorization](#wrap-authorization)
+and [version-selector](#version-selector)."
 (fact
  (def pair [(async/chan 10) (async/chan 10)])
+ (def ws-pair [(async/chan 10) (async/chan 10)])
  (let [$ (di/injector {:event-gateway
                        (fn [[c-c2s c-s2c] id-set app-ver]
                          (let [s-c2s (async/chan 10 (comp
@@ -780,7 +784,25 @@ and `event-bridge` (e.g., [this](rabbit-microservices.html#event-bridge)) to int
                        :event-bridge
                        (fn [[c2s s2c]]
                          (async/pipe c2s (first pair))
-                         (async/pipe (second pair) s2c))})]
+                         (async/pipe (second pair) s2c))
+                       :wrap-authorization
+                       (fn [handler]
+                         (fn [req]
+                           (-> req
+                               (assoc :identity-set :the-id-set)
+                               handler)))
+                       :version-selector
+                       (fn [handler]
+                         (fn [req]
+                           (-> req
+                               (assoc :app-version :the-app-ver)
+                               handler)))
+                       :wrap-websocket-handler
+                       (fn [handler]
+                         (fn [req]
+                           (-> req
+                               (assoc :ws-channel-pair ws-pair)
+                               handler)))})]
    (module $)
    (di/startup $)
    (di/do-with! $ [websocket-handler]
@@ -793,11 +815,8 @@ and `s2c` can take messages from the server to the client.
 We use our own `wrap-websocket-handler` middleware similar to chord's, which supports a 3-parameter handler and provides the channel as a pair).
 To use `websocket-handler` with `wrap-websocket-handler` one needs to add a wrapper that converts `:ws-channel` to `:ws-channel-pair`.)"
 (fact
- (let [c2s (async/chan 10)
-       s2c (async/chan 10)]
-   (websocket-handler {:ws-channel-pair [c2s s2c]
-                       :identity-set :the-id-set
-                       :app-version :the-app-ver})
+ (let [[c2s s2c] ws-pair]
+   (websocket-handler {})
    (async/>!! c2s {:foo :bar})
    (let [[ev chan] (async/alts!! [(first pair) (async/timeout 1000)])]
      chan => (first pair)
@@ -843,7 +862,79 @@ To use `websocket-handler` with `wrap-websocket-handler` one needs to add a wrap
  @the-handler => :static)
 
 [[:chapter {:title "http-server"}]]
-"The `http-server` is the essence of the gateway."
+"At its essence, the gateway tier is an HTTP server, represented by the `http-server` resource."
+
+"As a DI resource, it depends on [ring-handler](#ring-handler) to provide content, and `http-config` to provide parameters such as `:ip` and `:port`.
+See [http-kit's documentation](http://www.http-kit.org/server.html#options) for the complete list."
+(fact
+ (let [$ (di/injector {:http-config {:port 44444}
+                       :ring-handler (fn [req]
+                                       {:status 200
+                                        :body "hello"})})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [http-server]
+                (let [resp @(http/get "http://localhost:44444")
+                      {:keys [status headers body error]} resp]
+                  (when error
+                    (throw error))
+                  status => 200
+                  (slurp body) => "hello"))
+   (di/shutdown $)))
+
+"The server resource contains information about the server, such as its `:local-port` -- the actual port that was allocated to it on the local machine
+(as in the case where we provided `:port 0`, requesting it to choose a random available port)."
+(fact
+ (let [$ (di/injector {:http-config {:port 0}
+                       :ring-handler (fn [req]
+                                       {:status 200
+                                        :body "hello"})})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [http-server]
+                (let [resp @(http/get (str "http://localhost:" (:local-port http-server)))
+                      {:keys [status headers body error]} resp]
+                  (when error
+                    (throw error))
+                  status => 200))
+   (di/shutdown $)))
+
+"The `ring-handler` is wrapped with a [parameters middleware](https://github.com/ring-clojure/ring/wiki/Parameters),
+so query params are parsed into the `:params` field of the request."
+(fact
+ (let [$ (di/injector {:http-config {:port 44444}
+                       :ring-handler (fn [req]
+                                       {:status 200
+                                        :body (str "hello, " (get-in req [:params "name"]))})})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [http-server]
+                (let [resp @(http/get "http://localhost:44444?name=foo")
+                      {:keys [status headers body error]} resp]
+                  (when error
+                    (throw error))
+                  status => 200
+                  (slurp body) => "hello, foo"))
+   (di/shutdown $)))
+
+"It is also wrapped with the [cookies middleware](https://github.com/ring-clojure/ring/wiki/Cookies)."
+(fact
+ (let [$ (di/injector {:http-config {:port 44444}
+                       :ring-handler
+                       (fn [req]
+                         {:status 200
+                          :body (str "hello, " (get-in req [:cookies "name" :value]))})})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [http-server]
+                (let [resp @(http/get "http://localhost:44444"
+                                      {:headers {"Cookie" "name=foo"}})
+                      {:keys [status headers body error]} resp]
+                  (when error
+                    (throw error))
+                  status => 200
+                  (slurp body) => "hello, foo"))
+   (di/shutdown $)))
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "rule-version-verifier"}]]
@@ -940,9 +1031,9 @@ and replies to each such event with a similar event, with the `:data` field (a n
 (fact
  (let [[resp chan] (async/alts!! [client-resp (async/timeout 1000)])]
    chan => client-resp
-   resp  => "{:data 2, :foo :bar}")
- (ws/close socket))
+   resp  => "{:data 2, :foo :bar}"))
 
-
+"Finally, let's close both server and client connections."
 (fact
+ (ws/close socket)
  (srv))

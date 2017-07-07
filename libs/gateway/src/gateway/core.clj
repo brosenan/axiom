@@ -4,10 +4,13 @@
             [cloudlog-events.core :as ev]
             [cloudlog.interset :as interset]
             [ring.middleware.content-type :as ctype]
+            [ring.middleware.params :as params]
+            [ring.middleware.cookies :as cookies]
             [ring.util.codec :as codec]
             [clojure.edn :as edn]
             [compojure.core :refer :all]
-            [chord.http-kit :as chord]))
+            [chord.http-kit :as chord]
+            [org.httpkit.server :as htsrv]))
 
 
 (defn any? [list]
@@ -26,7 +29,7 @@
 
 (defn cookie-version-selector [handler]
   (fn [req]
-    (handler (assoc req :app-version (get-in req [:cookies "app-version"])))))
+    (handler (assoc req :app-version (get-in req [:cookies "app-version" :value])))))
 
 (defn uri-partial-event [req]
   (let [{:keys [ns name key]} (:route-params req)]
@@ -63,11 +66,11 @@
               (fn [handler]
                 (fn[req]
                   (let [id (or (get-in req [:params "_identity"])
-                               (get-in req [:cookies "user_identity"]))]
+                               (get-in req [:cookies "user_identity" :value]))]
                     (cond id
                           (-> (handler (-> req
                                            (assoc :identity id)))
-                              (update-in [:cookies] #(assoc % "user_identity" id)))
+                              (update-in [:cookies] #(assoc % "user_identity" {:value id})))
                           :else
                           (handler req))))))
   (di/provide $ version-selector [dummy-version]
@@ -77,7 +80,7 @@
                     (let [req (cond (contains? (:cookies req) "app-version")
                                     req
                                     :else
-                                    (assoc-in req [:cookies "app-version"] dummy-version))]
+                                    (assoc-in req [:cookies "app-version" :value] dummy-version))]
                       (handler req))))))
   
   (di/provide $ static-handler [version-selector
@@ -155,16 +158,31 @@
                   [s-c2s s-s2c])))
 
   (di/provide $ websocket-handler [event-gateway
-                                   event-bridge]
-              (fn [{:keys [ws-channel-pair
-                           identity-set
-                           app-version]}]
-                (-> ws-channel-pair
-                    (event-gateway identity-set app-version)
-                    event-bridge)))
+                                   event-bridge
+                                   wrap-websocket-handler
+                                   wrap-authorization
+                                   version-selector]
+              (-> (fn [{:keys [ws-channel-pair
+                               identity-set
+                               app-version]}]
+                    (-> ws-channel-pair
+                        (event-gateway identity-set app-version)
+                        event-bridge))
+                  wrap-websocket-handler
+                  wrap-authorization
+                  version-selector))
 
   (di/provide $ ring-handler [static-handler
                               websocket-handler]
               (routes
                (GET "/ws" [] websocket-handler)
-               static-handler)))
+               static-handler))
+
+  (di/provide $ http-server [http-config
+                             ring-handler]
+              (let [srv
+                    (htsrv/run-server (-> ring-handler
+                                          params/wrap-params
+                                          cookies/wrap-cookies) http-config)]
+                {:resource (meta srv)
+                 :shutdown srv})))
