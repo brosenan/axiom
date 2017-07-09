@@ -14,3 +14,5 @@ pom.xml
 *~
 docs/
 /libs/axiom-cljs/resources/public/cljs
+figwheel_server.log
+
