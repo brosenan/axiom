@@ -99,4 +99,8 @@
                     "axiom-clj"
                     {:input "libs/axiom-clj/test/axiom_clj/core_test.clj"
                      :title "axiom-clj.core"
-                     :subtitle "An Integration of All Dependencies"}}})
+                     :subtitle "An Integration of All Dependencies"}
+                    "axiom-cljs"
+                    {:input "libs/axiom-cljs/test/axiom-cljs/core_test.clj"
+                     :title "axiom-cljs.core"
+                     :subtitle "A Client Library"}}})

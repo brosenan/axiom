@@ -997,7 +997,7 @@ so query params are parsed into the `:params` field of the request."
  (rule-version-verifier "ver123" #{"some-hash-that-does-not-exist" :something-else})
  => false)
 
-[[:chapter {:title "wrap-websocket-handler"}]]
+[[:section {:title "wrap-websocket-handler"}]]
 "`wrap-websocket-handler` is based on [chord](https://github.com/jarohen/chord)'s implementation of middleware of the same name.
 It does the same, i.e., exposes WebSockets as `core.async` channels, but with the following differences:
 1. Instead of providing one bidirectional channel in `:ws-channel`, it provides two unidirectional channels in `:ws-channel-pair`.
