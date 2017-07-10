@@ -7,6 +7,8 @@
                    [axiom-cljs.tests :refer [fact]]
                    [axiom-cljs.macros :refer [defview]]))
 
+(enable-console-print!)
+
 [[:chapter {:title "connection"}]]
 "`connection` creates a connection to the host."
 
@@ -45,8 +47,62 @@ Additionally, it contains the fields of the `:init` event it receives from the s
 3. A [connection](#connection) object.
 4. A pattern of a fact or clause to be queried by this view."
 (fact defview-1
-      (let [host {}]
-        (defview user-tweets [user]
-          host
-          [:tweetlog/tweets user tweet])
-        (is (fn? user-tweets))))
+      (defonce host {:to-host (async/chan 10)
+                     :pub (async/pub (async/chan 1) :foo)})
+      (defview my-tweets [user]
+        host
+        [:tweetlog/tweeted user tweet]))
+
+"The defined view is a function with the parameters defined in the view definition."
+(fact defview-2
+      (is (fn? my-tweets)))
+
+"When called for the first time, the function will send a `:reg` event with key according to the parameters,
+and return an empty sequence with a meta field `:pending` indicating that the function should be consulted again later."
+(fact defview-3
+      (async done
+             (go
+               (let [res (my-tweets "alice")]
+                 (is (= res []))
+                 (is (= (-> res meta :pending) true))
+                 (is (= (async/<! (:to-host host)) {:kind :reg
+                                                    :name "tweetlog/tweeted"
+                                                    :key "alice"})))
+               (done))))
+
+"An optional keyword parameter `:store-in` takes an atom and initially `reset!`s is to an empty map."
+(fact defview-4
+      (defonce host2 (let [from-host (async/chan 10)]
+                       {:from-host from-host
+                        :pub (async/pub from-host :name)}))
+      (defonce my-atom2 (atom nil))
+      (defview my-tweets2 [user]
+        host2
+        [:tweetlog/tweeted user tweet]
+        :store-in my-atom2)
+      (is (= @my-atom2 {})))
+
+"When events are received from the host they are placed in this map.
+The keys in this map are vectors corresponding to the view's arguments,
+and the values are sequences of maps that map each symbol in the fact to its corresponding value."
+(fact defview-5
+      (async done
+             (go
+               (async/>! (:from-host host2)
+                         {:kind :fact
+                          :name "tweetlog/tweeted"
+                          :key "alice"
+                          :data ["hello"]})
+               (async/>! (:from-host host2)
+                         {:kind :fact
+                          :name "tweetlog/tweeted"
+                          :key "alice"
+                          :data ["world"]})
+               (async/<! (async/timeout 1))
+               (is (contains? @my-atom2 ["alice"]))
+               (is (= (count (@my-atom2 ["alice"])) 2))
+               (is (= (set (@my-atom2 ["alice"])) #{{:user "alice"
+                                                     :tweet "hello"}
+                                                    {:user "alice"
+                                                     :tweet "world"}}))
+               (done))))
