@@ -1,7 +1,6 @@
 (ns axiom-cljs.core
   (:require-macros [cljs.core.async.macros :refer [go go-loop]])
-  (:require
-   [cljs.core.async :as async]))
+  (:require [cljs.core.async :as async]))
 
 (defn connection [& {:keys [ws-ch]}]
   (go
