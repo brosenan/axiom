@@ -84,7 +84,7 @@
                 </ul>
               </nav>
           </div>
-          <div><span id="connection"></span><h2><b>1 &nbsp;&nbsp; connection</b></h2></div><div><p><code>connection</code> creates a connection to the host.</p></div><div><p>It takes an optional keyword parameter <code>:ws-ch</code>, which defaults to a <a href='https://github.com/jarohen/chord#clojurescript'>function of the same name in the chord library</a>. It returns a channel to which it will provide a map containing the following keys:</p><ol><li><code>:from-host</code>: A <code>core.async</code> channel for delivering events from the host,</li><li><code>:to-host</code>: A <code>core.async</code> channel for delivering events to the host,</li><li><code>:err</code>: An <code>atom</code> holding the latest error, or <code>nil</code> if communication is intact.Additionally, it contains the fields of the <code>:init</code> event it receives from the server-side once the connection is open.</li></ol></div><div class="code"><pre><code class="clojure">connection
+          <div class="code"><pre><code class="clojure">(enable-console-print!)</code></pre></div><div><span id="connection"></span><h2><b>1 &nbsp;&nbsp; connection</b></h2></div><div><p><code>connection</code> creates a connection to the host.</p></div><div><p>It takes an optional keyword parameter <code>:ws-ch</code>, which defaults to a <a href='https://github.com/jarohen/chord#clojurescript'>function of the same name in the chord library</a>. It returns a channel to which it will provide a map containing the following keys:</p><ol><li><code>:from-host</code>: A <code>core.async</code> channel for delivering events from the host,</li><li><code>:to-host</code>: A <code>core.async</code> channel for delivering events to the host,</li><li><code>:err</code>: An <code>atom</code> holding the latest error, or <code>nil</code> if communication is intact.Additionally, it contains the fields of the <code>:init</code> event it receives from the server-side once the connection is open.</li></ol></div><div class="code"><pre><code class="clojure">connection
 (async done
        (go
          (let [mock-ws-ch (fn [url]
@@ -103,11 +103,50 @@
            (async/&gt;! (:to-host host) {:some :event})
            (is (= (async/&lt;! (:from-host host)) {:some :event})))
          (done)))</code></pre></div><div><span id="defview"></span><h2><b>2 &nbsp;&nbsp; defview</b></h2></div><div><p>The <code>defview</code> macro defines a <em>view</em>, which is a data structure that aggregates events and allows query over these events.</p></div><div><p><code>defview</code> four positional parameters:</p><ol><li>The name of the view (a symbol).  This becomes the name of a function that retrieves data from that view.</li><li>An argument list for the view (a vector).  This becomes the argument list for the function.</li><li>A <a href='#connection'>connection</a> object.</li><li>A pattern of a fact or clause to be queried by this view.</li></ol></div><div class="code"><pre><code class="clojure">defview-1
-    (let [host {}]
-      (defview user-tweets [user]
-        host
-        [:tweetlog/tweets user tweet])
-      (is (fn? user-tweets)))</code></pre></div>
+    (defonce host {:to-host (async/chan 10)
+                   :pub (async/pub (async/chan 1) :foo)})
+    (defview my-tweets [user]
+      host
+      [:tweetlog/tweeted user tweet])</code></pre></div><div><p>The defined view is a function with the parameters defined in the view definition.</p></div><div class="code"><pre><code class="clojure">defview-2
+    (is (fn? my-tweets))</code></pre></div><div><p>When called for the first time, the function will send a <code>:reg</code> event with key according to the parameters, and return an empty sequence with a meta field <code>:pending</code> indicating that the function should be consulted again later.</p></div><div class="code"><pre><code class="clojure">defview-3
+    (async done
+           (go
+             (let [res (my-tweets &quot;alice&quot;)]
+               (is (= res []))
+               (is (= (-&gt; res meta :pending) true))
+               (is (= (async/&lt;! (:to-host host)) {:kind :reg
+                                                  :name &quot;tweetlog/tweeted&quot;
+                                                  :key &quot;alice&quot;})))
+             (done)))</code></pre></div><div><p>An optional keyword parameter <code>:store-in</code> takes an atom and initially <code>reset!</code>s is to an empty map.</p></div><div class="code"><pre><code class="clojure">defview-4
+    (defonce host2 (let [from-host (async/chan 10)]
+                     {:from-host from-host
+                      :pub (async/pub from-host :name)}))
+    (defonce my-atom2 (atom nil))
+    (defview my-tweets2 [user]
+      host2
+      [:tweetlog/tweeted user tweet]
+      :store-in my-atom2)
+    (is (= @my-atom2 {}))</code></pre></div><div><p>When events are received from the host they are placed in this map. The keys in this map are vectors corresponding to the view's arguments, and the values are sequences of maps that map each symbol in the fact to its corresponding value.</p></div><div class="code"><pre><code class="clojure">defview-5
+    (async done
+           (go
+             (async/&gt;! (:from-host host2)
+                       {:kind :fact
+                        :name &quot;tweetlog/tweeted&quot;
+                        :key &quot;alice&quot;
+                        :data [&quot;hello&quot;]})
+             (async/&gt;! (:from-host host2)
+                       {:kind :fact
+                        :name &quot;tweetlog/tweeted&quot;
+                        :key &quot;alice&quot;
+                        :data [&quot;world&quot;]})
+             (async/&lt;! (async/timeout 1))
+             (is (contains? @my-atom2 [&quot;alice&quot;]))
+             (is (= (count (@my-atom2 [&quot;alice&quot;])) 2))
+             (is (= (set (@my-atom2 [&quot;alice&quot;])) #{{:user &quot;alice&quot;
+                                                   :tweet &quot;hello&quot;}
+                                                  {:user &quot;alice&quot;
+                                                   :tweet &quot;world&quot;}}))
+             (done)))</code></pre></div>
         </div>
       </div>
     </div>
