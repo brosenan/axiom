@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">axiom-cljs.core</a>
-                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#defview"><h4>2 &nbsp; defview</h4></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,7 +80,7 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#defview"><h4>2 &nbsp; defview</h4></a></li>
                 </ul>
               </nav>
           </div>
@@ -102,7 +102,12 @@
            ;; :from-host and :to-host comms
            (async/&gt;! (:to-host host) {:some :event})
            (is (= (async/&lt;! (:from-host host)) {:some :event})))
-         (done)))</code></pre></div>
+         (done)))</code></pre></div><div><span id="defview"></span><h2><b>2 &nbsp;&nbsp; defview</b></h2></div><div><p>The <code>defview</code> macro defines a <em>view</em>, which is a data structure that aggregates events and allows query over these events.</p></div><div><p><code>defview</code> four positional parameters:</p><ol><li>The name of the view (a symbol).  This becomes the name of a function that retrieves data from that view.</li><li>An argument list for the view (a vector).  This becomes the argument list for the function.</li><li>A <a href='#connection'>connection</a> object.</li><li>A pattern of a fact or clause to be queried by this view.</li></ol></div><div class="code"><pre><code class="clojure">defview-1
+    (let [host {}]
+      (defview user-tweets [user]
+        host
+        [:tweetlog/tweets user tweet])
+      (is (fn? user-tweets)))</code></pre></div>
         </div>
       </div>
     </div>
