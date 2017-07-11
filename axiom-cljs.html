@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 10 July 2017</h5>
+              <h5>Date: 11 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
           <hr/>
@@ -84,7 +84,7 @@
                 </ul>
               </nav>
           </div>
-          <div class="code"><pre><code class="clojure">(enable-console-print!)</code></pre></div><div><span id="connection"></span><h2><b>1 &nbsp;&nbsp; connection</b></h2></div><div><p><code>connection</code> creates a connection to the host.</p></div><div><p>It takes an optional keyword parameter <code>:ws-ch</code>, which defaults to a <a href='https://github.com/jarohen/chord#clojurescript'>function of the same name in the chord library</a>. It returns a channel to which it will provide a map containing the following keys:</p><ol><li><code>:from-host</code>: A <code>core.async</code> channel for delivering events from the host,</li><li><code>:to-host</code>: A <code>core.async</code> channel for delivering events to the host,</li><li><code>:err</code>: An <code>atom</code> holding the latest error, or <code>nil</code> if communication is intact.Additionally, it contains the fields of the <code>:init</code> event it receives from the server-side once the connection is open.</li></ol></div><div class="code"><pre><code class="clojure">connection
+          <div class="code"><pre><code class="clojure">(enable-console-print!)</code></pre></div><div><span id="connection"></span><h2><b>1 &nbsp;&nbsp; connection</b></h2></div><div><p><code>connection</code> creates a connection to the host.</p></div><div><p>It takes an optional keyword parameter <code>:ws-ch</code>, which defaults to a <a href='https://github.com/jarohen/chord#clojurescript'>function of the same name in the chord library</a>. It returns a channel to which it will provide a map containing the following keys:</p><ol><li><code>:from-host</code>: A <code>core.async</code> channel for delivering events from the host,</li><li><code>:to-host</code>: A <code>core.async</code> channel for delivering events to the host,</li><li><code>:err</code>: An <code>atom</code> holding the latest error, or <code>nil</code> if communication is intact.</li><li><code>:pub</code>: A <code>core.async</code> <a href='https://github.com/clojure/core.async/wiki/Pub-Sub'>pub</a>, dispatching on <code>:name</code>.Additionally, it contains the fields of the <code>:init</code> event it receives from the server-side once the connection is open.</li></ol></div><div class="code"><pre><code class="clojure">connection
 (async done
        (go
          (let [mock-ws-ch (fn [url]
@@ -93,15 +93,20 @@
                                 (async/&gt;! ch {:kind :init
                                               :foo :bar})
                                 {:ws-channel ch})))
+               target-chan (async/chan 10)
                host (async/&lt;! (ax/connection :ws-ch mock-ws-ch))]
            (is (map? host))
            (is (contains? host :from-host))
            (is (contains? host :to-host))
            (is (= (:foo host) :bar))
+           (async/sub (:pub host) &quot;foo&quot; target-chan)
            ;; The mock provides one channel that is used for both
-           ;; :from-host and :to-host comms
-           (async/&gt;! (:to-host host) {:some :event})
-           (is (= (async/&lt;! (:from-host host)) {:some :event})))
+           ;; :from-host and :to-host comms.
+           (async/&gt;! (:to-host host) {:name &quot;foo&quot;
+                                      :key &quot;key&quot;})
+           ;; :pub is subscribed on :from-host
+           (is (= (async/&lt;! target-chan) {:name &quot;foo&quot;
+                                          :key &quot;key&quot;})))
          (done)))</code></pre></div><div><span id="defview"></span><h2><b>2 &nbsp;&nbsp; defview</b></h2></div><div><p>The <code>defview</code> macro defines a <em>view</em>, which is a data structure that aggregates events and allows query over these events.</p></div><div><p><code>defview</code> four positional parameters:</p><ol><li>The name of the view (a symbol).  This becomes the name of a function that retrieves data from that view.</li><li>An argument list for the view (a vector).  This becomes the argument list for the function.</li><li>A <a href='#connection'>connection</a> object.</li><li>A pattern of a fact or clause to be queried by this view.</li></ol></div><div class="code"><pre><code class="clojure">defview-1
     (defonce host {:to-host (async/chan 10)
                    :pub (async/pub (async/chan 1) :foo)})
@@ -126,26 +131,53 @@
       host2
       [:tweetlog/tweeted user tweet]
       :store-in my-atom2)
-    (is (= @my-atom2 {}))</code></pre></div><div><p>When events are received from the host they are placed in this map. The keys in this map are vectors corresponding to the view's arguments, and the values are sequences of maps that map each symbol in the fact to its corresponding value.</p></div><div class="code"><pre><code class="clojure">defview-5
+    (is (map? @my-atom2))</code></pre></div><div><p>When events are received from the host they are placed in this map. This is a two-level map, where the first level of keys corresponds to the view argument vector, mapping a set of results to each combination of arguments. The second level of keys consists of the received <a href='cloudlog-events.html#introduction'>events</a>,  with the <code>:ts</code> and <code>:change</code> fields omitted. The values are the accumulated <code>:change</code> of all matching events.</p></div><div class="code"><pre><code class="clojure">defview-5
     (async done
            (go
+             (reset! my-atom2 {})
              (async/&gt;! (:from-host host2)
                        {:kind :fact
                         :name &quot;tweetlog/tweeted&quot;
                         :key &quot;alice&quot;
-                        :data [&quot;hello&quot;]})
+                        :data [&quot;hello&quot;]
+                        :ts 1000
+                        :change 1
+                        :readers #{}
+                        :writers #{&quot;alice&quot;}})
              (async/&gt;! (:from-host host2)
                        {:kind :fact
                         :name &quot;tweetlog/tweeted&quot;
                         :key &quot;alice&quot;
-                        :data [&quot;world&quot;]})
+                        :data [&quot;world&quot;]
+                        :ts 2000
+                        :change 1
+                        :readers #{}
+                        :writers #{&quot;alice&quot;}})
+             (async/&gt;! (:from-host host2)
+                       {:kind :fact
+                        :name &quot;tweetlog/tweeted&quot;
+                        :key &quot;alice&quot;
+                        :data [&quot;world&quot;]
+                        :ts 3000
+                        :change 1
+                        :readers #{}
+                        :writers #{&quot;alice&quot;}})
              (async/&lt;! (async/timeout 1))
              (is (contains? @my-atom2 [&quot;alice&quot;]))
-             (is (= (count (@my-atom2 [&quot;alice&quot;])) 2))
-             (is (= (set (@my-atom2 [&quot;alice&quot;])) #{{:user &quot;alice&quot;
-                                                   :tweet &quot;hello&quot;}
-                                                  {:user &quot;alice&quot;
-                                                   :tweet &quot;world&quot;}}))
+             (is (= (get-in @my-atom2 [[&quot;alice&quot;]
+                                       {:kind :fact
+                                        :name &quot;tweetlog/tweeted&quot;
+                                        :key &quot;alice&quot;
+                                        :data [&quot;hello&quot;]
+                                        :readers #{}
+                                        :writers #{&quot;alice&quot;}}]) 1))
+             (is (= (get-in @my-atom2 [[&quot;alice&quot;]
+                                       {:kind :fact
+                                        :name &quot;tweetlog/tweeted&quot;
+                                        :key &quot;alice&quot;
+                                        :data [&quot;world&quot;]
+                                        :readers #{}
+                                        :writers #{&quot;alice&quot;}}]) 2))
              (done)))</code></pre></div>
         </div>
       </div>
