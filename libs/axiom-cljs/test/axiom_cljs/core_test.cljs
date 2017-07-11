@@ -17,6 +17,7 @@ It returns a channel to which it will provide a map containing the following key
 1. `:from-host`: A `core.async` channel for delivering events from the host,
 2. `:to-host`: A `core.async` channel for delivering events to the host,
 3. `:err`: An `atom` holding the latest error, or `nil` if communication is intact.
+4. `:pub`: A `core.async` [pub](https://github.com/clojure/core.async/wiki/Pub-Sub), dispatching on `:name`.
 Additionally, it contains the fields of the `:init` event it receives from the server-side once the connection is open."
 (fact connection
   (async done
@@ -27,15 +28,20 @@ Additionally, it contains the fields of the `:init` event it receives from the s
                                   (async/>! ch {:kind :init
                                                 :foo :bar})
                                   {:ws-channel ch})))
+                 target-chan (async/chan 10)
                  host (async/<! (ax/connection :ws-ch mock-ws-ch))]
              (is (map? host))
              (is (contains? host :from-host))
              (is (contains? host :to-host))
              (is (= (:foo host) :bar))
+             (async/sub (:pub host) "foo" target-chan)
              ;; The mock provides one channel that is used for both
-             ;; :from-host and :to-host comms
-             (async/>! (:to-host host) {:some :event})
-             (is (= (async/<! (:from-host host)) {:some :event})))
+             ;; :from-host and :to-host comms.
+             (async/>! (:to-host host) {:name "foo"
+                                        :key "key"})
+             ;; :pub is subscribed on :from-host
+             (is (= (async/<! target-chan) {:name "foo"
+                                            :key "key"})))
            (done))))
 
 [[:chapter {:title "defview"}]]
@@ -80,29 +86,59 @@ and return an empty sequence with a meta field `:pending` indicating that the fu
         host2
         [:tweetlog/tweeted user tweet]
         :store-in my-atom2)
-      (is (= @my-atom2 {})))
+      (is (map? @my-atom2)))
 
 "When events are received from the host they are placed in this map.
-The keys in this map are vectors corresponding to the view's arguments,
-and the values are sequences of maps that map each symbol in the fact to its corresponding value."
+This is a two-level map, where the first level of keys corresponds to the view argument vector,
+mapping a set of results to each combination of arguments.
+The second level of keys consists of the received [events](cloudlog-events.html#introduction), 
+with the `:ts` and `:change` fields omitted.
+The values are the accumulated `:change` of all matching events."
 (fact defview-5
       (async done
              (go
+               (reset! my-atom2 {})
                (async/>! (:from-host host2)
                          {:kind :fact
                           :name "tweetlog/tweeted"
                           :key "alice"
-                          :data ["hello"]})
+                          :data ["hello"]
+                          :ts 1000
+                          :change 1
+                          :readers #{}
+                          :writers #{"alice"}})
                (async/>! (:from-host host2)
                          {:kind :fact
                           :name "tweetlog/tweeted"
                           :key "alice"
-                          :data ["world"]})
+                          :data ["world"]
+                          :ts 2000
+                          :change 1
+                          :readers #{}
+                          :writers #{"alice"}})
+               (async/>! (:from-host host2)
+                         {:kind :fact
+                          :name "tweetlog/tweeted"
+                          :key "alice"
+                          :data ["world"]
+                          :ts 3000
+                          :change 1
+                          :readers #{}
+                          :writers #{"alice"}})
                (async/<! (async/timeout 1))
                (is (contains? @my-atom2 ["alice"]))
-               (is (= (count (@my-atom2 ["alice"])) 2))
-               (is (= (set (@my-atom2 ["alice"])) #{{:user "alice"
-                                                     :tweet "hello"}
-                                                    {:user "alice"
-                                                     :tweet "world"}}))
+               (is (= (get-in @my-atom2 [["alice"]
+                                         {:kind :fact
+                                          :name "tweetlog/tweeted"
+                                          :key "alice"
+                                          :data ["hello"]
+                                          :readers #{}
+                                          :writers #{"alice"}}]) 1))
+               (is (= (get-in @my-atom2 [["alice"]
+                                         {:kind :fact
+                                          :name "tweetlog/tweeted"
+                                          :key "alice"
+                                          :data ["world"]
+                                          :readers #{}
+                                          :writers #{"alice"}}]) 2))
                (done))))

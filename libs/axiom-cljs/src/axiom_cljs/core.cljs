@@ -9,4 +9,5 @@
                  :ws-channel)
           init (async/<! ch)]
       (merge init {:from-host ch
-                   :to-host ch}))))
+                   :to-host ch
+                   :pub (async/pub ch :name)}))))
