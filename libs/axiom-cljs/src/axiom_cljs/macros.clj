@@ -8,9 +8,16 @@
                                 :else #{}) form))
 
 (defmacro defview [name args host fact &
-                   {:keys [store-in when] :or {store-in `(atom nil)
-                                               when true}}]
-  (let [fact-name (-> fact first str (subs 1))]
+                   {:keys [store-in when order-by]
+                    :or {store-in `(atom nil)
+                         when true
+                         order-by []}}]
+  (let [fact-name (-> fact first str (subs 1))
+        cmp `(fn [a# b#]
+               (compare (let [{:keys [~@(symbols fact)]} a#]
+                          ~order-by)
+                        (let [{:keys [~@(symbols fact)]} b#]
+                          ~order-by)))]
     `(defonce ~name
        (let [sub-chan# (async/chan 1)
              state# ~store-in]
@@ -26,29 +33,30 @@
              (recur)))
          (fn ~args
            (cond (contains? @state# ~args)
-                 (-> (for [[ev# c#] (@state# ~args)
-                           :when (> c# 0)]
-                       (-> (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
-                             ~(into {}
-                                    (for [sym (symbols fact)]
-                                      [(keyword sym) sym])))
-                           (assoc :-readers (:readers ev#))
-                           (assoc :-writers (:writers ev#))
-                           (assoc :-delete! #(go
-                                               (async/>! (:to-host ~host)
-                                                         (-> ev#
-                                                             (assoc :ts ((:time ~host)))
-                                                             (assoc :change (- c#))))))
-                           (assoc :-swap! (fn [func# & args#]
-                                            (go
-                                              (async/>! (:to-host ~host)
-                                                        (-> ev#
-                                                            (assoc :ts ((:time ~host)))
-                                                            (assoc :change c#)
-                                                            (assoc :removed (:data ev#))
-                                                            (assoc :data
-                                                                   (let [{:keys ~(vec (symbols (drop 2 fact)))} (apply func# ev# args#)]
-                                                                     ~(vec (drop 2 fact)))))))))))
+                 (-> (->> (for [[ev# c#] (@state# ~args)
+                                :when (> c# 0)]
+                            (-> (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
+                                  ~(into {}
+                                         (for [sym (symbols fact)]
+                                           [(keyword sym) sym])))
+                                (assoc :-readers (:readers ev#))
+                                (assoc :-writers (:writers ev#))
+                                (assoc :-delete! #(go
+                                                    (async/>! (:to-host ~host)
+                                                              (-> ev#
+                                                                  (assoc :ts ((:time ~host)))
+                                                                  (assoc :change (- c#))))))
+                                (assoc :-swap! (fn [func# & args#]
+                                                 (go
+                                                   (async/>! (:to-host ~host)
+                                                             (-> ev#
+                                                                 (assoc :ts ((:time ~host)))
+                                                                 (assoc :change c#)
+                                                                 (assoc :removed (:data ev#))
+                                                                 (assoc :data
+                                                                        (let [{:keys ~(vec (symbols (drop 2 fact)))} (apply func# ev# args#)]
+                                                                          ~(vec (drop 2 fact)))))))))))
+                          (sort ~cmp))
                      (with-meta {:pending false
                                  :add (fn [{:keys ~(vec (symbols fact))}]
                                         (go

@@ -328,3 +328,48 @@ We define such filtering using an optional `:when` key in `defview`."
                (async/<! (async/timeout 1))
                (is (= (count (@my-atom5 ["alice"])) 1))
                (done))))
+
+[[:section {:title "Sorting"}]]
+"The optional keyword argument `:order-by` directs the view function to sort the elements it returns according to the given expression.
+The expression can rely on symbols from the fact pattern, and must result in a [comparable expression](https://clojure.org/guides/comparators)."
+(fact defview-sort
+      (defonce my-atom6 (atom nil))
+      (defonce from-host6 (async/chan 10))
+      (defonce host6 {:to-host (async/chan 10)
+                      :pub (async/pub from-host6 :name)})
+      (defview my-sorted-tweets [user]
+        host6
+        [:tweetlog/tweeted user tweet timestamp]
+        :store-in my-atom6
+        :order-by (- timestamp) ;; Later tweets first
+        )
+      (reset! my-atom6 {})
+      (swap! my-atom6 assoc-in
+             [["alice"]
+              {:kind :fact
+               :name "tweetlog/tweeted"
+               :key "alice"
+               :data ["my first tweet" 1000]
+               :readers #{}
+               :writers #{"alice"}}] 1)
+      (swap! my-atom6 assoc-in
+             [["alice"]
+              {:kind :fact
+               :name "tweetlog/tweeted"
+               :key "alice"
+               :data ["my second tweet" 2000]
+               :readers #{}
+               :writers #{"alice"}}] 1)
+      (swap! my-atom6 assoc-in
+             [["alice"]
+              {:kind :fact
+               :name "tweetlog/tweeted"
+               :key "alice"
+               :data ["my third tweet" 3000]
+               :readers #{}
+               :writers #{"alice"}}] 1)
+      (let [tweets-in-order (for [result (my-sorted-tweets "alice")]
+                              (:tweet result))]
+        (is (= tweets-in-order ["my third tweet"
+                                "my second tweet"
+                                "my first tweet"]))))
