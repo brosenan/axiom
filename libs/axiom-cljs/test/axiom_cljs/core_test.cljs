@@ -80,7 +80,10 @@ and return an empty sequence with a meta field `:pending` indicating that the fu
 (fact defview-4
       (defonce host2 (let [from-host (async/chan 10)]
                        {:from-host from-host
-                        :pub (async/pub from-host :name)}))
+                        :to-host (async/chan 10)
+                        :pub (async/pub from-host :name)
+                        :time (constantly 12345)
+                        :identity "alice"}))
       (defonce my-atom2 (atom nil))
       (defview my-tweets2 [user]
         host2
@@ -141,4 +144,147 @@ The values are the accumulated `:change` of all matching events."
                                           :data ["world"]
                                           :readers #{}
                                           :writers #{"alice"}}]) 2))
+               (done))))
+
+"The view function returns, for a given combination of arguments, a collection of all data elements with a positive total count.
+In our case, both \"hello\" and \"world\" tweets are taken (in some order)."
+(fact defview-6
+      (is (= (count (my-tweets2 "alice")) 2))
+      (is (= (-> (my-tweets2 "alice")
+                 meta :pending) false)))
+
+"Each element in the returned collection is a *value map*, a map in which the keys correspond to the symbols in the fact pattern provided in the view definition.
+In our case these are `:user` and `:tweet`.
+The values are their corresponding values in each event."
+(fact defview-7a
+      (doseq [result (my-tweets2 "alice")]
+        (is (= (:user result) "alice"))
+        (is (contains? #{"hello" "world"} (:tweet result)))))
+
+"Along with the data fields, each value map also contains the `:-readers` and `:-writers` of the corresponding events."
+(fact defview-7b
+      (doseq [result (my-tweets2 "alice")]
+        (is (= (:-readers result) #{}))
+        (is (= (:-writers result) #{"alice"}))))
+
+"Elements with zero or negative count values are not shown."
+(fact defview-8
+      (reset! my-atom2 {})
+      (swap! my-atom2 assoc-in [["alice"]
+                                {:kind :fact
+                                 :name "tweetlog/tweeted"
+                                 :key "alice"
+                                 :data ["hello"]
+                                 :readers #{}
+                                 :writers #{"alice"}}] 0)
+      (swap! my-atom2 assoc-in [["alice"]
+                                {:kind :fact
+                                 :name "tweetlog/tweeted"
+                                 :key "alice"
+                                 :data ["world"]
+                                 :readers #{}
+                                 :writers #{"alice"}}] -1)
+      (is (= (count (my-tweets2 "alice")) 0)))
+
+[[:section {:title "Event-Emitting Functions"}]]
+"A view provides functions that allow users to emit event for creating, updating and deleting facts."
+
+"For *creating facts*, a non-pending sequence returned by a view function has an `:add` meta-field.
+This is a function that takes a value map as input, and emits a corresponding event with the following keys:
+1. `:kind` is always `:fact`.
+2. `:name` is the first element in the fact pattern, converted to string.
+3. `:key` and `:data` are derived from the value map.
+4. `:ts` consults the host's `:time` function.
+5. `:change` is always 1.
+6. `:writers` defaults to the set representing the user.
+7. `:readers` defaults to the universal set."
+(fact defview-9
+      (async done
+             (go
+               (let [add (-> (my-tweets2 "alice")
+                             meta :add)]
+                 (is (fn? add))
+                 (add {:user "alice"
+                       :tweet "Hola!"})
+                 (is (= (async/<! (:to-host host2))
+                        {:kind :fact
+                         :name "tweetlog/tweeted"
+                         :key "alice"
+                         :data ["Hola!"]
+                         :ts 12345
+                         :change 1
+                         :writers #{"alice"}
+                         :readers #{}})))
+               (done))))
+
+"In value maps where the user is a writer, a `:-delete!` entry contains a function that deletes the corresponding fact.
+It creates an event with all the same values, but with a new `:ts` and a `:change` value equal to the negative of the count value of the original event."
+(fact defview-10
+      (async done
+             (defonce my-atom3 (atom nil))
+             (let [from-host (async/chan 10)]
+               (defonce host3 {:to-host (async/chan 10)
+                               :pub (async/pub from-host :name)
+                               :time (constantly 23456)}))
+             (defview my-tweets3 [user]
+               host3
+               [:tweetlog/tweeted user tweet]
+               :store-in my-atom3)
+             (go
+               (swap! my-atom3 assoc-in [["alice"]
+                                         {:kind :fact
+                                          :name "tweetlog/tweeted"
+                                          :key "alice"
+                                          :data ["hello"]
+                                          :readers #{}
+                                          :writers #{"alice"}}] 3)
+               (let [valmap (first (my-tweets3 "alice"))]
+                 (is (fn? (:-delete! valmap)))
+                 ((:-delete! valmap))
+                 (is (= (async/<! (:to-host host3))
+                        {:kind :fact
+                         :name "tweetlog/tweeted"
+                         :key "alice"
+                         :data ["hello"]
+                         :ts 23456
+                         :change -3
+                         :readers #{}
+                         :writers #{"alice"}})))
+               (done))))
+
+"A `:-swap!` function provides a way to update a value map.
+It takes a function (and optionally arguments) that is applied to the value map, and emits an [atomic update](cloudlog-events.html#atomic-updates)
+event from the original state to the state reflected by the modified value map."
+(fact defview-11
+      (async done
+             (defonce my-atom4 (atom nil))
+             (let [from-host (async/chan 10)]
+               (defonce host4 {:to-host (async/chan 10)
+                               :pub (async/pub from-host :name)
+                               :time (constantly 34567)}))
+             (defview my-tweets4 [user]
+               host4
+               [:tweetlog/tweeted user tweet]
+               :store-in my-atom4)
+             (go
+               (swap! my-atom4 assoc-in [["alice"]
+                                         {:kind :fact
+                                          :name "tweetlog/tweeted"
+                                          :key "alice"
+                                          :data ["hello"]
+                                          :readers #{}
+                                          :writers #{"alice"}}] 3)
+               (let [valmap (first (my-tweets4 "alice"))]
+                 (is (fn? (:-swap! valmap)))
+                 ((:-swap! valmap) assoc :tweet "world")
+                 (is (= (async/<! (:to-host host4))
+                        {:kind :fact
+                         :name "tweetlog/tweeted"
+                         :key "alice"
+                         :removed ["hello"]
+                         :data ["world"]
+                         :ts 34567
+                         :change 3
+                         :readers #{}
+                         :writers #{"alice"}})))
                (done))))
