@@ -2,10 +2,11 @@
   (:require [cljs.test :refer-macros [is testing async]]
             [devcards.core :refer-macros [deftest]]
             [axiom-cljs.core :as ax]
-            [cljs.core.async :as async])
+            [cljs.core.async :as async]
+            [clojure.string :as str])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [axiom-cljs.tests :refer [fact]]
-                   [axiom-cljs.macros :refer [defview]]))
+                   [axiom-cljs.macros :refer [defview defquery]]))
 
 (enable-console-print!)
 
@@ -373,3 +374,179 @@ The expression can rely on symbols from the fact pattern, and must result in a [
         (is (= tweets-in-order ["my third tweet"
                                 "my second tweet"
                                 "my first tweet"]))))
+
+[[:chapter {:title "defquery"}]]
+"`defquery` is similar to [defview](#defview), but instead of querying for facts, it queries for results contributed by [clauses](cloudlog.html#defclause)."
+
+"This macro's structure is similar to `defview`, with one exception -- instead of providing a fact pattern, we provide a *predicate pattern*, of the form:"
+(comment
+  [:some/name input argument -> output arguments])
+
+(fact defquery-1
+      (defonce from-host7 (async/chan 10))
+      (defonce unique7 (atom nil))
+      (reset! unique7 0)
+      (defonce host7 {:to-host (async/chan 10)
+                      :pub (async/pub from-host7 :name)
+                      :identity "alice"
+                      :uuid (fn []
+                              (str "SOMEUUID" (swap! unique7 inc)))
+                      :time (constantly 12345)})
+      (defonce my-atom7 (atom nil))
+      (defquery my-query7 [user]
+        host7
+        [:tweetlog/timeline user -> author tweet]
+        :store-in my-atom7 ;; Optional
+        ))
+
+"The optional `:store-in` arguement provides an atom in which received events are stored.
+The structure is similar to that used by `defview`."
+(fact defquery-2
+      (is (map? @my-atom7)))
+
+"As in `defview`, `defquery` defines a function.
+When called, two events are emitted:
+1. A `:reg` event for registering to results, and
+2. A `:fact` event to make the query.
+In such a case the function returns an empty sequence with a `:pending` meta field set to `true`."
+(fact defquery-3
+      (async done
+             (go
+               (reset! my-atom7 {})
+               (let [result (my-query7 "alice")]
+                 (is (= result []))
+                 (is (= (-> result meta :pending) true)))
+               (is (= (async/<! (:to-host host7))
+                      {:kind :reg
+                       :name "tweetlog/timeline!"
+                       :key "SOMEUUID1"}))
+               (is (= (async/<! (:to-host host7))
+                      {:kind :fact
+                       :name "tweetlog/timeline?"
+                       :key "SOMEUUID1"
+                       :data ["alice"]
+                       :ts 12345
+                       :change 1
+                       :writers #{"alice"}
+                       :readers #{"alice"}}))
+               (done))))
+
+"Incoming events that carry query results update the map in this atom.
+The main difference between this and what `defview` does is that 
+while the events that `defview` receives contain all the data necessary for calculating both the keys and the values,
+The results here do not contain the information for the key (the function's arguments).
+Instead, the event contains a unique ID, which is mapped by `defquery` to input arguments."
+(fact defquery-4
+      (async done
+             (reset! my-atom7 {})
+             (go
+               (async/>! from-host7
+                         {:kind :fact
+                          :name "tweetlog/timeline!"
+                          :key "SOMEUUID1"
+                          :data ["bob" "hi there"]
+                          :ts 23456
+                          :change 1
+                          :writers #{"XXYY"}
+                          :readers #{}})
+               (async/<! (async/timeout 1))
+               (is (= (get-in @my-atom7
+                              [["alice"]
+                               {:kind :fact
+                                :name "tweetlog/timeline!"
+                                :key "SOMEUUID1"
+                                :data ["bob" "hi there"]
+                                :writers #{"XXYY"}
+                                :readers #{}}]) 1))
+               (done))))
+
+"With results in place, the query function returns a (non-`:pending`) list of value maps.
+This time, the value maps capture the query's *output parameters* only."
+(fact defquery-5
+      (let [result (my-query7 "alice")]
+        (is (= (-> result meta :pending) false))
+        (is (= result
+               [{:author "bob"
+                 :tweet "hi there"}])) ))
+
+"As with `defview`, results with a count value of zero or under are omitted."
+(fact defquery-6
+      (reset! my-atom7 {})
+      (swap! my-atom7 assoc-in [["alice"]
+                                {:kind :fact
+                                 :name "tweetlog/timeline!"
+                                 :key "SOMEUUID1"
+                                 :data ["bob" "hi there"]
+                                 :writers #{"XXYY"}
+                                 :readers #{}}] 0)
+      (swap! my-atom7 assoc-in [["alice"]
+                                {:kind :fact
+                                 :name "tweetlog/timeline!"
+                                 :key "SOMEUUID1"
+                                 :data ["bob" "bye there"]
+                                 :writers #{"XXYY"}
+                                 :readers #{}}] -1)
+      (is (= (my-query7 "alice") [])))
+
+[[:section {:title "Filtering and Sorting"}]]
+"Filtering and sorting work exactly as with `defview`."
+(fact defquery-filt
+      (async done
+             (defonce from-host8 (async/chan 10))
+             (defonce host8 {:to-host (async/chan 10)
+                             :pub (async/pub from-host8 :name)
+                             :identity "alice"
+                             :uuid (constantly "SOMEUUID")
+                             :time (constantly 12345)})
+             (defonce my-atom8 (atom nil))
+             (defquery tweets-by-authors-that-begin-in-b [user]
+               host8
+               [:tweetlog/timeline user -> author tweet]
+               :store-in my-atom8
+               :when (str/starts-with? author "b")
+               :order-by tweet)
+             (go
+               (tweets-by-authors-that-begin-in-b "alice") ;; Start listenning...
+               (async/>! from-host8
+                         {:kind :fact
+                          :name "tweetlog/timeline!"
+                          :key "SOMEUUID"
+                          :data ["bob" "D"]
+                          :ts 1000
+                          :change 1
+                          :writers #{"XXYY"}
+                          :readers #{}})
+               (async/>! from-host8
+                         {:kind :fact
+                          :name "tweetlog/timeline!"
+                          :key "SOMEUUID"
+                          :data ["charlie" "C"] ;; Dropped
+                          :ts 2000
+                          :change 1
+                          :writers #{"XXYY"}
+                          :readers #{}})
+               (async/>! from-host8
+                         {:kind :fact
+                          :name "tweetlog/timeline!"
+                          :key "SOMEUUID"
+                          :data ["boaz" "B"]
+                          :ts 3000
+                          :change 1
+                          :writers #{"XXYY"}
+                          :readers #{}})
+               (async/>! from-host8
+                         {:kind :fact
+                          :name "tweetlog/timeline!"
+                          :key "SOMEUUID"
+                          :data ["bob" "A"]
+                          :ts 4000
+                          :change 1
+                          :writers #{"XXYY"}
+                          :readers #{}})
+               (async/<! (async/timeout 1))
+               (let [results (tweets-by-authors-that-begin-in-b "alice")]
+                 (is (= (count results) 3))
+                 (is (= (->> results
+                             (map :tweet))
+                        ["A" "B" "D"])))
+               (done))))

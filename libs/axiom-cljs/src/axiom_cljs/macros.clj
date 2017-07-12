@@ -7,17 +7,30 @@
                                 (sequential? %) (apply clojure.set/union %)
                                 :else #{}) form))
 
+(defmacro update-state [state ev args when]
+  `(cond ~when
+         (swap! ~state update-in [~args (-> ~ev
+                                            (dissoc :ts)
+                                            (dissoc :change))] (fnil #(+ % (:change ~ev)) 0))))
+
+(defn symbol-map [expr]
+  (into {}
+        (for [sym (symbols expr)]
+          [(keyword sym) sym])))
+
+(defn comparator [fact order-by]
+  `(fn [a# b#]
+     (compare (let [{:keys [~@(symbols fact)]} a#]
+                ~order-by)
+              (let [{:keys [~@(symbols fact)]} b#]
+                ~order-by))))
+
 (defmacro defview [name args host fact &
                    {:keys [store-in when order-by]
                     :or {store-in `(atom nil)
                          when true
                          order-by []}}]
-  (let [fact-name (-> fact first str (subs 1))
-        cmp `(fn [a# b#]
-               (compare (let [{:keys [~@(symbols fact)]} a#]
-                          ~order-by)
-                        (let [{:keys [~@(symbols fact)]} b#]
-                          ~order-by)))]
+  (let [fact-name (-> fact first str (subs 1))]
     `(defonce ~name
        (let [sub-chan# (async/chan 1)
              state# ~store-in]
@@ -26,19 +39,14 @@
          (go-loop []
            (let [ev# (async/<! sub-chan#)
                  ~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
-             (cond ~when
-                   (swap! state# update-in [~args (-> ev#
-                                                      (dissoc :ts)
-                                                      (dissoc :change))] (fnil #(+ % (:change ev#)) 0)))
+             (update-state state# ev# ~args ~when)
              (recur)))
          (fn ~args
            (cond (contains? @state# ~args)
                  (-> (->> (for [[ev# c#] (@state# ~args)
                                 :when (> c# 0)]
                             (-> (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
-                                  ~(into {}
-                                         (for [sym (symbols fact)]
-                                           [(keyword sym) sym])))
+                                  ~(symbol-map fact))
                                 (assoc :-readers (:readers ev#))
                                 (assoc :-writers (:writers ev#))
                                 (assoc :-delete! #(go
@@ -56,7 +64,7 @@
                                                                  (assoc :data
                                                                         (let [{:keys ~(vec (symbols (drop 2 fact)))} (apply func# ev# args#)]
                                                                           ~(vec (drop 2 fact)))))))))))
-                          (sort ~cmp))
+                          (sort ~(comparator fact order-by)))
                      (with-meta {:pending false
                                  :add (fn [{:keys ~(vec (symbols fact))}]
                                         (go
@@ -76,3 +84,53 @@
                                                            :key ~(-> fact second)}))
                    (with-meta '() {:pending true}))))))))
 
+(defn ^:private parse-target-form [[name & args]]
+   (let [[in out] (split-with (partial not= '->) args)]
+     [name in (rest out)]))
+
+(defmacro defquery [name args host query &
+                   {:keys [store-in when order-by]
+                    :or {store-in `(atom nil)
+                         when true
+                         order-by []}}]
+  (let [[pred-name inputs outputs] (parse-target-form query)
+        pred-name (-> pred-name str (subs 1))]
+    `(defonce ~name
+       (let [id-map# (atom {})
+             sub-chan# (async/chan 1)
+             state# ~store-in]
+         (reset! ~store-in {})
+         (async/sub (:pub ~host) ~(str pred-name "!") sub-chan#)
+         (go-loop []
+           (let [ev# (async/<! sub-chan#)
+                 args# (@id-map# (:key ev#))
+                 [~@outputs] (:data ev#)]
+             (update-state state# ev# args# ~when))
+           (recur))
+         (fn ~args
+           (cond (contains? @state# ~args)
+                 (-> (->> (for [[ev# c#] (@state# ~args)
+                                :when (> c# 0)]
+                            (let [[~@outputs] (:data ev#)]
+                              ~(symbol-map outputs)))
+                          (sort ~(comparator outputs order-by)))
+                     (with-meta {:pending false}))
+                 :else
+                 (let [uuid# ((:uuid ~host))]
+                   (swap! id-map# assoc uuid# ~args)
+                   (go
+                     (async/>! (:to-host ~host)
+                               {:kind :reg
+                                :name ~(str pred-name "!")
+                                :key uuid#})
+                     (async/>! (:to-host ~host)
+                               {:kind :fact
+                                :name ~(str pred-name "?")
+                                :key uuid#
+                                :data [~@inputs]
+                                :ts ((:time ~host))
+                                :change 1
+                                :writers #{(:identity ~host)}
+                                :readers #{(:identity ~host)}}))
+                   (-> '()
+                       (with-meta {:pending true})))))))))
