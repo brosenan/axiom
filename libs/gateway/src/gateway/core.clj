@@ -53,10 +53,10 @@
                                                       :name rel
                                                       :key user} chan]))
                           (let [xform (comp
-                                       (filter (fn [ev] (contains? (:writers ev) (-> ev
-                                                                                     :name
-                                                                                     keyword
-                                                                                     namespace))))
+                                       (filter (fn [ev] (interset/subset? (:writers ev) #{(-> ev
+                                                                                               :name
+                                                                                               keyword
+                                                                                               namespace)})))
                                        (filter (fn [ev] (interset/subset? #{user} (:readers ev))))
                                        (map (fn [ev] (vec (cons (keyword (:name ev)) (:data ev))))))
                                 trans-chan (async/chan 1 xform)]
