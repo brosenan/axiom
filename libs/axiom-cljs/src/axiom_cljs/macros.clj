@@ -7,10 +7,10 @@
                                 (sequential? %) (apply clojure.set/union %)
                                 :else #{}) form))
 
-(defmacro defview [name args host fact & {:keys [store-in] :or {store-in `(atom nil)}}]
-  (let [fact-name (-> fact first str (subs 1))
-        data-vars (drop 2 fact)
-        all-vars (rest fact)]
+(defmacro defview [name args host fact &
+                   {:keys [store-in when] :or {store-in `(atom nil)
+                                               when true}}]
+  (let [fact-name (-> fact first str (subs 1))]
     `(defonce ~name
        (let [sub-chan# (async/chan 1)
              state# ~store-in]
@@ -18,16 +18,17 @@
          (async/sub (:pub ~host) ~fact-name sub-chan#)
          (go-loop []
            (let [ev# (async/<! sub-chan#)
-                 ~(vec all-vars) (cons (:key ev#) (:data ev#))]
-             (swap! state# update-in [~args (-> ev#
-                                                (dissoc :ts)
-                                                (dissoc :change))] (fnil #(+ % (:change ev#)) 0))
+                 ~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
+             (cond ~when
+                   (swap! state# update-in [~args (-> ev#
+                                                      (dissoc :ts)
+                                                      (dissoc :change))] (fnil #(+ % (:change ev#)) 0)))
              (recur)))
          (fn ~args
            (cond (contains? @state# ~args)
                  (-> (for [[ev# c#] (@state# ~args)
                            :when (> c# 0)]
-                       (-> (let [~(vec all-vars) (cons (:key ev#) (:data ev#))]
+                       (-> (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
                              ~(into {}
                                     (for [sym (symbols fact)]
                                       [(keyword sym) sym])))
@@ -46,8 +47,8 @@
                                                             (assoc :change c#)
                                                             (assoc :removed (:data ev#))
                                                             (assoc :data
-                                                                   (let [{:keys ~(vec data-vars)} (apply func# ev# args#)]
-                                                                     ~(vec data-vars))))))))))
+                                                                   (let [{:keys ~(vec (symbols (drop 2 fact)))} (apply func# ev# args#)]
+                                                                     ~(vec (drop 2 fact)))))))))))
                      (with-meta {:pending false
                                  :add (fn [{:keys ~(vec (symbols fact))}]
                                         (go
@@ -66,3 +67,4 @@
                                                            :name ~fact-name
                                                            :key ~(-> fact second)}))
                    (with-meta '() {:pending true}))))))))
+

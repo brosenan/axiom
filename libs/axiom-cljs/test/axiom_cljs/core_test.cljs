@@ -198,7 +198,7 @@ This is a function that takes a value map as input, and emits a corresponding ev
 5. `:change` is always 1.
 6. `:writers` defaults to the set representing the user.
 7. `:readers` defaults to the universal set."
-(fact defview-9
+(fact defview-ev-1
       (async done
              (go
                (let [add (-> (my-tweets2 "alice")
@@ -219,7 +219,7 @@ This is a function that takes a value map as input, and emits a corresponding ev
 
 "In value maps where the user is a writer, a `:-delete!` entry contains a function that deletes the corresponding fact.
 It creates an event with all the same values, but with a new `:ts` and a `:change` value equal to the negative of the count value of the original event."
-(fact defview-10
+(fact defview-ev-2
       (async done
              (defonce my-atom3 (atom nil))
              (let [from-host (async/chan 10)]
@@ -255,7 +255,7 @@ It creates an event with all the same values, but with a new `:ts` and a `:chang
 "A `:-swap!` function provides a way to update a value map.
 It takes a function (and optionally arguments) that is applied to the value map, and emits an [atomic update](cloudlog-events.html#atomic-updates)
 event from the original state to the state reflected by the modified value map."
-(fact defview-11
+(fact defview-ev-3
       (async done
              (defonce my-atom4 (atom nil))
              (let [from-host (async/chan 10)]
@@ -287,4 +287,44 @@ event from the original state to the state reflected by the modified value map."
                          :change 3
                          :readers #{}
                          :writers #{"alice"}})))
+               (done))))
+
+[[:section {:title "Filtering"}]]
+"Views can define client-side filtering for facts."
+
+"Imagine we are only interested in tweets that contain a hash-tag, i.e., tweets that match the regular expression `#\".*#[a-zA-Z0-9]+.*\"`.
+We define such filtering using an optional `:when` key in `defview`."
+(fact defview-filt
+      (async done
+             (defonce my-atom5 (atom nil))
+             (defonce from-host5 (async/chan 10))
+             (defonce host5 {:to-host (async/chan 10)
+                             :pub (async/pub from-host5 :name)})
+             (defview hashtags-only [user]
+               host5
+               [:tweetlog/tweeted user tweet]
+               :store-in my-atom5
+               :when (re-matches #".*#[a-zA-Z0-9]+.*" tweet))
+             (reset! my-atom5 {})
+             (go
+               (async/>! from-host5
+                         {:kind :fact
+                          :name "tweetlog/tweeted"
+                          :key "alice"
+                          :data ["No hashtags here..."]
+                          :ts 1000
+                          :change 1
+                          :readers #{}
+                          :writers #{"alice"}})
+               (async/>! from-host5
+                         {:kind :fact
+                          :name "tweetlog/tweeted"
+                          :key "alice"
+                          :data ["This one hash #hashtags..."]
+                          :ts 2000
+                          :change 1
+                          :readers #{}
+                          :writers #{"alice"}})
+               (async/<! (async/timeout 1))
+               (is (= (count (@my-atom5 ["alice"])) 1))
                (done))))
