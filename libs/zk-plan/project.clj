@@ -1,5 +1,8 @@
 (defproject axiom-clj/zk-plan "MONOLITH-SNAPSHOT"
-  :description "Cool new project to do things and stuff"
+  :description "A batch processing framework based on Zookeeper"
+  :url "https://github.com/brosenan/axiom"
+  :license {:name "Eclipse Public License"
+            :url "http://www.eclipse.org/legal/epl-v10.html"}
   :monolith/inherit true
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [zookeeper-clj "0.9.4"]

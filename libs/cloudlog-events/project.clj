@@ -1,5 +1,8 @@
 (defproject axiom-clj/cloudlog-events "MONOLITH-SNAPSHOT"
   :description "Event processors for Cloudlog"
+  :url "https://github.com/brosenan/axiom"
+  :license {:name "Eclipse Public License"
+            :url "http://www.eclipse.org/legal/epl-v10.html"}
   :monolith/inherit true
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/core.async "0.2.395"]

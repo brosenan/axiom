@@ -1,5 +1,8 @@
 (defproject axiom-clj/migrator "MONOLITH-SNAPSHOT"
-  :description "Cool new project to do things and stuff"
+  :description "Automatic migration for Axiom apps"
+  :url "https://github.com/brosenan/axiom"
+  :license {:name "Eclipse Public License"
+            :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [axiom-clj/permacode "MONOLITH-SNAPSHOT"]
                  [zookeeper-clj "0.9.4"]

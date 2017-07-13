@@ -1,5 +1,8 @@
 (defproject axiom-clj/s3 "MONOLITH-SNAPSHOT"
   :description "S3 storage provider"
+  :url "https://github.com/brosenan/axiom"
+  :license {:name "Eclipse Public License"
+            :url "http://www.eclipse.org/legal/epl-v10.html"}
   :monolith/inherit true
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [clj-aws-s3 "0.3.8"]

@@ -1,5 +1,8 @@
 (defproject axiom-clj/gateway "MONOLITH-SNAPSHOT"
   :description "Axiom Gateway Tier"
+  :url "https://github.com/brosenan/axiom"
+  :license {:name "Eclipse Public License"
+            :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/core.async "0.3.442"]
                  [axiom-clj/di "MONOLITH-SNAPSHOT"]

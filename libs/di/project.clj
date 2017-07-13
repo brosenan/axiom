@@ -1,5 +1,8 @@
 (defproject axiom-clj/di "MONOLITH-SNAPSHOT"
   :description "Dependency Injection for Axiom"
+  :url "https://github.com/brosenan/axiom"
+  :license {:name "Eclipse Public License"
+            :url "http://www.eclipse.org/legal/epl-v10.html"}
   :monolith/inherit true
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/core.async "0.3.442"]

@@ -1,4 +1,4 @@
-(defproject axiom "0.1.1-SNAPSHOT"
+(defproject axiom "0.1.2"
   :description "FIXME: write description"
   :url "https://github.com/brosenan/axiom"
   :license {:name "Eclipse Public License"
