@@ -1,8 +1,5 @@
 (defproject axiom-clj/cloudlog "MONOLITH-SNAPSHOT"
   :description "FIXME: write description"
-  :url "http://example.combolton/FIXME"
-  :license {:name "Eclipse Public License"
-            :url "http://www.eclipse.org/legal/epl-v10.html"}
   :monolith/inherit true
   :permacode-paths ["src"]
   :dependencies [[org.clojure/clojure "1.8.0"]

@@ -1,8 +1,5 @@
 (defproject axiom-clj/permacode "MONOLITH-SNAPSHOT"
   :description "A pure dialect of Clojure with content-addressed modules"
-  :url "http://github.com/brosenan/permacode"
-  :license {:name "Eclipse Public License"
-            :url "http://www.eclipse.org/legal/epl-v10.html"}
   :monolith/inherit true
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [mvxcvi/multihash "2.0.1"]

@@ -16,4 +16,4 @@ docs/
 /libs/axiom-cljs/resources/public/cljs
 /libs/axiom-cljs/out/
 figwheel_server.log
-
+pom.xml.asc

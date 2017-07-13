@@ -1,10 +1,7 @@
 (defproject axiom-clj/axiom-cljs "MONOLITH-SNAPSHOT"
   :description "A client library for Axiom"
-  :url "http://axiom-clj.org"
   :aliases {"im" "classpath" ;; As a no-op
             "eim" ["monolith" "each" "im"]}
-  :license {:name "Eclipse Public License"
-            :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.9.671"]
                  [lein-doo "0.1.7"]
