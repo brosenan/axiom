@@ -7,7 +7,7 @@
   :plugins [[lein-monolith "1.0.0"]
             [lein-cprint "1.2.0"]
             [lein-midje "3.2.1"]
-            [axiom-clj/permacode "MONOLITH-SNAPSHOT"]]
+            [axiom-clj/permacode "0.1.0-SNAPSHOT"]]
   :aliases {"im" ["do"
                   ["midje" ":filter" "-integ"]
                   ["install"]]
