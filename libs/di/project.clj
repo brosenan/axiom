@@ -1,4 +1,4 @@
-(defproject di "MONOLITH-SNAPSHOT"
+(defproject axiom-clj/di "MONOLITH-SNAPSHOT"
   :description "Dependency Injection for Axiom"
   :monolith/inherit true
   :dependencies [[org.clojure/clojure "1.8.0"]

@@ -1,10 +1,10 @@
-(defproject gateway "MONOLITH-SNAPSHOT"
+(defproject axiom-clj/gateway "MONOLITH-SNAPSHOT"
   :description "Axiom Gateway Tier"
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/core.async "0.3.442"]
-                 [di "MONOLITH-SNAPSHOT"]
-                 [cloudlog "MONOLITH-SNAPSHOT"]
-                 [cloudlog-events "MONOLITH-SNAPSHOT"]
+                 [axiom-clj/di "MONOLITH-SNAPSHOT"]
+                 [axiom-clj/cloudlog "MONOLITH-SNAPSHOT"]
+                 [axiom-clj/cloudlog-events "MONOLITH-SNAPSHOT"]
                  [ring/ring-core "1.6.1"]
                  [ring/ring-codec "1.0.1"]
                  [compojure "1.6.0"]

@@ -1,4 +1,4 @@
-(defproject cloudlog "MONOLITH-SNAPSHOT"
+(defproject axiom-clj/cloudlog "MONOLITH-SNAPSHOT"
   :description "FIXME: write description"
   :url "http://example.combolton/FIXME"
   :license {:name "Eclipse Public License"
@@ -6,7 +6,7 @@
   :monolith/inherit true
   :permacode-paths ["src"]
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [permacode "MONOLITH-SNAPSHOT"]]
+                 [axiom-clj/permacode "MONOLITH-SNAPSHOT"]]
   :profiles {:dev {:dependencies [[midje "1.8.3"]
                                   [im.chit/lucid.publish "1.2.8"]
                                   [im.chit/hara.string.prose "2.4.8"]

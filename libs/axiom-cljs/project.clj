@@ -1,4 +1,4 @@
-(defproject axiom-cljs "MONOLITH-SNAPSHOT"
+(defproject axiom-clj/axiom-cljs "MONOLITH-SNAPSHOT"
   :description "A client library for Axiom"
   :url "http://axiom-clj.org"
   :aliases {"im" "classpath" ;; As a no-op

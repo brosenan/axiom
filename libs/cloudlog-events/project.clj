@@ -1,4 +1,4 @@
-(defproject cloudlog-events "MONOLITH-SNAPSHOT"
+(defproject axiom-clj/cloudlog-events "MONOLITH-SNAPSHOT"
   :description "Event processors for Cloudlog"
   :url "https://github.com/brosenan/cloudlog-events"
   :license {:name "Eclipse Public License"
@@ -6,7 +6,7 @@
   :monolith/inherit true
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/core.async "0.2.395"]
-                 [cloudlog "MONOLITH-SNAPSHOT"]]
+                 [axiom-clj/cloudlog "MONOLITH-SNAPSHOT"]]
   :profiles {:dev {:dependencies [[midje "1.8.3"]
                                   [im.chit/lucid.publish "1.2.8"]
                                   [im.chit/hara.string.prose "2.4.8"]]

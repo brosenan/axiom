@@ -7,7 +7,7 @@
   :plugins [[lein-monolith "1.0.0"]
             [lein-cprint "1.2.0"]
             [lein-midje "3.2.1"]
-            [permacode "MONOLITH-SNAPSHOT"]]
+            [axiom-clj/permacode "MONOLITH-SNAPSHOT"]]
   :aliases {"im" ["do"
                   ["midje" ":filter" "-integ"]
                   ["install"]]
@@ -18,6 +18,8 @@
             "epub" ["monolith" "each" "permacode" "publish"]}
   :monolith {:project-dirs ["libs/*"]
              :inherit [:aliases :plugins]}
+  :repositories [["releases" {:url "https://clojars.org/repo"
+                              :creds :gpg}]]
   :profiles {:dev {:dependencies [[im.chit/lucid.publish "1.2.8"]
                                   [im.chit/hara.string.prose "2.4.8"]]}}
   :publish {:theme  "bolton"

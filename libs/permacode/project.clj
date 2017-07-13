@@ -1,4 +1,4 @@
-(defproject permacode "MONOLITH-SNAPSHOT"
+(defproject axiom-clj/permacode "MONOLITH-SNAPSHOT"
   :description "A pure dialect of Clojure with content-addressed modules"
   :url "http://github.com/brosenan/permacode"
   :license {:name "Eclipse Public License"
