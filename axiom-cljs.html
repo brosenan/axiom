@@ -62,16 +62,16 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 12 July 2017</h5>
+              <h5>Date: 14 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
-              <h5>Version: 0.1.0-SNAPSHOT</h5></div></div>
+              <h5>Version: 0.1.2</h5></div></div>
           <hr/>
           <div class="outline">
             <div class="toc">
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">axiom-cljs.core</a>
-                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#defview"><h4>2 &nbsp; defview</h4></a><a class="section" data-scroll="" href="#event-emitting-functions"><h5><i>2.1 &nbsp; Event-Emitting Functions</i></h5></a><a class="section" data-scroll="" href="#filtering"><h5><i>2.2 &nbsp; Filtering</i></h5></a><a class="section" data-scroll="" href="#sorting"><h5><i>2.3 &nbsp; Sorting</i></h5></a></li><li><a class="chapter" data-scroll="" href="#defquery"><h4>3 &nbsp; defquery</h4></a><a class="section" data-scroll="" href="#filtering-and-sorting"><h5><i>3.1 &nbsp; Filtering and Sorting</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#defview"><h4>2 &nbsp; defview</h4></a><a class="section" data-scroll="" href="#event-emitting-functions"><h5><i>2.1 &nbsp; Event-Emitting Functions</i></h5></a><a class="section" data-scroll="" href="#filtering"><h5><i>2.2 &nbsp; Filtering</i></h5></a><a class="section" data-scroll="" href="#sorting"><h5><i>2.3 &nbsp; Sorting</i></h5></a></li><li><a class="chapter" data-scroll="" href="#defquery"><h4>3 &nbsp; defquery</h4></a><a class="section" data-scroll="" href="#filtering-and-sorting"><h5><i>3.1 &nbsp; Filtering and Sorting</i></h5></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>4 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#pubsub"><h5><i>4.1 &nbsp; pubsub</i></h5></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,7 +80,7 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#defview"><h4>2 &nbsp; defview</h4></a><a class="section" data-scroll="" href="#event-emitting-functions"><h5><i>2.1 &nbsp; Event-Emitting Functions</i></h5></a><a class="section" data-scroll="" href="#filtering"><h5><i>2.2 &nbsp; Filtering</i></h5></a><a class="section" data-scroll="" href="#sorting"><h5><i>2.3 &nbsp; Sorting</i></h5></a></li><li><a class="chapter" data-scroll="" href="#defquery"><h4>3 &nbsp; defquery</h4></a><a class="section" data-scroll="" href="#filtering-and-sorting"><h5><i>3.1 &nbsp; Filtering and Sorting</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#defview"><h4>2 &nbsp; defview</h4></a><a class="section" data-scroll="" href="#event-emitting-functions"><h5><i>2.1 &nbsp; Event-Emitting Functions</i></h5></a><a class="section" data-scroll="" href="#filtering"><h5><i>2.2 &nbsp; Filtering</i></h5></a><a class="section" data-scroll="" href="#sorting"><h5><i>2.3 &nbsp; Sorting</i></h5></a></li><li><a class="chapter" data-scroll="" href="#defquery"><h4>3 &nbsp; defquery</h4></a><a class="section" data-scroll="" href="#filtering-and-sorting"><h5><i>3.1 &nbsp; Filtering and Sorting</i></h5></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>4 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#pubsub"><h5><i>4.1 &nbsp; pubsub</i></h5></a></li>
                 </ul>
               </nav>
           </div>
@@ -497,7 +497,21 @@
                (is (= (-&gt;&gt; results
                            (map :tweet))
                       [&quot;A&quot; &quot;B&quot; &quot;D&quot;])))
-             (done)))</code></pre></div>
+             (done)))</code></pre></div><div><span id="under-the-hood"></span><h2><b>4 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="pubsub"></span><h3>4.1 &nbsp;&nbsp; pubsub</h3></div><div><p><code>pubsub</code> is a simple synchronous publish/subscribe mechanism. The <code>pubsub</code> function takes a dispatch function as parameter, and returns a map containing two functions: <code>:sub</code> and <code>:pub</code>.</p></div><div class="code"><pre><code class="clojure">pubsub-1
+    (let [ps (ax/pubsub (fn [x]))]
+      (is (fn? (:pub ps)))
+      (is (fn? (:sub ps))))</code></pre></div><div><p>When calling the <code>:pub</code> function with a value, the dispatch function is called with that value.</p></div><div class="code"><pre><code class="clojure">pubsub-2
+    (let [val (atom nil)
+          ps (ax/pubsub (fn [x]
+                          (reset! val x)))]
+      ((:pub ps) [1 2 3])
+      (is (= @val [1 2 3])))</code></pre></div><div><p>The <code>:sub</code> function takes a dispatch value, and a function. When the dispatch function returns that dispatch value, the <code>:sub</code>scribed function is called with the <code>:pub</code>lished value.</p></div><div class="code"><pre><code class="clojure">pubsub-3
+    (let [val (atom nil)
+          ps (ax/pubsub :name)]
+      ((:sub ps) &quot;alice&quot; (partial reset! val))
+      ((:pub ps) {:name &quot;alice&quot; :age 28})
+      ((:pub ps) {:name &quot;bob&quot; :age 31})
+      (is (= @val {:name &quot;alice&quot; :age 28})))</code></pre></div>
         </div>
       </div>
     </div>
