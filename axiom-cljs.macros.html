@@ -1,0 +1,503 @@
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+
+  <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+
+  <!-- Enable responsiveness on mobile devices-->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <link rel="shortcut icon" href="favicon.ico">
+  <title>axiom//axiom-cljs.macros - Client-side Macros</title>
+  <script src="js/highlight.min.js"></script>
+  <script src="js/gumshoe.min.js"></script>
+  <script src="js/smooth-scroll.min.js"></script>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/poole.css">
+  <link rel="stylesheet" href="css/syntax.css">
+  <link rel="stylesheet" href="css/lanyon.css">
+  <link rel="stylesheet" href="css/bolton.css">
+  <link rel="stylesheet" href="css/bolton-api.css">
+  <link rel="stylesheet" href="css/bolton-highlight.css">
+  <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=PT+Serif:400,400italic,700|PT+Sans:400">
+  
+</head>
+
+  <body class="theme-base-08">
+    <span id="page-top"></span>
+
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+     styles, `#sidebar-checkbox` for behavior. -->
+<input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox">
+
+<!-- Toggleable sidebar -->
+<div class="sidebar" id="sidebar">
+  <nav class="sidebar-nav">
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
+    <span>&nbsp;</span>
+    <a class="sidebar-nav-item" href="axiom-clj.html">axiom-clj.core</a><a class="sidebar-nav-item" href="axiom-cljs.html">axiom-cljs.core</a><a class="sidebar-nav-item active" href="axiom-cljs.macros.html">axiom-cljs.macros</a><a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="di.html">di.core</a><a class="sidebar-nav-item" href="docs.html"></a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="gateway.html">gateway.core</a><a class="sidebar-nav-item" href="migrator.html">migrator.core</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="s3.html">s3.core</a><a class="sidebar-nav-item" href="storm.html">storm.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
+    <span class="sidebar-nav-item">&nbsp;</span>
+    <span class="sidebar-nav-item">&nbsp;</span>
+  </nav>
+</div>
+
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+	  <a href="index.html"><img src="img/axiom-logo.png"></a>
+          <h3 class="masthead-title">
+            <span>axiom//axiom-cljs.macros</span>
+            <small>Client-side Macros</small>
+          </h3>
+        </div>
+      </div>
+
+      <div class="container content">
+        <div class="page">
+          <div class="heading">
+            <div>
+              <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
+              <h5>Date: 14 July 2017</h5>
+              <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
+              <h5>Version: 0.1.2</h5></div></div>
+          <hr/>
+          <div class="outline">
+            <div class="toc">
+              <nav data-gumshoe-header>
+                <ul data-gumshoe>
+                  <a data-scroll class="top" href="#page-top">axiom-cljs.macros</a>
+                  <li><a class="chapter" data-scroll="" href="#defview"><h4>1 &nbsp; defview</h4></a><a class="section" data-scroll="" href="#event-emitting-functions"><h5><i>1.1 &nbsp; Event-Emitting Functions</i></h5></a><a class="section" data-scroll="" href="#filtering"><h5><i>1.2 &nbsp; Filtering</i></h5></a><a class="section" data-scroll="" href="#sorting"><h5><i>1.3 &nbsp; Sorting</i></h5></a></li><li><a class="chapter" data-scroll="" href="#defquery"><h4>2 &nbsp; defquery</h4></a><a class="section" data-scroll="" href="#filtering-and-sorting"><h5><i>2.1 &nbsp; Filtering and Sorting</i></h5></a></li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+
+          <div class="toc">
+              <nav>
+                <ul>
+                  <li><a class="chapter" data-scroll="" href="#defview"><h4>1 &nbsp; defview</h4></a><a class="section" data-scroll="" href="#event-emitting-functions"><h5><i>1.1 &nbsp; Event-Emitting Functions</i></h5></a><a class="section" data-scroll="" href="#filtering"><h5><i>1.2 &nbsp; Filtering</i></h5></a><a class="section" data-scroll="" href="#sorting"><h5><i>1.3 &nbsp; Sorting</i></h5></a></li><li><a class="chapter" data-scroll="" href="#defquery"><h4>2 &nbsp; defquery</h4></a><a class="section" data-scroll="" href="#filtering-and-sorting"><h5><i>2.1 &nbsp; Filtering and Sorting</i></h5></a></li>
+                </ul>
+              </nav>
+          </div>
+          <div><span id="defview"></span><h2><b>1 &nbsp;&nbsp; defview</b></h2></div><div><p>The <code>defview</code> macro defines a <em>view</em>, which is a data structure that aggregates events and allows query over these events.</p></div><div><p><code>defview</code> four positional parameters:</p><ol><li>The name of the view (a symbol).  This becomes the name of a function that retrieves data from that view.</li><li>An argument list for the view (a vector).  This becomes the argument list for the function.</li><li>A <a href='#connection'>connection</a> object.</li><li>A pattern of a fact or clause to be queried by this view.</li></ol></div><div class="code"><pre><code class="clojure">defview-1
+    (defonce host {:to-host (async/chan 10)
+                   :pub (async/pub (async/chan 1) :foo)})
+    (defview my-tweets [user]
+      host
+      [:tweetlog/tweeted user tweet])</code></pre></div><div><p>The defined view is a function with the parameters defined in the view definition.</p></div><div class="code"><pre><code class="clojure">defview-2
+    (is (fn? my-tweets))</code></pre></div><div><p>When called for the first time, the function will send a <code>:reg</code> event with key according to the parameters, and return an empty sequence with a meta field <code>:pending</code> indicating that the function should be consulted again later.</p></div><div class="code"><pre><code class="clojure">defview-3
+    (async done
+           (go
+             (let [res (my-tweets &quot;alice&quot;)]
+               (is (= res []))
+               (is (= (-&gt; res meta :pending) true))
+               (is (= (async/&lt;! (:to-host host)) {:kind :reg
+                                                  :name &quot;tweetlog/tweeted&quot;
+                                                  :key &quot;alice&quot;})))
+             (done)))</code></pre></div><div><p>An optional keyword parameter <code>:store-in</code> takes an atom and initially <code>reset!</code>s is to an empty map.</p></div><div class="code"><pre><code class="clojure">defview-4
+    (defonce host2 (let [from-host (async/chan 10)]
+                     {:from-host from-host
+                      :to-host (async/chan 10)
+                      :pub (async/pub from-host :name)
+                      :time (constantly 12345)
+                      :identity &quot;alice&quot;}))
+    (defonce my-atom2 (atom nil))
+    (defview my-tweets2 [user]
+      host2
+      [:tweetlog/tweeted user tweet]
+      :store-in my-atom2)
+    (is (map? @my-atom2))</code></pre></div><div><p>When events are received from the host they are placed in this map. This is a two-level map, where the first level of keys corresponds to the view argument vector, mapping a set of results to each combination of arguments. The second level of keys consists of the received <a href='cloudlog-events.html#introduction'>events</a>,  with the <code>:ts</code> and <code>:change</code> fields omitted. The values are the accumulated <code>:change</code> of all matching events.</p></div><div class="code"><pre><code class="clojure">defview-5
+    (async done
+           (go
+             (reset! my-atom2 {})
+             (async/&gt;! (:from-host host2)
+                       {:kind :fact
+                        :name &quot;tweetlog/tweeted&quot;
+                        :key &quot;alice&quot;
+                        :data [&quot;hello&quot;]
+                        :ts 1000
+                        :change 1
+                        :readers #{}
+                        :writers #{&quot;alice&quot;}})
+             (async/&gt;! (:from-host host2)
+                       {:kind :fact
+                        :name &quot;tweetlog/tweeted&quot;
+                        :key &quot;alice&quot;
+                        :data [&quot;world&quot;]
+                        :ts 2000
+                        :change 1
+                        :readers #{}
+                        :writers #{&quot;alice&quot;}})
+             (async/&gt;! (:from-host host2)
+                       {:kind :fact
+                        :name &quot;tweetlog/tweeted&quot;
+                        :key &quot;alice&quot;
+                        :data [&quot;world&quot;]
+                        :ts 3000
+                        :change 1
+                        :readers #{}
+                        :writers #{&quot;alice&quot;}})
+             (async/&lt;! (async/timeout 1))
+             (is (contains? @my-atom2 [&quot;alice&quot;]))
+             (is (= (get-in @my-atom2 [[&quot;alice&quot;]
+                                       {:kind :fact
+                                        :name &quot;tweetlog/tweeted&quot;
+                                        :key &quot;alice&quot;
+                                        :data [&quot;hello&quot;]
+                                        :readers #{}
+                                        :writers #{&quot;alice&quot;}}]) 1))
+             (is (= (get-in @my-atom2 [[&quot;alice&quot;]
+                                       {:kind :fact
+                                        :name &quot;tweetlog/tweeted&quot;
+                                        :key &quot;alice&quot;
+                                        :data [&quot;world&quot;]
+                                        :readers #{}
+                                        :writers #{&quot;alice&quot;}}]) 2))
+             (done)))</code></pre></div><div><p>The view function returns, for a given combination of arguments, a collection of all data elements with a positive total count. In our case, both "hello" and "world" tweets are taken (in some order).</p></div><div class="code"><pre><code class="clojure">defview-6
+    (is (= (count (my-tweets2 &quot;alice&quot;)) 2))
+    (is (= (-&gt; (my-tweets2 &quot;alice&quot;)
+               meta :pending) false))</code></pre></div><div><p>Each element in the returned collection is a <em>value map</em>, a map in which the keys correspond to the symbols in the fact pattern provided in the view definition. In our case these are <code>:user</code> and <code>:tweet</code>. The values are their corresponding values in each event.</p></div><div class="code"><pre><code class="clojure">defview-7a
+    (doseq [result (my-tweets2 &quot;alice&quot;)]
+      (is (= (:user result) &quot;alice&quot;))
+      (is (contains? #{&quot;hello&quot; &quot;world&quot;} (:tweet result))))</code></pre></div><div><p>Along with the data fields, each value map also contains the <code>:-readers</code> and <code>:-writers</code> of the corresponding events.</p></div><div class="code"><pre><code class="clojure">defview-7b
+    (doseq [result (my-tweets2 &quot;alice&quot;)]
+      (is (= (:-readers result) #{}))
+      (is (= (:-writers result) #{&quot;alice&quot;})))</code></pre></div><div><p>Elements with zero or negative count values are not shown.</p></div><div class="code"><pre><code class="clojure">defview-8
+    (reset! my-atom2 {})
+    (swap! my-atom2 assoc-in [[&quot;alice&quot;]
+                              {:kind :fact
+                               :name &quot;tweetlog/tweeted&quot;
+                               :key &quot;alice&quot;
+                               :data [&quot;hello&quot;]
+                               :readers #{}
+                               :writers #{&quot;alice&quot;}}] 0)
+    (swap! my-atom2 assoc-in [[&quot;alice&quot;]
+                              {:kind :fact
+                               :name &quot;tweetlog/tweeted&quot;
+                               :key &quot;alice&quot;
+                               :data [&quot;world&quot;]
+                               :readers #{}
+                               :writers #{&quot;alice&quot;}}] -1)
+    (is (= (count (my-tweets2 &quot;alice&quot;)) 0))</code></pre></div><div><span id="event-emitting-functions"></span><h3>1.1 &nbsp;&nbsp; Event-Emitting Functions</h3></div><div><p>A view provides functions that allow users to emit event for creating, updating and deleting facts.</p></div><div><p>For <em>creating facts</em>, a non-pending sequence returned by a view function has an <code>:add</code> meta-field. This is a function that takes a value map as input, and emits a corresponding event with the following keys:</p><ol><li><code>:kind</code> is always <code>:fact</code>.</li><li><code>:name</code> is the first element in the fact pattern, converted to string.</li><li><code>:key</code> and <code>:data</code> are derived from the value map.</li><li><code>:ts</code> consults the host's <code>:time</code> function.</li><li><code>:change</code> is always 1.</li><li><code>:writers</code> defaults to the set representing the user.</li><li><code>:readers</code> defaults to the universal set.</li></ol></div><div class="code"><pre><code class="clojure">defview-ev-1
+    (async done
+           (go
+             (let [add (-&gt; (my-tweets2 &quot;alice&quot;)
+                           meta :add)]
+               (is (fn? add))
+               (add {:user &quot;alice&quot;
+                     :tweet &quot;Hola!&quot;})
+               (is (= (async/&lt;! (:to-host host2))
+                      {:kind :fact
+                       :name &quot;tweetlog/tweeted&quot;
+                       :key &quot;alice&quot;
+                       :data [&quot;Hola!&quot;]
+                       :ts 12345
+                       :change 1
+                       :writers #{&quot;alice&quot;}
+                       :readers #{}})))
+             (done)))</code></pre></div><div><p>In value maps where the user is a writer, a <code>:-delete!</code> entry contains a function that deletes the corresponding fact. It creates an event with all the same values, but with a new <code>:ts</code> and a <code>:change</code> value equal to the negative of the count value of the original event.</p></div><div class="code"><pre><code class="clojure">defview-ev-2
+    (async done
+           (defonce my-atom3 (atom nil))
+           (let [from-host (async/chan 10)]
+             (defonce host3 {:to-host (async/chan 10)
+                             :pub (async/pub from-host :name)
+                             :time (constantly 23456)}))
+           (defview my-tweets3 [user]
+             host3
+             [:tweetlog/tweeted user tweet]
+             :store-in my-atom3)
+           (go
+             (swap! my-atom3 assoc-in [[&quot;alice&quot;]
+                                       {:kind :fact
+                                        :name &quot;tweetlog/tweeted&quot;
+                                        :key &quot;alice&quot;
+                                        :data [&quot;hello&quot;]
+                                        :readers #{}
+                                        :writers #{&quot;alice&quot;}}] 3)
+             (let [valmap (first (my-tweets3 &quot;alice&quot;))]
+               (is (fn? (:-delete! valmap)))
+               ((:-delete! valmap))
+               (is (= (async/&lt;! (:to-host host3))
+                      {:kind :fact
+                       :name &quot;tweetlog/tweeted&quot;
+                       :key &quot;alice&quot;
+                       :data [&quot;hello&quot;]
+                       :ts 23456
+                       :change -3
+                       :readers #{}
+                       :writers #{&quot;alice&quot;}})))
+             (done)))</code></pre></div><div><p>A <code>:-swap!</code> function provides a way to update a value map. It takes a function (and optionally arguments) that is applied to the value map, and emits an <a href='cloudlog-events.html#atomic-updates'>atomic update</a> event from the original state to the state reflected by the modified value map.</p></div><div class="code"><pre><code class="clojure">defview-ev-3
+    (async done
+           (defonce my-atom4 (atom nil))
+           (let [from-host (async/chan 10)]
+             (defonce host4 {:to-host (async/chan 10)
+                             :pub (async/pub from-host :name)
+                             :time (constantly 34567)}))
+           (defview my-tweets4 [user]
+             host4
+             [:tweetlog/tweeted user tweet]
+             :store-in my-atom4)
+           (go
+             (swap! my-atom4 assoc-in [[&quot;alice&quot;]
+                                       {:kind :fact
+                                        :name &quot;tweetlog/tweeted&quot;
+                                        :key &quot;alice&quot;
+                                        :data [&quot;hello&quot;]
+                                        :readers #{}
+                                        :writers #{&quot;alice&quot;}}] 3)
+             (let [valmap (first (my-tweets4 &quot;alice&quot;))]
+               (is (fn? (:-swap! valmap)))
+               ((:-swap! valmap) assoc :tweet &quot;world&quot;)
+               (is (= (async/&lt;! (:to-host host4))
+                      {:kind :fact
+                       :name &quot;tweetlog/tweeted&quot;
+                       :key &quot;alice&quot;
+                       :removed [&quot;hello&quot;]
+                       :data [&quot;world&quot;]
+                       :ts 34567
+                       :change 3
+                       :readers #{}
+                       :writers #{&quot;alice&quot;}})))
+             (done)))</code></pre></div><div><span id="filtering"></span><h3>1.2 &nbsp;&nbsp; Filtering</h3></div><div><p>Views can define client-side filtering for facts.</p></div><div><p>Imagine we are only interested in tweets that contain a hash-tag, i.e., tweets that match the regular expression <code>#&quot;.&#42;#&#91;a-zA-Z0-9&#93;+.&#42;&quot;</code>. We define such filtering using an optional <code>:when</code> key in <code>defview</code>.</p></div><div class="code"><pre><code class="clojure">defview-filt
+    (async done
+           (defonce my-atom5 (atom nil))
+           (defonce from-host5 (async/chan 10))
+           (defonce host5 {:to-host (async/chan 10)
+                           :pub (async/pub from-host5 :name)})
+           (defview hashtags-only [user]
+             host5
+             [:tweetlog/tweeted user tweet]
+             :store-in my-atom5
+             :when (re-matches #&quot;.*#[a-zA-Z0-9]+.*&quot; tweet))
+           (reset! my-atom5 {})
+           (go
+             (async/&gt;! from-host5
+                       {:kind :fact
+                        :name &quot;tweetlog/tweeted&quot;
+                        :key &quot;alice&quot;
+                        :data [&quot;No hashtags here...&quot;]
+                        :ts 1000
+                        :change 1
+                        :readers #{}
+                        :writers #{&quot;alice&quot;}})
+             (async/&gt;! from-host5
+                       {:kind :fact
+                        :name &quot;tweetlog/tweeted&quot;
+                        :key &quot;alice&quot;
+                        :data [&quot;This one hash #hashtags...&quot;]
+                        :ts 2000
+                        :change 1
+                        :readers #{}
+                        :writers #{&quot;alice&quot;}})
+             (async/&lt;! (async/timeout 1))
+             (is (= (count (@my-atom5 [&quot;alice&quot;])) 1))
+             (done)))</code></pre></div><div><span id="sorting"></span><h3>1.3 &nbsp;&nbsp; Sorting</h3></div><div><p>The optional keyword argument <code>:order-by</code> directs the view function to sort the elements it returns according to the given expression. The expression can rely on symbols from the fact pattern, and must result in a <a href='https://clojure.org/guides/comparators'>comparable expression</a>.</p></div><div class="code"><pre><code class="clojure">defview-sort
+    (defonce my-atom6 (atom nil))
+    (defonce from-host6 (async/chan 10))
+    (defonce host6 {:to-host (async/chan 10)
+                    :pub (async/pub from-host6 :name)})
+    (defview my-sorted-tweets [user]
+      host6
+      [:tweetlog/tweeted user tweet timestamp]
+      :store-in my-atom6
+      :order-by (- timestamp) ;; Later tweets first
+      )
+    (reset! my-atom6 {})
+    (swap! my-atom6 assoc-in
+           [[&quot;alice&quot;]
+            {:kind :fact
+             :name &quot;tweetlog/tweeted&quot;
+             :key &quot;alice&quot;
+             :data [&quot;my first tweet&quot; 1000]
+             :readers #{}
+             :writers #{&quot;alice&quot;}}] 1)
+    (swap! my-atom6 assoc-in
+           [[&quot;alice&quot;]
+            {:kind :fact
+             :name &quot;tweetlog/tweeted&quot;
+             :key &quot;alice&quot;
+             :data [&quot;my second tweet&quot; 2000]
+             :readers #{}
+             :writers #{&quot;alice&quot;}}] 1)
+    (swap! my-atom6 assoc-in
+           [[&quot;alice&quot;]
+            {:kind :fact
+             :name &quot;tweetlog/tweeted&quot;
+             :key &quot;alice&quot;
+             :data [&quot;my third tweet&quot; 3000]
+             :readers #{}
+             :writers #{&quot;alice&quot;}}] 1)
+    (let [tweets-in-order (for [result (my-sorted-tweets &quot;alice&quot;)]
+                            (:tweet result))]
+      (is (= tweets-in-order [&quot;my third tweet&quot;
+                              &quot;my second tweet&quot;
+                              &quot;my first tweet&quot;])))</code></pre></div><div><span id="defquery"></span><h2><b>2 &nbsp;&nbsp; defquery</b></h2></div><div><p><code>defquery</code> is similar to <a href='#defview'>defview</a>, but instead of querying for facts, it queries for results contributed by <a href='cloudlog.html#defclause'>clauses</a>.</p></div><div><p>This macro's structure is similar to <code>defview</code>, with one exception &ndash; instead of providing a fact pattern, we provide a <em>predicate pattern</em>, of the form:</p></div><div class="code"><pre><code class="clojure">[:some/name input argument -&gt; output arguments]</code></pre></div><div class="code"><pre><code class="clojure">defquery-1
+    (defonce from-host7 (async/chan 10))
+    (defonce unique7 (atom nil))
+    (reset! unique7 0)
+    (defonce host7 {:to-host (async/chan 10)
+                    :pub (async/pub from-host7 :name)
+                    :identity &quot;alice&quot;
+                    :uuid (fn []
+                            (str &quot;SOMEUUID&quot; (swap! unique7 inc)))
+                    :time (constantly 12345)})
+    (defonce my-atom7 (atom nil))
+    (defquery my-query7 [user]
+      host7
+      [:tweetlog/timeline user -&gt; author tweet]
+      :store-in my-atom7 ;; Optional
+      )</code></pre></div><div><p>The optional <code>:store-in</code> arguement provides an atom in which received events are stored. The structure is similar to that used by <code>defview</code>.</p></div><div class="code"><pre><code class="clojure">defquery-2
+    (is (map? @my-atom7))</code></pre></div><div><p>As in <code>defview</code>, <code>defquery</code> defines a function. When called, two events are emitted:</p><ol><li>A <code>:reg</code> event for registering to results, and</li><li>A <code>:fact</code> event to make the query.In such a case the function returns an empty sequence with a <code>:pending</code> meta field set to <code>true</code>.</li></ol></div><div class="code"><pre><code class="clojure">defquery-3
+    (async done
+           (go
+             (reset! my-atom7 {})
+             (let [result (my-query7 &quot;alice&quot;)]
+               (is (= result []))
+               (is (= (-&gt; result meta :pending) true)))
+             (is (= (async/&lt;! (:to-host host7))
+                    {:kind :reg
+                     :name &quot;tweetlog/timeline!&quot;
+                     :key &quot;SOMEUUID1&quot;}))
+             (is (= (async/&lt;! (:to-host host7))
+                    {:kind :fact
+                     :name &quot;tweetlog/timeline?&quot;
+                     :key &quot;SOMEUUID1&quot;
+                     :data [&quot;alice&quot;]
+                     :ts 12345
+                     :change 1
+                     :writers #{&quot;alice&quot;}
+                     :readers #{&quot;alice&quot;}}))
+             (done)))</code></pre></div><div><p>Incoming events that carry query results update the map in this atom. The main difference between this and what <code>defview</code> does is that  while the events that <code>defview</code> receives contain all the data necessary for calculating both the keys and the values, The results here do not contain the information for the key (the function's arguments). Instead, the event contains a unique ID, which is mapped by <code>defquery</code> to input arguments.</p></div><div class="code"><pre><code class="clojure">defquery-4
+    (async done
+           (reset! my-atom7 {})
+           (go
+             (async/&gt;! from-host7
+                       {:kind :fact
+                        :name &quot;tweetlog/timeline!&quot;
+                        :key &quot;SOMEUUID1&quot;
+                        :data [&quot;bob&quot; &quot;hi there&quot;]
+                        :ts 23456
+                        :change 1
+                        :writers #{&quot;XXYY&quot;}
+                        :readers #{}})
+             (async/&lt;! (async/timeout 1))
+             (is (= (get-in @my-atom7
+                            [[&quot;alice&quot;]
+                             {:kind :fact
+                              :name &quot;tweetlog/timeline!&quot;
+                              :key &quot;SOMEUUID1&quot;
+                              :data [&quot;bob&quot; &quot;hi there&quot;]
+                              :writers #{&quot;XXYY&quot;}
+                              :readers #{}}]) 1))
+             (done)))</code></pre></div><div><p>With results in place, the query function returns a (non-<code>:pending</code>) list of value maps. This time, the value maps capture the query's <em>output parameters</em> only.</p></div><div class="code"><pre><code class="clojure">defquery-5
+    (let [result (my-query7 &quot;alice&quot;)]
+      (is (= (-&gt; result meta :pending) false))
+      (is (= result
+             [{:author &quot;bob&quot;
+               :tweet &quot;hi there&quot;}])) )</code></pre></div><div><p>As with <code>defview</code>, results with a count value of zero or under are omitted.</p></div><div class="code"><pre><code class="clojure">defquery-6
+    (reset! my-atom7 {})
+    (swap! my-atom7 assoc-in [[&quot;alice&quot;]
+                              {:kind :fact
+                               :name &quot;tweetlog/timeline!&quot;
+                               :key &quot;SOMEUUID1&quot;
+                               :data [&quot;bob&quot; &quot;hi there&quot;]
+                               :writers #{&quot;XXYY&quot;}
+                               :readers #{}}] 0)
+    (swap! my-atom7 assoc-in [[&quot;alice&quot;]
+                              {:kind :fact
+                               :name &quot;tweetlog/timeline!&quot;
+                               :key &quot;SOMEUUID1&quot;
+                               :data [&quot;bob&quot; &quot;bye there&quot;]
+                               :writers #{&quot;XXYY&quot;}
+                               :readers #{}}] -1)
+    (is (= (my-query7 &quot;alice&quot;) []))</code></pre></div><div><span id="filtering-and-sorting"></span><h3>2.1 &nbsp;&nbsp; Filtering and Sorting</h3></div><div><p>Filtering and sorting work exactly as with <code>defview</code>.</p></div><div class="code"><pre><code class="clojure">defquery-filt
+    (async done
+           (defonce from-host8 (async/chan 10))
+           (defonce host8 {:to-host (async/chan 10)
+                           :pub (async/pub from-host8 :name)
+                           :identity &quot;alice&quot;
+                           :uuid (constantly &quot;SOMEUUID&quot;)
+                           :time (constantly 12345)})
+           (defonce my-atom8 (atom nil))
+           (defquery tweets-by-authors-that-begin-in-b [user]
+             host8
+             [:tweetlog/timeline user -&gt; author tweet]
+             :store-in my-atom8
+             :when (str/starts-with? author &quot;b&quot;)
+             :order-by tweet)
+           (go
+             (tweets-by-authors-that-begin-in-b &quot;alice&quot;) ;; Start listenning...
+             (async/&gt;! from-host8
+                       {:kind :fact
+                        :name &quot;tweetlog/timeline!&quot;
+                        :key &quot;SOMEUUID&quot;
+                        :data [&quot;bob&quot; &quot;D&quot;]
+                        :ts 1000
+                        :change 1
+                        :writers #{&quot;XXYY&quot;}
+                        :readers #{}})
+             (async/&gt;! from-host8
+                       {:kind :fact
+                        :name &quot;tweetlog/timeline!&quot;
+                        :key &quot;SOMEUUID&quot;
+                        :data [&quot;charlie&quot; &quot;C&quot;] ;; Dropped
+                        :ts 2000
+                        :change 1
+                        :writers #{&quot;XXYY&quot;}
+                        :readers #{}})
+             (async/&gt;! from-host8
+                       {:kind :fact
+                        :name &quot;tweetlog/timeline!&quot;
+                        :key &quot;SOMEUUID&quot;
+                        :data [&quot;boaz&quot; &quot;B&quot;]
+                        :ts 3000
+                        :change 1
+                        :writers #{&quot;XXYY&quot;}
+                        :readers #{}})
+             (async/&gt;! from-host8
+                       {:kind :fact
+                        :name &quot;tweetlog/timeline!&quot;
+                        :key &quot;SOMEUUID&quot;
+                        :data [&quot;bob&quot; &quot;A&quot;]
+                        :ts 4000
+                        :change 1
+                        :writers #{&quot;XXYY&quot;}
+                        :readers #{}})
+             (async/&lt;! (async/timeout 1))
+             (let [results (tweets-by-authors-that-begin-in-b &quot;alice&quot;)]
+               (is (= (count results) 3))
+               (is (= (-&gt;&gt; results
+                           (map :tweet))
+                      [&quot;A&quot; &quot;B&quot; &quot;D&quot;])))
+             (done)))</code></pre></div>
+        </div>
+      </div>
+    </div>
+
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+  </body>
+
+  <script>
+  if (false) {
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', '<@=tracking>', 'caudate.me');
+    ga('send', 'pageview');
+  }
+  </script>
+  
+  <script type="text/javascript">
+    smoothScroll.init();
+    gumshoe.init({});
+  
+    hljs.registerLanguage("clojure",function(e){var t={"builtin-name":"def defonce cond apply if-not if-let if not not= = < > <= >= == + / * - rem quot neg? pos? delay? symbol? keyword? true? false? integer? empty? coll? list? set? ifn? fn? associative? sequential? sorted? counted? reversible? number? decimal? class? distinct? isa? float? rational? reduced? ratio? odd? even? char? seq? vector? string? map? nil? contains? zero? instance? not-every? not-any? libspec? -> ->> .. . inc compare do dotimes mapcat take remove take-while drop letfn drop-last take-last drop-while while intern condp case reduced cycle split-at split-with repeat replicate iterate range merge zipmap declare line-seq sort comparator sort-by dorun doall nthnext nthrest partition eval doseq await await-for let agent atom send send-off release-pending-sends add-watch mapv filterv remove-watch agent-error restart-agent set-error-handler error-handler set-error-mode! error-mode shutdown-agents quote var fn loop recur throw try monitor-enter monitor-exit defmacro defn defn- macroexpand macroexpand-1 for dosync and or when when-not when-let comp juxt partial sequence memoize constantly complement identity assert peek pop doto proxy defstruct first rest cons defprotocol cast coll deftype defrecord last butlast sigs reify second ffirst fnext nfirst nnext defmulti defmethod meta with-meta ns in-ns create-ns import refer keys select-keys vals key val rseq name namespace promise into transient persistent! conj! assoc! dissoc! pop! disj! use class type num float double short byte boolean bigint biginteger bigdec print-method print-dup throw-if printf format load compile get-in update-in pr pr-on newline flush read slurp read-line subvec with-open memfn time re-find re-groups rand-int rand mod locking assert-valid-fdecl alias resolve ref deref refset swap! reset! set-validator! compare-and-set! alter-meta! reset-meta! commute get-validator alter ref-set ref-history-count ref-min-history ref-max-history ensure sync io! new next conj set! to-array future future-call into-array aset gen-class reduce map filter find empty hash-map hash-set sorted-map sorted-map-by sorted-set sorted-set-by vec vector seq flatten reverse assoc dissoc list disj get union difference intersection extend extend-type extend-protocol int nth delay count concat chunk chunk-buffer chunk-append chunk-first chunk-rest max min dec unchecked-inc-int unchecked-inc unchecked-dec-inc unchecked-dec unchecked-negate unchecked-add-int unchecked-add unchecked-subtract-int unchecked-subtract chunk-next chunk-cons chunked-seq? prn vary-meta lazy-seq spread list* str find-keyword keyword symbol gensym force rationalize"},r="a-zA-Z_\\-!.?+*=<>&#'",n="["+r+"]["+r+"0-9/;:]*",a="[-+]?\\d+(\\.\\d+)?",o={b:n,r:0},s={cN:"number",b:a,r:0},i=e.inherit(e.QSM,{i:null}),c=e.C(";","$",{r:0}),d={cN:"literal",b:/\b(true|false|nil)\b/},l={b:"[\\[\\{]",e:"[\\]\\}]"},m={cN:"comment",b:"\\^"+n},p=e.C("\\^\\{","\\}"),u={cN:"symbol",b:"[:]{1,2}"+n},f={b:"\\(",e:"\\)"},h={eW:!0,r:0},y={k:t,l:n,cN:"name",b:n,starts:h},b=[f,i,m,p,c,u,l,s,d,o];return f.c=[e.C("comment",""),y,h],h.c=b,l.c=b,{aliases:["clj"],i:/\S/,c:[f,i,m,p,c,u,l,s,d]}});
+    hljs.initHighlightingOnLoad();
+  </script>
+</html>
