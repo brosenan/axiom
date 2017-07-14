@@ -105,4 +105,8 @@
                     "axiom-cljs"
                     {:input "libs/axiom-cljs/test/axiom_cljs/core_test.cljs"
                      :title "axiom-cljs.core"
-                     :subtitle "A Client Library"}}})
+                     :subtitle "A Client Library"}
+                    "axiom-cljs.macros"
+                    {:input "libs/axiom-cljs/test/axiom_cljs/macros_test.cljs"
+                     :title "axiom-cljs.macros"
+                     :subtitle "Client-side Macros"}}})
