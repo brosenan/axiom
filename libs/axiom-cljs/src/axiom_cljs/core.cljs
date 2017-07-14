@@ -11,3 +11,11 @@
       (merge init {:from-host ch
                    :to-host ch
                    :pub (async/pub ch :name)}))))
+
+(defn pubsub [f]
+  (let [listeners (atom {})]
+    {:pub (fn [val]
+            (doseq [listener (@listeners (f val))]
+              (listener val)))
+     :sub (fn [disp f]
+            (swap! listeners update disp conj f))}))

@@ -550,3 +550,30 @@ This time, the value maps capture the query's *output parameters* only."
                              (map :tweet))
                         ["A" "B" "D"])))
                (done))))
+
+[[:chapter {:title "Under the Hood"}]]
+[[:section {:title "pubsub"}]]
+"`pubsub` is a simple synchronous publish/subscribe mechanism.
+The `pubsub` function takes a dispatch function as parameter, and returns a map containing two functions: `:sub` and `:pub`."
+(fact pubsub-1
+      (let [ps (ax/pubsub (fn [x]))]
+        (is (fn? (:pub ps)))
+        (is (fn? (:sub ps)))))
+
+"When calling the `:pub` function with a value, the dispatch function is called with that value."
+(fact pubsub-2
+      (let [val (atom nil)
+            ps (ax/pubsub (fn [x]
+                            (reset! val x)))]
+        ((:pub ps) [1 2 3])
+        (is (= @val [1 2 3]))))
+
+"The `:sub` function takes a dispatch value, and a function.
+When the dispatch function returns that dispatch value, the `:sub`scribed function is called with the `:pub`lished value."
+(fact pubsub-3
+      (let [val (atom nil)
+            ps (ax/pubsub :name)]
+        ((:sub ps) "alice" (partial reset! val))
+        ((:pub ps) {:name "alice" :age 28})
+        ((:pub ps) {:name "bob" :age 31})
+        (is (= @val {:name "alice" :age 28}))))
