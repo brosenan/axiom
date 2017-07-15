@@ -12,37 +12,51 @@
 [[:chapter {:title "connection"}]]
 "`connection` creates a connection to the host."
 
-"It takes an optional keyword parameter `:ws-ch`, which defaults to a [function of the same name in the chord library](https://github.com/jarohen/chord#clojurescript).
+"It takes a URL and a an optional keyword parameter `:ws-ch`, 
+which defaults to a [function of the same name in the chord library](https://github.com/jarohen/chord#clojurescript).
 It returns a channel to which it will provide a map containing the following keys:
-1. `:from-host`: A `core.async` channel for delivering events from the host,
-2. `:to-host`: A `core.async` channel for delivering events to the host,
-3. `:err`: An `atom` holding the latest error, or `nil` if communication is intact.
-4. `:pub`: A `core.async` [pub](https://github.com/clojure/core.async/wiki/Pub-Sub), dispatching on `:name`.
+1. A `:sub` function for subscribing to events coming from the host.
+2. A `:pub` function for publishing events.
+3. A `:time` function which returns the current time in milliseconds.
+4. A `:uuid` function which returns some universally-unique identifier.
 Additionally, it contains the fields of the `:init` event it receives from the server-side once the connection is open."
 (fact connection
   (async done
          (go
-           (let [mock-ws-ch (fn [url]
+           (let [the-chan (async/chan 10)
+                 mock-ws-ch (fn [url]
+                              (is (= url "ws://some-url"))
                               (go
-                                (let [ch (async/chan 1)]
-                                  (async/>! ch {:kind :init
-                                                :foo :bar})
-                                  {:ws-channel ch})))
-                 target-chan (async/chan 10)
-                 host (async/<! (ax/connection :ws-ch mock-ws-ch))]
+                                (async/>! the-chan {:kind :init
+                                                    :foo :bar})
+                                {:ws-channel the-chan}))
+                 host (async/<! (ax/connection "ws://some-url"
+                                               :ws-ch mock-ws-ch))]
              (is (map? host))
-             (is (contains? host :from-host))
-             (is (contains? host :to-host))
-             (is (= (:foo host) :bar))
-             (async/sub (:pub host) "foo" target-chan)
-             ;; The mock provides one channel that is used for both
-             ;; :from-host and :to-host comms.
-             (async/>! (:to-host host) {:name "foo"
-                                        :key "key"})
-             ;; :pub is subscribed on :from-host
-             (is (= (async/<! target-chan) {:name "foo"
-                                            :key "key"})))
-           (done))))
+             (is (= (:foo host) :bar)) ;; from the :init event
+
+             (is (fn? (:pub host)))
+             (is (fn? (:sub host)))
+             (let [test-chan (async/chan 10)]
+               ((:sub host) "foo" #(go (async/>! test-chan %)))
+               (async/>! the-chan {:name "bar" :some :event})
+               (async/>! the-chan {:name "foo" :other :event})
+               (println 123)
+               (is (= (async/<! test-chan) {:name "foo" :other :event}))
+               ;; Since our mock `ws-ch` creates a normal channel, publishing into this channel
+               ;; will be captured by subscribers
+               ((:pub host) {:name "foo" :third :event})
+               (is (= (async/<! test-chan) {:name "foo" :third :event})))
+
+             (is (fn? (:time host)))
+             (let [time-before ((:time host))]
+               (async/<! (async/timeout 1))
+               (is (< time-before ((:time host)))))
+
+             (is (fn? (:uuid host)))
+             (is (= (count ((:uuid host))) 36))
+             (is (not= ((:uuid host)) ((:uuid host))))
+             (done)))))
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "pubsub"}]]
