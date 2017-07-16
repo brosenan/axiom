@@ -332,11 +332,13 @@ The expression can rely on symbols from the fact pattern, and must result in a [
   [:some/name input argument -> output arguments])
 
 (fact defquery-1
-      (defonce from-host7 (async/chan 10))
       (defonce unique7 (atom nil))
       (reset! unique7 0)
-      (defonce host7 {:to-host (async/chan 10)
-                      :pub (async/pub from-host7 :name)
+      (defonce ps7 (ax/pubsub :name))
+      (defonce published7 (atom nil))
+      (reset! published7 [])
+      (defonce host7 {:sub (:sub ps7)
+                      :pub #(swap! published7 conj %)
                       :identity "alice"
                       :uuid (fn []
                               (str "SOMEUUID" (swap! unique7 inc)))
@@ -359,26 +361,22 @@ When called, two events are emitted:
 2. A `:fact` event to make the query.
 In such a case the function returns an empty sequence with a `:pending` meta field set to `true`."
 (fact defquery-3
-      (async done
-             (go
-               (reset! my-atom7 {})
-               (let [result (my-query7 "alice")]
-                 (is (= result []))
-                 (is (= (-> result meta :pending) true)))
-               (is (= (async/<! (:to-host host7))
-                      {:kind :reg
-                       :name "tweetlog/timeline!"
-                       :key "SOMEUUID1"}))
-               (is (= (async/<! (:to-host host7))
-                      {:kind :fact
-                       :name "tweetlog/timeline?"
-                       :key "SOMEUUID1"
-                       :data ["alice"]
-                       :ts 12345
-                       :change 1
-                       :writers #{"alice"}
-                       :readers #{"alice"}}))
-               (done))))
+      (reset! my-atom7 {})
+      (let [result (my-query7 "alice")]
+        (is (= result []))
+        (is (= (-> result meta :pending) true)))
+      (is (= @published7
+             [{:kind :reg
+                :name "tweetlog/timeline!"
+               :key "SOMEUUID1"}
+              {:kind :fact
+               :name "tweetlog/timeline?"
+               :key "SOMEUUID1"
+               :data ["alice"]
+               :ts 12345
+               :change 1
+               :writers #{"alice"}
+               :readers #{"alice"}}])))
 
 "Incoming events that carry query results update the map in this atom.
 The main difference between this and what `defview` does is that 
@@ -386,28 +384,23 @@ while the events that `defview` receives contain all the data necessary for calc
 The results here do not contain the information for the key (the function's arguments).
 Instead, the event contains a unique ID, which is mapped by `defquery` to input arguments."
 (fact defquery-4
-      (async done
-             (reset! my-atom7 {})
-             (go
-               (async/>! from-host7
-                         {:kind :fact
-                          :name "tweetlog/timeline!"
-                          :key "SOMEUUID1"
-                          :data ["bob" "hi there"]
-                          :ts 23456
-                          :change 1
-                          :writers #{"XXYY"}
-                          :readers #{}})
-               (async/<! (async/timeout 1))
-               (is (= (get-in @my-atom7
-                              [["alice"]
-                               {:kind :fact
-                                :name "tweetlog/timeline!"
-                                :key "SOMEUUID1"
-                                :data ["bob" "hi there"]
-                                :writers #{"XXYY"}
-                                :readers #{}}]) 1))
-               (done))))
+      (reset! my-atom7 {})
+      ((:pub ps7) {:kind :fact
+                   :name "tweetlog/timeline!"
+                   :key "SOMEUUID1"
+                   :data ["bob" "hi there"]
+                   :ts 23456
+                   :change 1
+                   :writers #{"XXYY"}
+                   :readers #{}})
+      (is (= (get-in @my-atom7
+                     [["alice"]
+                      {:kind :fact
+                       :name "tweetlog/timeline!"
+                       :key "SOMEUUID1"
+                       :data ["bob" "hi there"]
+                       :writers #{"XXYY"}
+                       :readers #{}}]) 1)))
 
 "With results in place, the query function returns a (non-`:pending`) list of value maps.
 This time, the value maps capture the query's *output parameters* only."
@@ -440,63 +433,59 @@ This time, the value maps capture the query's *output parameters* only."
 [[:section {:title "Filtering and Sorting"}]]
 "Filtering and sorting work exactly as with `defview`."
 (fact defquery-filt
-      (async done
-             (defonce from-host8 (async/chan 10))
-             (defonce host8 {:to-host (async/chan 10)
-                             :pub (async/pub from-host8 :name)
-                             :identity "alice"
-                             :uuid (constantly "SOMEUUID")
-                             :time (constantly 12345)})
-             (defonce my-atom8 (atom nil))
-             (defquery tweets-by-authors-that-begin-in-b [user]
-               host8
-               [:tweetlog/timeline user -> author tweet]
-               :store-in my-atom8
-               :when (str/starts-with? author "b")
-               :order-by tweet)
-             (go
-               (tweets-by-authors-that-begin-in-b "alice") ;; Start listenning...
-               (async/>! from-host8
-                         {:kind :fact
-                          :name "tweetlog/timeline!"
-                          :key "SOMEUUID"
-                          :data ["bob" "D"]
-                          :ts 1000
-                          :change 1
-                          :writers #{"XXYY"}
-                          :readers #{}})
-               (async/>! from-host8
-                         {:kind :fact
-                          :name "tweetlog/timeline!"
-                          :key "SOMEUUID"
-                          :data ["charlie" "C"] ;; Dropped
-                          :ts 2000
-                          :change 1
-                          :writers #{"XXYY"}
-                          :readers #{}})
-               (async/>! from-host8
-                         {:kind :fact
-                          :name "tweetlog/timeline!"
-                          :key "SOMEUUID"
-                          :data ["boaz" "B"]
-                          :ts 3000
-                          :change 1
-                          :writers #{"XXYY"}
-                          :readers #{}})
-               (async/>! from-host8
-                         {:kind :fact
-                          :name "tweetlog/timeline!"
-                          :key "SOMEUUID"
-                          :data ["bob" "A"]
-                          :ts 4000
-                          :change 1
-                          :writers #{"XXYY"}
-                          :readers #{}})
-               (async/<! (async/timeout 1))
-               (let [results (tweets-by-authors-that-begin-in-b "alice")]
-                 (is (= (count results) 3))
-                 (is (= (->> results
-                             (map :tweet))
-                        ["A" "B" "D"])))
-               (done))))
+      (defonce ps8 (ax/pubsub :name))
+      (defonce host8 {:pub (fn [ev])
+                      :sub (:sub ps8)
+                      :identity "alice"
+                      :uuid (constantly "SOMEUUID")
+                      :time (constantly 12345)})
+      (defonce my-atom8 (atom nil))
+      (defquery tweets-by-authors-that-begin-in-b [user]
+        host8
+        [:tweetlog/timeline user -> author tweet]
+        :store-in my-atom8
+        :when (str/starts-with? author "b")
+        :order-by tweet)
+      (tweets-by-authors-that-begin-in-b "alice") ;; Start listenning...
+      ((:pub ps8)
+                {:kind :fact
+                 :name "tweetlog/timeline!"
+                 :key "SOMEUUID"
+                 :data ["bob" "D"]
+                 :ts 1000
+                 :change 1
+                 :writers #{"XXYY"}
+                 :readers #{}})
+      ((:pub ps8)
+                {:kind :fact
+                 :name "tweetlog/timeline!"
+                 :key "SOMEUUID"
+                 :data ["charlie" "C"] ;; Dropped
+                 :ts 2000
+                 :change 1
+                 :writers #{"XXYY"}
+                 :readers #{}})
+      ((:pub ps8)
+                {:kind :fact
+                 :name "tweetlog/timeline!"
+                 :key "SOMEUUID"
+                 :data ["boaz" "B"]
+                 :ts 3000
+                 :change 1
+                 :writers #{"XXYY"}
+                 :readers #{}})
+      ((:pub ps8)
+                {:kind :fact
+                 :name "tweetlog/timeline!"
+                 :key "SOMEUUID"
+                 :data ["bob" "A"]
+                 :ts 4000
+                 :change 1
+                 :writers #{"XXYY"}
+                 :readers #{}})
+      (let [results (tweets-by-authors-that-begin-in-b "alice")]
+        (is (= (count results) 3))
+        (is (= (->> results
+                    (map :tweet))
+               ["A" "B" "D"]))))
 

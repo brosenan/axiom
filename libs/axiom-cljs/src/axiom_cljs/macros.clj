@@ -95,13 +95,11 @@
              sub-chan# (async/chan 1)
              state# ~store-in]
          (reset! ~store-in {})
-         (async/sub (:pub ~host) ~(str pred-name "!") sub-chan#)
-         (go-loop []
-           (let [ev# (async/<! sub-chan#)
-                 args# (@id-map# (:key ev#))
-                 [~@outputs] (:data ev#)]
-             (update-state state# ev# args# ~when))
-           (recur))
+         ((:sub ~host) ~(str pred-name "!")
+          (fn [ev#]
+            (let [args# (@id-map# (:key ev#))
+                  [~@outputs] (:data ev#)]
+              (update-state state# ev# args# ~when))))
          (fn ~args
            (cond (contains? @state# ~args)
                  (-> (->> (for [[ev# c#] (@state# ~args)
@@ -113,19 +111,16 @@
                  :else
                  (let [uuid# ((:uuid ~host))]
                    (swap! id-map# assoc uuid# ~args)
-                   (go
-                     (async/>! (:to-host ~host)
-                               {:kind :reg
-                                :name ~(str pred-name "!")
-                                :key uuid#})
-                     (async/>! (:to-host ~host)
-                               {:kind :fact
-                                :name ~(str pred-name "?")
-                                :key uuid#
-                                :data [~@inputs]
-                                :ts ((:time ~host))
-                                :change 1
-                                :writers #{(:identity ~host)}
-                                :readers #{(:identity ~host)}}))
+                   ((:pub ~host) {:kind :reg
+                                  :name ~(str pred-name "!")
+                                  :key uuid#})
+                   ((:pub ~host) {:kind :fact
+                                  :name ~(str pred-name "?")
+                                  :key uuid#
+                                  :data [~@inputs]
+                                  :ts ((:time ~host))
+                                  :change 1
+                                  :writers #{(:identity ~host)}
+                                  :readers #{(:identity ~host)}})
                    (-> '()
                        (with-meta {:pending true})))))))))
