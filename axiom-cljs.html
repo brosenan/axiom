@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 14 July 2017</h5>
+              <h5>Date: 16 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.2</h5></div></div>
           <hr/>
@@ -84,30 +84,40 @@
                 </ul>
               </nav>
           </div>
-          <div class="code"><pre><code class="clojure">(enable-console-print!)</code></pre></div><div><span id="connection"></span><h2><b>1 &nbsp;&nbsp; connection</b></h2></div><div><p><code>connection</code> creates a connection to the host.</p></div><div><p>It takes an optional keyword parameter <code>:ws-ch</code>, which defaults to a <a href='https://github.com/jarohen/chord#clojurescript'>function of the same name in the chord library</a>. It returns a channel to which it will provide a map containing the following keys:</p><ol><li><code>:from-host</code>: A <code>core.async</code> channel for delivering events from the host,</li><li><code>:to-host</code>: A <code>core.async</code> channel for delivering events to the host,</li><li><code>:err</code>: An <code>atom</code> holding the latest error, or <code>nil</code> if communication is intact.</li><li><code>:pub</code>: A <code>core.async</code> <a href='https://github.com/clojure/core.async/wiki/Pub-Sub'>pub</a>, dispatching on <code>:name</code>.Additionally, it contains the fields of the <code>:init</code> event it receives from the server-side once the connection is open.</li></ol></div><div class="code"><pre><code class="clojure">connection
+          <div class="code"><pre><code class="clojure">(enable-console-print!)</code></pre></div><div><span id="connection"></span><h2><b>1 &nbsp;&nbsp; connection</b></h2></div><div><p><code>connection</code> creates a connection to the host.</p></div><div><p>It takes a URL and a an optional keyword parameter <code>:ws-ch</code>,  which defaults to a <a href='https://github.com/jarohen/chord#clojurescript'>function of the same name in the chord library</a>. It returns a map containing the following keys:</p><ol><li>A <code>:sub</code> function for subscribing to events coming from the host.</li><li>A <code>:pub</code> function for publishing events.</li><li>A <code>:time</code> function which returns the current time in milliseconds.</li><li>A <code>:uuid</code> function which returns some universally-unique identifier.</li></ol></div><div class="code"><pre><code class="clojure">connection
 (async done
        (go
-         (let [mock-ws-ch (fn [url]
+         (let [the-chan (async/chan 10)
+               mock-ws-ch (fn [url]
+                            (is (= url &quot;ws://some-url&quot;))
                             (go
-                              (let [ch (async/chan 1)]
-                                (async/&gt;! ch {:kind :init
-                                              :foo :bar})
-                                {:ws-channel ch})))
-               target-chan (async/chan 10)
-               host (async/&lt;! (ax/connection :ws-ch mock-ws-ch))]
+                              (async/&gt;! the-chan {:kind :init
+                                                  :foo :bar})
+                              {:ws-channel the-chan}))
+               host (ax/connection &quot;ws://some-url&quot;
+                                   :ws-ch mock-ws-ch)]
            (is (map? host))
-           (is (contains? host :from-host))
-           (is (contains? host :to-host))
-           (is (= (:foo host) :bar))
-           (async/sub (:pub host) &quot;foo&quot; target-chan)
-           ;; The mock provides one channel that is used for both
-           ;; :from-host and :to-host comms.
-           (async/&gt;! (:to-host host) {:name &quot;foo&quot;
-                                      :key &quot;key&quot;})
-           ;; :pub is subscribed on :from-host
-           (is (= (async/&lt;! target-chan) {:name &quot;foo&quot;
-                                          :key &quot;key&quot;})))
-         (done)))</code></pre></div><div><span id="under-the-hood"></span><h2><b>2 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="pubsub"></span><h3>2.1 &nbsp;&nbsp; pubsub</h3></div><div><p><code>pubsub</code> is a simple synchronous publish/subscribe mechanism. The <code>pubsub</code> function takes a dispatch function as parameter, and returns a map containing two functions: <code>:sub</code> and <code>:pub</code>.</p></div><div class="code"><pre><code class="clojure">pubsub-1
+           (is (fn? (:pub host)))
+           (is (fn? (:sub host)))
+           (let [test-chan (async/chan 10)]
+             ((:sub host) &quot;foo&quot; #(go (async/&gt;! test-chan %)))
+             (async/&gt;! the-chan {:name &quot;bar&quot; :some :event})
+             (async/&gt;! the-chan {:name &quot;foo&quot; :other :event})
+             (is (= (async/&lt;! test-chan) {:name &quot;foo&quot; :other :event}))
+             ;; Since our mock `ws-ch` creates a normal channel, publishing into this channel
+             ;; will be captured by subscribers
+             ((:pub host) {:name &quot;foo&quot; :third :event})
+             (is (= (async/&lt;! test-chan) {:name &quot;foo&quot; :third :event})))
+
+           (is (fn? (:time host)))
+           (let [time-before ((:time host))]
+             (async/&lt;! (async/timeout 1))
+             (is (&lt; time-before ((:time host)))))
+
+           (is (fn? (:uuid host)))
+           (is (= (count ((:uuid host))) 36))
+           (is (not= ((:uuid host)) ((:uuid host))))
+           (done))))</code></pre></div><div><span id="under-the-hood"></span><h2><b>2 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="pubsub"></span><h3>2.1 &nbsp;&nbsp; pubsub</h3></div><div><p><code>pubsub</code> is a simple synchronous publish/subscribe mechanism. The <code>pubsub</code> function takes a dispatch function as parameter, and returns a map containing two functions: <code>:sub</code> and <code>:pub</code>.</p></div><div class="code"><pre><code class="clojure">pubsub-1
     (let [ps (ax/pubsub (fn [x]))]
       (is (fn? (:pub ps)))
       (is (fn? (:sub ps))))</code></pre></div><div><p>When calling the <code>:pub</code> function with a value, the dispatch function is called with that value.</p></div><div class="code"><pre><code class="clojure">pubsub-2
