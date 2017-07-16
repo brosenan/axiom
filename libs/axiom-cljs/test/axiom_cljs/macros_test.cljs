@@ -2,7 +2,8 @@
   (:require [cljs.test :refer-macros [is testing async]]
             [devcards.core :refer-macros [deftest]]
             [cljs.core.async :as async]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [axiom-cljs.core :as ax])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [axiom-cljs.tests :refer [fact]]
                    [axiom-cljs.macros :refer [defview defquery]]))
@@ -13,11 +14,14 @@
 "`defview` four positional parameters:
 1. The name of the view (a symbol).  This becomes the name of a function that retrieves data from that view.
 2. An argument list for the view (a vector).  This becomes the argument list for the function.
-3. A [connection](#connection) object.
-4. A pattern of a fact or clause to be queried by this view."
+3. A [connection](axiom-cljs.html#connection) object.
+4. A pattern of a fact or clause to be queried by this view.
+It also takes optional keyword parameters that will be discussed later."
 (fact defview-1
-      (defonce host {:to-host (async/chan 10)
-                     :pub (async/pub (async/chan 1) :foo)})
+      (defonce published1 (atom nil))
+      (defonce host {:pub (fn [ev]
+                            (swap! published1 conj ev))
+                     :sub (fn [key f])})
       (defview my-tweets [user]
         host
         [:tweetlog/tweeted user tweet]))
@@ -29,24 +33,19 @@
 "When called for the first time, the function will send a `:reg` event with key according to the parameters,
 and return an empty sequence with a meta field `:pending` indicating that the function should be consulted again later."
 (fact defview-3
-      (async done
-             (go
-               (let [res (my-tweets "alice")]
-                 (is (= res []))
-                 (is (= (-> res meta :pending) true))
-                 (is (= (async/<! (:to-host host)) {:kind :reg
-                                                    :name "tweetlog/tweeted"
-                                                    :key "alice"})))
-               (done))))
+      (let [res (my-tweets "alice")]
+        (is (= res []))
+        (is (= (-> res meta :pending) true))
+        (is (= @published1 [{:kind :reg
+                              :name "tweetlog/tweeted"
+                              :key "alice"}]))))
 
 "An optional keyword parameter `:store-in` takes an atom and initially `reset!`s is to an empty map."
 (fact defview-4
-      (defonce host2 (let [from-host (async/chan 10)]
-                       {:from-host from-host
-                        :to-host (async/chan 10)
-                        :pub (async/pub from-host :name)
-                        :time (constantly 12345)
-                        :identity "alice"}))
+      (defonce ps2 (ax/pubsub :name))
+      (defonce host2 {:sub (:sub ps2)
+                      :time (constantly 12345)
+                      :identity "alice"})
       (defonce my-atom2 (atom nil))
       (defview my-tweets2 [user]
         host2
@@ -61,53 +60,49 @@ The second level of keys consists of the received [events](cloudlog-events.html#
 with the `:ts` and `:change` fields omitted.
 The values are the accumulated `:change` of all matching events."
 (fact defview-5
-      (async done
-             (go
-               (reset! my-atom2 {})
-               (async/>! (:from-host host2)
-                         {:kind :fact
-                          :name "tweetlog/tweeted"
-                          :key "alice"
-                          :data ["hello"]
-                          :ts 1000
-                          :change 1
-                          :readers #{}
-                          :writers #{"alice"}})
-               (async/>! (:from-host host2)
-                         {:kind :fact
-                          :name "tweetlog/tweeted"
-                          :key "alice"
-                          :data ["world"]
-                          :ts 2000
-                          :change 1
-                          :readers #{}
-                          :writers #{"alice"}})
-               (async/>! (:from-host host2)
-                         {:kind :fact
-                          :name "tweetlog/tweeted"
-                          :key "alice"
-                          :data ["world"]
-                          :ts 3000
-                          :change 1
-                          :readers #{}
-                          :writers #{"alice"}})
-               (async/<! (async/timeout 1))
-               (is (contains? @my-atom2 ["alice"]))
-               (is (= (get-in @my-atom2 [["alice"]
-                                         {:kind :fact
-                                          :name "tweetlog/tweeted"
-                                          :key "alice"
-                                          :data ["hello"]
-                                          :readers #{}
-                                          :writers #{"alice"}}]) 1))
-               (is (= (get-in @my-atom2 [["alice"]
-                                         {:kind :fact
-                                          :name "tweetlog/tweeted"
-                                          :key "alice"
-                                          :data ["world"]
-                                          :readers #{}
-                                          :writers #{"alice"}}]) 2))
-               (done))))
+      (reset! my-atom2 {})
+      ((:pub ps2)
+       {:kind :fact
+        :name "tweetlog/tweeted"
+        :key "alice"
+        :data ["hello"]
+        :ts 1000
+        :change 1
+        :readers #{}
+        :writers #{"alice"}})
+      ((:pub ps2)
+       {:kind :fact
+        :name "tweetlog/tweeted"
+        :key "alice"
+        :data ["world"]
+        :ts 2000
+        :change 1
+        :readers #{}
+        :writers #{"alice"}})
+      ((:pub ps2)
+       {:kind :fact
+        :name "tweetlog/tweeted"
+        :key "alice"
+        :data ["world"]
+        :ts 3000
+        :change 1
+        :readers #{}
+        :writers #{"alice"}})
+      (is (contains? @my-atom2 ["alice"]))
+      (is (= (get-in @my-atom2 [["alice"]
+                                {:kind :fact
+                                 :name "tweetlog/tweeted"
+                                 :key "alice"
+                                 :data ["hello"]
+                                 :readers #{}
+                                 :writers #{"alice"}}]) 1))
+      (is (= (get-in @my-atom2 [["alice"]
+                                {:kind :fact
+                                 :name "tweetlog/tweeted"
+                                 :key "alice"
+                                 :data ["world"]
+                                 :readers #{}
+                                 :writers #{"alice"}}]) 2)))
 
 "The view function returns, for a given combination of arguments, a collection of all data elements with a positive total count.
 In our case, both \"hello\" and \"world\" tweets are taken (in some order)."

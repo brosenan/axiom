@@ -35,12 +35,10 @@
        (let [sub-chan# (async/chan 1)
              state# ~store-in]
          (reset! state# {})
-         (async/sub (:pub ~host) ~fact-name sub-chan#)
-         (go-loop []
-           (let [ev# (async/<! sub-chan#)
-                 ~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
-             (update-state state# ev# ~args ~when)
-             (recur)))
+         ((:sub ~host) ~fact-name
+          (fn [ev#]
+            (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
+              (update-state state# ev# ~args ~when))))
          (fn ~args
            (cond (contains? @state# ~args)
                  (-> (->> (for [[ev# c#] (@state# ~args)
@@ -78,10 +76,9 @@
                                                                       :readers #{}})))}))
                  :else
                  (do
-                   (go
-                     (cljs.core.async/>! (:to-host ~host) {:kind :reg
-                                                           :name ~fact-name
-                                                           :key ~(-> fact second)}))
+                   ((:pub ~host) {:kind :reg
+                                  :name ~fact-name
+                                  :key ~(-> fact second)})
                    (with-meta '() {:pending true}))))))))
 
 (defn ^:private parse-target-form [[name & args]]
