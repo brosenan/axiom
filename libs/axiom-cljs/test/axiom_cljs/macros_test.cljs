@@ -8,6 +8,8 @@
                    [axiom-cljs.tests :refer [fact]]
                    [axiom-cljs.macros :refer [defview defquery]]))
 
+(enable-console-print!)
+
 [[:chapter {:title "defview"}]]
 "The `defview` macro defines a *view*, which is a data structure that aggregates events and allows query over these events."
 
@@ -19,6 +21,7 @@
 It also takes optional keyword parameters that will be discussed later."
 (fact defview-1
       (defonce published1 (atom nil))
+      (reset! published1 nil)
       (defonce host {:pub (fn [ev]
                             (swap! published1 conj ev))
                      :sub (fn [key f])})
@@ -43,7 +46,10 @@ and return an empty sequence with a meta field `:pending` indicating that the fu
 "An optional keyword parameter `:store-in` takes an atom and initially `reset!`s is to an empty map."
 (fact defview-4
       (defonce ps2 (ax/pubsub :name))
+      (defonce published2 (atom nil))
+      (reset! published2 nil)
       (defonce host2 {:sub (:sub ps2)
+                      :pub #(swap! published2 conj %)
                       :time (constantly 12345)
                       :identity "alice"})
       (defonce my-atom2 (atom nil))
@@ -157,95 +163,88 @@ This is a function that takes a value map as input, and emits a corresponding ev
 6. `:writers` defaults to the set representing the user.
 7. `:readers` defaults to the universal set."
 (fact defview-ev-1
-      (async done
-             (go
-               (let [add (-> (my-tweets2 "alice")
-                             meta :add)]
-                 (is (fn? add))
-                 (add {:user "alice"
-                       :tweet "Hola!"})
-                 (is (= (async/<! (:to-host host2))
-                        {:kind :fact
-                         :name "tweetlog/tweeted"
-                         :key "alice"
-                         :data ["Hola!"]
-                         :ts 12345
-                         :change 1
-                         :writers #{"alice"}
-                         :readers #{}})))
-               (done))))
+      (let [add (-> (my-tweets2 "alice")
+                    meta :add)]
+        (is (fn? add))
+        (add {:user "alice"
+              :tweet "Hola!"})
+        (is (= @published2
+               [{:kind :fact
+                  :name "tweetlog/tweeted"
+                  :key "alice"
+                  :data ["Hola!"]
+                  :ts 12345
+                  :change 1
+                  :writers #{"alice"}
+                  :readers #{}}]))))
 
 "In value maps where the user is a writer, a `:-delete!` entry contains a function that deletes the corresponding fact.
 It creates an event with all the same values, but with a new `:ts` and a `:change` value equal to the negative of the count value of the original event."
 (fact defview-ev-2
-      (async done
-             (defonce my-atom3 (atom nil))
-             (let [from-host (async/chan 10)]
-               (defonce host3 {:to-host (async/chan 10)
-                               :pub (async/pub from-host :name)
-                               :time (constantly 23456)}))
-             (defview my-tweets3 [user]
-               host3
-               [:tweetlog/tweeted user tweet]
-               :store-in my-atom3)
-             (go
-               (swap! my-atom3 assoc-in [["alice"]
-                                         {:kind :fact
-                                          :name "tweetlog/tweeted"
-                                          :key "alice"
-                                          :data ["hello"]
-                                          :readers #{}
-                                          :writers #{"alice"}}] 3)
-               (let [valmap (first (my-tweets3 "alice"))]
-                 (is (fn? (:-delete! valmap)))
-                 ((:-delete! valmap))
-                 (is (= (async/<! (:to-host host3))
-                        {:kind :fact
-                         :name "tweetlog/tweeted"
-                         :key "alice"
-                         :data ["hello"]
-                         :ts 23456
-                         :change -3
-                         :readers #{}
-                         :writers #{"alice"}})))
-               (done))))
+      (defonce my-atom3 (atom nil))
+      (defonce published3 (atom nil))
+      (reset! published3 nil)
+      (defonce host3 {:pub #(swap! published3 conj %)
+                      :sub (fn [key f])
+                      :time (constantly 23456)})
+      (defview my-tweets3 [user]
+        host3
+        [:tweetlog/tweeted user tweet]
+        :store-in my-atom3)
+      (swap! my-atom3 assoc-in [["alice"]
+                                {:kind :fact
+                                 :name "tweetlog/tweeted"
+                                 :key "alice"
+                                 :data ["hello"]
+                                 :readers #{}
+                                 :writers #{"alice"}}] 3)
+      (let [valmap (first (my-tweets3 "alice"))]
+        (is (fn? (:-delete! valmap)))
+        ((:-delete! valmap))
+        (is (= @published3
+               [{:kind :fact
+                  :name "tweetlog/tweeted"
+                  :key "alice"
+                  :data ["hello"]
+                  :ts 23456
+                  :change -3
+                  :readers #{}
+                  :writers #{"alice"}}]))))
 
 "A `:-swap!` function provides a way to update a value map.
 It takes a function (and optionally arguments) that is applied to the value map, and emits an [atomic update](cloudlog-events.html#atomic-updates)
 event from the original state to the state reflected by the modified value map."
 (fact defview-ev-3
-      (async done
-             (defonce my-atom4 (atom nil))
-             (let [from-host (async/chan 10)]
-               (defonce host4 {:to-host (async/chan 10)
-                               :pub (async/pub from-host :name)
-                               :time (constantly 34567)}))
-             (defview my-tweets4 [user]
-               host4
-               [:tweetlog/tweeted user tweet]
-               :store-in my-atom4)
-             (go
-               (swap! my-atom4 assoc-in [["alice"]
-                                         {:kind :fact
-                                          :name "tweetlog/tweeted"
-                                          :key "alice"
-                                          :data ["hello"]
-                                          :readers #{}
-                                          :writers #{"alice"}}] 3)
-               (let [valmap (first (my-tweets4 "alice"))]
-                 (is (fn? (:-swap! valmap)))
-                 ((:-swap! valmap) assoc :tweet "world")
-                 (is (= (async/<! (:to-host host4))
-                        {:kind :fact
-                         :name "tweetlog/tweeted"
-                         :key "alice"
-                         :removed ["hello"]
-                         :data ["world"]
-                         :ts 34567
-                         :change 3
-                         :readers #{}
-                         :writers #{"alice"}})))
-               (done))))
+      (defonce my-atom4 (atom nil))
+      (defonce published4 (atom nil))
+      (reset! published4 nil)
+      (defonce host4 {:pub #(swap! published4 conj %)
+                      :sub (fn [key f])
+                      :time (constantly 34567)})
+      (defview my-tweets4 [user]
+        host4
+        [:tweetlog/tweeted user tweet]
+        :store-in my-atom4)
+      (swap! my-atom4 assoc-in [["alice"]
+                                {:kind :fact
+                                 :name "tweetlog/tweeted"
+                                 :key "alice"
+                                 :data ["hello"]
+                                 :readers #{}
+                                 :writers #{"alice"}}] 3)
+      (let [valmap (first (my-tweets4 "alice"))]
+        (is (fn? (:-swap! valmap)))
+        ((:-swap! valmap) assoc :tweet "world")
+        (is (= @published4
+               [{:kind :fact
+                  :name "tweetlog/tweeted"
+                  :key "alice"
+                  :removed ["hello"]
+                  :data ["world"]
+                  :ts 34567
+                  :change 3
+                  :readers #{}
+                  :writers #{"alice"}}]))))
 
 [[:section {:title "Filtering"}]]
 "Views can define client-side filtering for facts."
@@ -253,48 +252,41 @@ event from the original state to the state reflected by the modified value map."
 "Imagine we are only interested in tweets that contain a hash-tag, i.e., tweets that match the regular expression `#\".*#[a-zA-Z0-9]+.*\"`.
 We define such filtering using an optional `:when` key in `defview`."
 (fact defview-filt
-      (async done
-             (defonce my-atom5 (atom nil))
-             (defonce from-host5 (async/chan 10))
-             (defonce host5 {:to-host (async/chan 10)
-                             :pub (async/pub from-host5 :name)})
-             (defview hashtags-only [user]
-               host5
-               [:tweetlog/tweeted user tweet]
-               :store-in my-atom5
-               :when (re-matches #".*#[a-zA-Z0-9]+.*" tweet))
-             (reset! my-atom5 {})
-             (go
-               (async/>! from-host5
-                         {:kind :fact
-                          :name "tweetlog/tweeted"
-                          :key "alice"
-                          :data ["No hashtags here..."]
-                          :ts 1000
-                          :change 1
-                          :readers #{}
-                          :writers #{"alice"}})
-               (async/>! from-host5
-                         {:kind :fact
-                          :name "tweetlog/tweeted"
-                          :key "alice"
-                          :data ["This one hash #hashtags..."]
-                          :ts 2000
-                          :change 1
-                          :readers #{}
-                          :writers #{"alice"}})
-               (async/<! (async/timeout 1))
-               (is (= (count (@my-atom5 ["alice"])) 1))
-               (done))))
+      (defonce my-atom5 (atom nil))
+      (defonce ps5 (ax/pubsub :name))
+      (defonce host5 {:sub (:sub ps5)})
+      (defview hashtags-only [user]
+        host5
+        [:tweetlog/tweeted user tweet]
+        :store-in my-atom5
+        :when (re-matches #".*#[a-zA-Z0-9]+.*" tweet))
+      (reset! my-atom5 {})
+      ((:pub ps5)
+                {:kind :fact
+                 :name "tweetlog/tweeted"
+                 :key "alice"
+                 :data ["No hashtags here..."]
+                 :ts 1000
+                 :change 1
+                 :readers #{}
+                 :writers #{"alice"}})
+      ((:pub ps5)
+                {:kind :fact
+                 :name "tweetlog/tweeted"
+                 :key "alice"
+                 :data ["This one hash #hashtags..."]
+                 :ts 2000
+                 :change 1
+                 :readers #{}
+                 :writers #{"alice"}})
+      (is (= (count (@my-atom5 ["alice"])) 1)))
 
 [[:section {:title "Sorting"}]]
 "The optional keyword argument `:order-by` directs the view function to sort the elements it returns according to the given expression.
 The expression can rely on symbols from the fact pattern, and must result in a [comparable expression](https://clojure.org/guides/comparators)."
 (fact defview-sort
       (defonce my-atom6 (atom nil))
-      (defonce from-host6 (async/chan 10))
-      (defonce host6 {:to-host (async/chan 10)
-                      :pub (async/pub from-host6 :name)})
+      (defonce host6 {:sub (fn [key f])})
       (defview my-sorted-tweets [user]
         host6
         [:tweetlog/tweeted user tweet timestamp]

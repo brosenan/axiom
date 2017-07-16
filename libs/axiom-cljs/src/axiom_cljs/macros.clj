@@ -47,33 +47,31 @@
                                   ~(symbol-map fact))
                                 (assoc :-readers (:readers ev#))
                                 (assoc :-writers (:writers ev#))
-                                (assoc :-delete! #(go
-                                                    (async/>! (:to-host ~host)
-                                                              (-> ev#
-                                                                  (assoc :ts ((:time ~host)))
-                                                                  (assoc :change (- c#))))))
+                                (assoc :-delete! #((:pub ~host)
+                                                   (-> ev#
+                                                       (assoc :ts ((:time ~host)))
+                                                       (assoc :change (- c#)))))
                                 (assoc :-swap! (fn [func# & args#]
-                                                 (go
-                                                   (async/>! (:to-host ~host)
-                                                             (-> ev#
-                                                                 (assoc :ts ((:time ~host)))
-                                                                 (assoc :change c#)
-                                                                 (assoc :removed (:data ev#))
-                                                                 (assoc :data
-                                                                        (let [{:keys ~(vec (symbols (drop 2 fact)))} (apply func# ev# args#)]
-                                                                          ~(vec (drop 2 fact)))))))))))
+                                                 ((:pub ~host)
+                                                  (-> ev#
+                                                      (assoc :ts ((:time ~host)))
+                                                      (assoc :change c#)
+                                                      (assoc :removed (:data ev#))
+                                                      (assoc :data
+                                                             (let [{:keys ~(vec (symbols (drop 2 fact)))} (apply func# ev# args#)]
+                                                               ~(vec (drop 2 fact))))))))))
                           (sort ~(comparator fact order-by)))
                      (with-meta {:pending false
                                  :add (fn [{:keys ~(vec (symbols fact))}]
-                                        (go
-                                          (async/>! (:to-host ~host) {:kind :fact
-                                                                      :name ~fact-name
-                                                                      :key ~(second fact)
-                                                                      :data ~(vec (drop 2 fact))
-                                                                      :ts ((:time ~host))
-                                                                      :change 1
-                                                                      :writers #{(:identity ~host)}
-                                                                      :readers #{}})))}))
+                                        ((:pub ~host)
+                                         {:kind :fact
+                                          :name ~fact-name
+                                          :key ~(second fact)
+                                          :data ~(vec (drop 2 fact))
+                                          :ts ((:time ~host))
+                                          :change 1
+                                          :writers #{(:identity ~host)}
+                                          :readers #{}}))}))
                  :else
                  (do
                    ((:pub ~host) {:kind :reg
