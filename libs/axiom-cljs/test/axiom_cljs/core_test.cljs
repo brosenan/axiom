@@ -14,12 +14,11 @@
 
 "It takes a URL and a an optional keyword parameter `:ws-ch`, 
 which defaults to a [function of the same name in the chord library](https://github.com/jarohen/chord#clojurescript).
-It returns a channel to which it will provide a map containing the following keys:
+It returns a map containing the following keys:
 1. A `:sub` function for subscribing to events coming from the host.
 2. A `:pub` function for publishing events.
 3. A `:time` function which returns the current time in milliseconds.
-4. A `:uuid` function which returns some universally-unique identifier.
-Additionally, it contains the fields of the `:init` event it receives from the server-side once the connection is open."
+4. A `:uuid` function which returns some universally-unique identifier."
 (fact connection
   (async done
          (go
@@ -30,18 +29,15 @@ Additionally, it contains the fields of the `:init` event it receives from the s
                                 (async/>! the-chan {:kind :init
                                                     :foo :bar})
                                 {:ws-channel the-chan}))
-                 host (async/<! (ax/connection "ws://some-url"
-                                               :ws-ch mock-ws-ch))]
+                 host (ax/connection "ws://some-url"
+                                     :ws-ch mock-ws-ch)]
              (is (map? host))
-             (is (= (:foo host) :bar)) ;; from the :init event
-
              (is (fn? (:pub host)))
              (is (fn? (:sub host)))
              (let [test-chan (async/chan 10)]
                ((:sub host) "foo" #(go (async/>! test-chan %)))
                (async/>! the-chan {:name "bar" :some :event})
                (async/>! the-chan {:name "foo" :other :event})
-               (println 123)
                (is (= (async/<! test-chan) {:name "foo" :other :event}))
                ;; Since our mock `ws-ch` creates a normal channel, publishing into this channel
                ;; will be captured by subscribers
