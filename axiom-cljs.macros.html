@@ -180,7 +180,7 @@
                                :data [&quot;world&quot;]
                                :readers #{}
                                :writers #{&quot;alice&quot;}}] -1)
-    (is (= (count (my-tweets2 &quot;alice&quot;)) 0))</code></pre></div><div><span id="event-emitting-functions"></span><h3>1.1 &nbsp;&nbsp; Event-Emitting Functions</h3></div><div><p>A view provides functions that allow users to emit event for creating, updating and deleting facts.</p></div><div><p>For <em>creating facts</em>, a non-pending sequence returned by a view function has an <code>:add</code> meta-field. This is a function that takes a value map as input, and emits a corresponding event with the following keys:</p><ol><li><code>:kind</code> is always <code>:fact</code>.</li><li><code>:name</code> is the first element in the fact pattern, converted to string.</li><li><code>:key</code> and <code>:data</code> are derived from the value map.</li><li><code>:ts</code> consults the host's <code>:time</code> function.</li><li><code>:change</code> is always 1.</li><li><code>:writers</code> defaults to the set representing the user.</li><li><code>:readers</code> defaults to the universal set.</li></ol></div><div class="code"><pre><code class="clojure">defview-ev-1
+    (is (= (count (my-tweets2 &quot;alice&quot;)) 0))</code></pre></div><div><span id="event-emitting-functions"></span><h3>1.1 &nbsp;&nbsp; Event-Emitting Functions</h3></div><div><p>A view provides functions that allow users to emit event for creating, updating and deleting facts.</p></div><div><p>For <em>creating facts</em>, a sequence returned by a view function has an <code>:add</code> meta-field. This is a function that takes a value map as input, and emits a corresponding event with the following keys:</p><ol><li><code>:kind</code> is always <code>:fact</code>.</li><li><code>:name</code> is the first element in the fact pattern, converted to string.</li><li><code>:key</code> and <code>:data</code> are derived from the value map.</li><li><code>:ts</code> consults the host's <code>:time</code> function.</li><li><code>:change</code> is always 1.</li><li><code>:writers</code> defaults to the set representing the user.</li><li><code>:readers</code> defaults to the universal set.</li></ol></div><div class="code"><pre><code class="clojure">defview-ev-1a
     (let [add (-&gt; (my-tweets2 &quot;alice&quot;)
                   meta :add)]
       (is (fn? add))
@@ -194,7 +194,40 @@
                 :ts 12345
                 :change 1
                 :writers #{&quot;alice&quot;}
-                :readers #{}}])))</code></pre></div><div><p>In value maps where the user is a writer, a <code>:-delete!</code> entry contains a function that deletes the corresponding fact. It creates an event with all the same values, but with a new <code>:ts</code> and a <code>:change</code> value equal to the negative of the count value of the original event.</p></div><div class="code"><pre><code class="clojure">defview-ev-2
+               :readers #{}}])))</code></pre></div><div><p>The <code>:readers</code> and <code>:writers</code> sets in newly-added facts are controlled by the optional <code>:readers</code> and <code>:writers</code> keyword arguments in the view definition. These arguments are expressions that are evaluated for every invocation of <code>add</code>. They can use any of the symbols in the fact pattern (which will evaluate to their corresponding value in the value map given to <code>add</code>), and the symbol <code>$user</code>, which represents the identity of the current user.</p></div><div><p>In the following example we define a view for <code>tweetlog/follows</code> facts, indicating that one user follows another. We set the <code>:writers</code> set to be the (following) user using both his or her system identity (<code>$user</code>) and alias, and the <code>:readers</code> set to contain the user being followed by alias.</p></div><div class="code"><pre><code class="clojure">defview-ev-1b
+    (defonce published-follows (atom nil))
+    (reset! published-follows nil)
+    (let [my-atom (atom nil)
+          ps (ax/pubsub :name)
+          host {:sub (:sub ps)
+                :pub #(reset! published-follows %)
+                :identity (atom &quot;alice&quot;)
+                :time (constantly 2345)}]
+      (defview my-following [follower]
+        host
+        [:tweetlog/follows follower followee]
+        :writers #{$user [:tweetlog/has-alias follower]}
+        :readers #{[:tweetlog/has-alias followee]})
+      ((:pub ps) {:kind :fact
+                  :name &quot;tweetlog/follows&quot;
+                  :key &quot;alice123&quot;
+                  :data [&quot;bob345&quot;]
+                  :ts 1234
+                  :change 1
+                  :writers #{&quot;alice&quot;}
+                  :readers #{}})
+      (let [add (-&gt; (my-following &quot;alice123&quot;)
+                    meta :add)]
+        (add {:follower &quot;alice123&quot;
+              :followee &quot;charlie678&quot;}))
+      (is (= @published-follows {:kind :fact
+                                 :name &quot;tweetlog/follows&quot;
+                                 :key &quot;alice123&quot;
+                                 :data [&quot;charlie678&quot;]
+                                 :ts 2345
+                                 :change 1
+                                 :writers #{&quot;alice&quot; [:tweetlog/has-alias &quot;alice123&quot;]}
+                                 :readers #{[:tweetlog/has-alias &quot;charlie678&quot;]}})))</code></pre></div><div><p>In value maps where the user is a writer, a <code>:-delete!</code> entry contains a function that deletes the corresponding fact. It creates an event with all the same values, but with a new <code>:ts</code> and a <code>:change</code> value equal to the negative of the count value of the original event.</p></div><div class="code"><pre><code class="clojure">defview-ev-2
     (defonce my-atom3 (atom nil))
     (defonce published3 (atom nil))
     (reset! published3 nil)
