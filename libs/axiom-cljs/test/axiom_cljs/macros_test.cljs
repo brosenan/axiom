@@ -51,7 +51,7 @@ and return an empty sequence with a meta field `:pending` indicating that the fu
       (defonce host2 {:sub (:sub ps2)
                       :pub #(swap! published2 conj %)
                       :time (constantly 12345)
-                      :identity "alice"})
+                      :identity (atom "alice")})
       (defonce my-atom2 (atom nil))
       (defview my-tweets2 [user]
         host2
@@ -339,7 +339,7 @@ The expression can rely on symbols from the fact pattern, and must result in a [
       (reset! published7 [])
       (defonce host7 {:sub (:sub ps7)
                       :pub #(swap! published7 conj %)
-                      :identity "alice"
+                      :identity (atom "alice")
                       :uuid (fn []
                               (str "SOMEUUID" (swap! unique7 inc)))
                       :time (constantly 12345)})
@@ -436,7 +436,7 @@ This time, the value maps capture the query's *output parameters* only."
       (defonce ps8 (ax/pubsub :name))
       (defonce host8 {:pub (fn [ev])
                       :sub (:sub ps8)
-                      :identity "alice"
+                      :identity (atom "alice")
                       :uuid (constantly "SOMEUUID")
                       :time (constantly 12345)})
       (defonce my-atom8 (atom nil))

@@ -14,18 +14,24 @@
 (defn connection [url & {:keys [ws-ch]
                          :or {:ws-ch ws-ch}}]
   (let [to-host (async/chan 2)
-        ps (pubsub :name)]
+        ps (pubsub :name)
+        identity (atom nil)]
     (go
       (let [ch (-> (ws-ch url)
                async/<!
                :ws-channel)]
         (async/pipe to-host ch)
         (go-loop []
-          ((:pub ps) (async/<! ch))
+          (let [ev (async/<! ch)]
+            (prn ev)
+            (when (= (:kind ev) :init)
+              (reset! identity (:identity ev)))
+            ((:pub ps) ev))
           (recur))))
     {:pub (fn [ev] (go
                      (async/>! to-host ev)))
      :sub (:sub ps)
      :time (fn [] (.getTime (js/Date.)))
-     :uuid #(str (random-uuid))}))
+     :uuid #(str (random-uuid))
+     :identity identity}))
 

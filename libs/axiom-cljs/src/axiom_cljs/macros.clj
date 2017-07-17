@@ -25,6 +25,9 @@
               (let [{:keys [~@(symbols fact)]} b#]
                 ~order-by))))
 
+(defmacro user [host]
+  `@(:identity ~host))
+
 (defmacro defview [name args host fact &
                    {:keys [store-in when order-by]
                     :or {store-in `(atom nil)
@@ -70,7 +73,7 @@
                                           :data ~(vec (drop 2 fact))
                                           :ts ((:time ~host))
                                           :change 1
-                                          :writers #{(:identity ~host)}
+                                          :writers #{(user ~host)}
                                           :readers #{}}))}))
                  :else
                  (do
@@ -120,7 +123,7 @@
                                   :data [~@inputs]
                                   :ts ((:time ~host))
                                   :change 1
-                                  :writers #{(:identity ~host)}
-                                  :readers #{(:identity ~host)}})
+                                  :writers #{(user ~host)}
+                                  :readers #{(user ~host)}})
                    (-> '()
                        (with-meta {:pending true})))))))))

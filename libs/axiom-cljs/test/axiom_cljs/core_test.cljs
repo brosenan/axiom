@@ -18,7 +18,8 @@ It returns a map containing the following keys:
 1. A `:sub` function for subscribing to events coming from the host.
 2. A `:pub` function for publishing events.
 3. A `:time` function which returns the current time in milliseconds.
-4. A `:uuid` function which returns some universally-unique identifier."
+4. A `:uuid` function which returns some universally-unique identifier.
+5. An `:identity` atom, which will contain the user's identity once an `:init` event is received from the host."
 (fact connection
   (async done
          (go
@@ -26,12 +27,18 @@ It returns a map containing the following keys:
                  mock-ws-ch (fn [url]
                               (is (= url "ws://some-url"))
                               (go
-                                (async/>! the-chan {:kind :init
-                                                    :foo :bar})
                                 {:ws-channel the-chan}))
                  host (ax/connection "ws://some-url"
                                      :ws-ch mock-ws-ch)]
              (is (map? host))
+             (is (= @(:identity host) nil)) ;; Initial value
+             ;; The host sends an `:init` event
+             (async/>! the-chan {:kind :init
+                                 :name "some/name"
+                                 :identity "alice"})
+             (async/<! (async/timeout 1))
+             (is (= @(:identity host) "alice"))
+             
              (is (fn? (:pub host)))
              (is (fn? (:sub host)))
              (let [test-chan (async/chan 10)]
