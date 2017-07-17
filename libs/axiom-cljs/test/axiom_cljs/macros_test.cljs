@@ -153,7 +153,7 @@ The values are their corresponding values in each event."
 [[:section {:title "Event-Emitting Functions"}]]
 "A view provides functions that allow users to emit event for creating, updating and deleting facts."
 
-"For *creating facts*, a non-pending sequence returned by a view function has an `:add` meta-field.
+"For *creating facts*, a sequence returned by a view function has an `:add` meta-field.
 This is a function that takes a value map as input, and emits a corresponding event with the following keys:
 1. `:kind` is always `:fact`.
 2. `:name` is the first element in the fact pattern, converted to string.
@@ -162,7 +162,7 @@ This is a function that takes a value map as input, and emits a corresponding ev
 5. `:change` is always 1.
 6. `:writers` defaults to the set representing the user.
 7. `:readers` defaults to the universal set."
-(fact defview-ev-1
+(fact defview-ev-1a
       (let [add (-> (my-tweets2 "alice")
                     meta :add)]
         (is (fn? add))
@@ -176,7 +176,50 @@ This is a function that takes a value map as input, and emits a corresponding ev
                   :ts 12345
                   :change 1
                   :writers #{"alice"}
-                  :readers #{}}]))))
+                 :readers #{}}]))))
+
+"The `:readers` and `:writers` sets in newly-added facts are controlled by the optional `:readers` and `:writers` keyword arguments in the view definition.
+These arguments are expressions that are evaluated for every invocation of `add`.
+They can use any of the symbols in the fact pattern (which will evaluate to their corresponding value in the value map given to `add`),
+and the symbol `$user`, which represents the identity of the current user."
+
+"In the following example we define a view for `tweetlog/follows` facts, indicating that one user follows another.
+We set the `:writers` set to be the (following) user using both his or her system identity (`$user`) and alias,
+and the `:readers` set to contain the user being followed by alias."
+(fact defview-ev-1b
+      (defonce published-follows (atom nil))
+      (reset! published-follows nil)
+      (let [my-atom (atom nil)
+            ps (ax/pubsub :name)
+            host {:sub (:sub ps)
+                  :pub #(reset! published-follows %)
+                  :identity (atom "alice")
+                  :time (constantly 2345)}]
+        (defview my-following [follower]
+          host
+          [:tweetlog/follows follower followee]
+          :writers #{$user [:tweetlog/has-alias follower]}
+          :readers #{[:tweetlog/has-alias followee]})
+        ((:pub ps) {:kind :fact
+                    :name "tweetlog/follows"
+                    :key "alice123"
+                    :data ["bob345"]
+                    :ts 1234
+                    :change 1
+                    :writers #{"alice"}
+                    :readers #{}})
+        (let [add (-> (my-following "alice123")
+                      meta :add)]
+          (add {:follower "alice123"
+                :followee "charlie678"}))
+        (is (= @published-follows {:kind :fact
+                                   :name "tweetlog/follows"
+                                   :key "alice123"
+                                   :data ["charlie678"]
+                                   :ts 2345
+                                   :change 1
+                                   :writers #{"alice" [:tweetlog/has-alias "alice123"]}
+                                   :readers #{[:tweetlog/has-alias "charlie678"]}}))))
 
 "In value maps where the user is a writer, a `:-delete!` entry contains a function that deletes the corresponding fact.
 It creates an event with all the same values, but with a new `:ts` and a `:change` value equal to the negative of the count value of the original event."

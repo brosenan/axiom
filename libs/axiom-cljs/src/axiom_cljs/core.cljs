@@ -35,3 +35,5 @@
      :uuid #(str (random-uuid))
      :identity identity}))
 
+(defn merge-meta [obj m]
+  (with-meta obj (merge (meta obj) m)))

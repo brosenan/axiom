@@ -29,10 +29,12 @@
   `@(:identity ~host))
 
 (defmacro defview [name args host fact &
-                   {:keys [store-in when order-by]
+                   {:keys [store-in when order-by readers writers]
                     :or {store-in `(atom nil)
                          when true
-                         order-by []}}]
+                         order-by []
+                         readers #{}
+                         writers #{'$user}}}]
   (let [fact-name (-> fact first str (subs 1))]
     `(defonce ~name
        (let [sub-chan# (async/chan 1)
@@ -43,44 +45,45 @@
             (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
               (update-state state# ev# ~args ~when))))
          (fn ~args
-           (cond (contains? @state# ~args)
-                 (-> (->> (for [[ev# c#] (@state# ~args)
-                                :when (> c# 0)]
-                            (-> (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
-                                  ~(symbol-map fact))
-                                (assoc :-readers (:readers ev#))
-                                (assoc :-writers (:writers ev#))
-                                (assoc :-delete! #((:pub ~host)
-                                                   (-> ev#
-                                                       (assoc :ts ((:time ~host)))
-                                                       (assoc :change (- c#)))))
-                                (assoc :-swap! (fn [func# & args#]
-                                                 ((:pub ~host)
-                                                  (-> ev#
-                                                      (assoc :ts ((:time ~host)))
-                                                      (assoc :change c#)
-                                                      (assoc :removed (:data ev#))
-                                                      (assoc :data
-                                                             (let [{:keys ~(vec (symbols (drop 2 fact)))} (apply func# ev# args#)]
-                                                               ~(vec (drop 2 fact))))))))))
-                          (sort ~(comparator fact order-by)))
-                     (with-meta {:pending false
-                                 :add (fn [{:keys ~(vec (symbols fact))}]
+           (-> (cond (contains? @state# ~args)
+                     (-> (->> (for [[ev# c#] (@state# ~args)
+                                    :when (> c# 0)]
+                                (-> (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
+                                      ~(symbol-map fact))
+                                    (assoc :-readers (:readers ev#))
+                                    (assoc :-writers (:writers ev#))
+                                    (assoc :-delete! #((:pub ~host)
+                                                       (-> ev#
+                                                           (assoc :ts ((:time ~host)))
+                                                           (assoc :change (- c#)))))
+                                    (assoc :-swap! (fn [func# & args#]
+                                                     ((:pub ~host)
+                                                      (-> ev#
+                                                          (assoc :ts ((:time ~host)))
+                                                          (assoc :change c#)
+                                                          (assoc :removed (:data ev#))
+                                                          (assoc :data
+                                                                 (let [{:keys [~@(symbols (drop 2 fact))]} (apply func# ev# args#)]
+                                                                   ~(vec (drop 2 fact))))))))))
+                              (sort ~(comparator fact order-by)))
+                         (ax/merge-meta {:pending false}))
+                     :else
+                     (do
+                       ((:pub ~host) {:kind :reg
+                                      :name ~fact-name
+                                      :key ~(-> fact second)})
+                       (ax/merge-meta '() {:pending true})))
+               (ax/merge-meta {:add (fn [{:keys [~@(symbols fact)]}]
+                                      (let [~'$user (user ~host)]
                                         ((:pub ~host)
                                          {:kind :fact
                                           :name ~fact-name
                                           :key ~(second fact)
-                                          :data ~(vec (drop 2 fact))
+                                          :data [~@(drop 2 fact)]
                                           :ts ((:time ~host))
                                           :change 1
-                                          :writers #{(user ~host)}
-                                          :readers #{}}))}))
-                 :else
-                 (do
-                   ((:pub ~host) {:kind :reg
-                                  :name ~fact-name
-                                  :key ~(-> fact second)})
-                   (with-meta '() {:pending true}))))))))
+                                          :writers ~writers
+                                          :readers ~readers})))})))))))
 
 (defn ^:private parse-target-form [[name & args]]
    (let [[in out] (split-with (partial not= '->) args)]
