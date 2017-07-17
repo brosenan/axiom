@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 16 July 2017</h5>
+              <h5>Date: 17 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.2</h5></div></div>
           <hr/>
@@ -84,19 +84,25 @@
                 </ul>
               </nav>
           </div>
-          <div class="code"><pre><code class="clojure">(enable-console-print!)</code></pre></div><div><span id="connection"></span><h2><b>1 &nbsp;&nbsp; connection</b></h2></div><div><p><code>connection</code> creates a connection to the host.</p></div><div><p>It takes a URL and a an optional keyword parameter <code>:ws-ch</code>,  which defaults to a <a href='https://github.com/jarohen/chord#clojurescript'>function of the same name in the chord library</a>. It returns a map containing the following keys:</p><ol><li>A <code>:sub</code> function for subscribing to events coming from the host.</li><li>A <code>:pub</code> function for publishing events.</li><li>A <code>:time</code> function which returns the current time in milliseconds.</li><li>A <code>:uuid</code> function which returns some universally-unique identifier.</li></ol></div><div class="code"><pre><code class="clojure">connection
+          <div class="code"><pre><code class="clojure">(enable-console-print!)</code></pre></div><div><span id="connection"></span><h2><b>1 &nbsp;&nbsp; connection</b></h2></div><div><p><code>connection</code> creates a connection to the host.</p></div><div><p>It takes a URL and a an optional keyword parameter <code>:ws-ch</code>,  which defaults to a <a href='https://github.com/jarohen/chord#clojurescript'>function of the same name in the chord library</a>. It returns a map containing the following keys:</p><ol><li>A <code>:sub</code> function for subscribing to events coming from the host.</li><li>A <code>:pub</code> function for publishing events.</li><li>A <code>:time</code> function which returns the current time in milliseconds.</li><li>A <code>:uuid</code> function which returns some universally-unique identifier.</li><li>An <code>:identity</code> atom, which will contain the user's identity once an <code>:init</code> event is received from the host.</li></ol></div><div class="code"><pre><code class="clojure">connection
 (async done
        (go
          (let [the-chan (async/chan 10)
                mock-ws-ch (fn [url]
                             (is (= url &quot;ws://some-url&quot;))
                             (go
-                              (async/&gt;! the-chan {:kind :init
-                                                  :foo :bar})
                               {:ws-channel the-chan}))
                host (ax/connection &quot;ws://some-url&quot;
                                    :ws-ch mock-ws-ch)]
            (is (map? host))
+           (is (= @(:identity host) nil)) ;; Initial value
+           ;; The host sends an `:init` event
+           (async/&gt;! the-chan {:kind :init
+                               :name &quot;some/name&quot;
+                               :identity &quot;alice&quot;})
+           (async/&lt;! (async/timeout 1))
+           (is (= @(:identity host) &quot;alice&quot;))
+           
            (is (fn? (:pub host)))
            (is (fn? (:sub host)))
            (let [test-chan (async/chan 10)]

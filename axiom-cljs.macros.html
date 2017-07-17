@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 16 July 2017</h5>
+              <h5>Date: 17 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.2</h5></div></div>
           <hr/>
@@ -106,7 +106,7 @@
     (defonce host2 {:sub (:sub ps2)
                     :pub #(swap! published2 conj %)
                     :time (constantly 12345)
-                    :identity &quot;alice&quot;})
+                    :identity (atom &quot;alice&quot;)})
     (defonce my-atom2 (atom nil))
     (defview my-tweets2 [user]
       host2
@@ -327,7 +327,7 @@
     (reset! published7 [])
     (defonce host7 {:sub (:sub ps7)
                     :pub #(swap! published7 conj %)
-                    :identity &quot;alice&quot;
+                    :identity (atom &quot;alice&quot;)
                     :uuid (fn []
                             (str &quot;SOMEUUID&quot; (swap! unique7 inc)))
                     :time (constantly 12345)})
@@ -395,7 +395,7 @@
     (defonce ps8 (ax/pubsub :name))
     (defonce host8 {:pub (fn [ev])
                     :sub (:sub ps8)
-                    :identity &quot;alice&quot;
+                    :identity (atom &quot;alice&quot;)
                     :uuid (constantly &quot;SOMEUUID&quot;)
                     :time (constantly 12345)})
     (defonce my-atom8 (atom nil))
