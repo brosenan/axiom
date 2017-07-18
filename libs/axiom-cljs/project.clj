@@ -3,7 +3,8 @@
   :url "https://github.com/brosenan/axiom"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :aliases {"im" "classpath" ;; As a no-op
+  :aliases {"im" "classpath"
+            "im1" ["doo" "phantom" "test" "once"]
             "eim" ["monolith" "each" "im"]}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.9.671"]
@@ -11,7 +12,7 @@
                  [devcards "0.2.3"]
                  [org.clojure/core.async "0.3.442"]
                  [jarohen/chord "0.8.1"]]
-  :plugins [[lein-cljsbuild "1.1.4" :exclusions [[org.clojure/clojure]]]
+  :plugins [[lein-cljsbuild "1.1.7-SNAPSHOT" :exclusions [[org.clojure/clojure]]]
             [lein-figwheel "0.5.6"]
             [lein-doo "0.1.7"]]
   :clean-targets ^{:protect false} [:target-path "out" "resources/public/cljs"]
