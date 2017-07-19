@@ -875,6 +875,18 @@ As a second argument it expects the application version identifier (the `:app-ve
      :writers #{"someone" [:perm.AAA/bar 8]}
      :readers #{[:perm.AAA/baz 15]}})
 
+"If the original event does not have `:writers` or `:readers` (or both), these fields are ignored."
+(fact
+ (translate-names {:kind :fact
+                   :name "foo.core/something"
+                   :key 123
+                   :data [1 2 3]}
+                  {'foo.core 'perm.AAA})
+ => {:kind :fact
+     :name "perm.AAA/something"
+     :key 123
+     :data [1 2 3]})
+
 [[:chapter {:title "websocket-handler"}]]
 "The gateway tier exposes Axiom's information tier through [WebSockets](https://en.wikipedia.org/wiki/WebSocket).
 The `websocket-handler` is a RING handler that provides this functionality.
@@ -882,19 +894,29 @@ It assumes it is wrapped with [chord](https://github.com/jarohen/chord)'s `wrap-
 which translates WebSockets to `core.async` channels."
 
 "`websocket-handler` is a DI resource that depends on [event-gateway](#event-gateway) to filter events,
+[name-translator](#name-translator) to translate namespaces between the client and the server,
 and `event-bridge` (e.g., [this](rabbit-microservices.html#event-bridge)) to interact with the information tier.
-It also depends on the middleware resources [wrap-websocket-handler](#wrap-websocket-handler) and [version-selector](#version-selector)."
+It also depends on the middleware resources [wrap-websocket-handler](#wrap-websocket-handler), [authenticator](#authenticator) and [version-selector](#version-selector)."
 (fact
  (def pair [(async/chan 10) (async/chan 10)])
  (def ws-pair [(async/chan 10) (async/chan 10)])
  (let [$ (di/injector {:event-gateway
-                       (fn [[c-c2s c-s2c] id-set app-ver]
+                       (fn [[c-c2s c-s2c] id app-ver]
                          (let [s-c2s (async/chan 10 (comp
-                                                     (map #(assoc % :id-set id-set))
+                                                     (map #(assoc % :id id))
                                                      (map #(assoc % :app-ver app-ver))))
                                s-s2c (async/chan 10 (comp
-                                                     (map #(assoc % :id-set id-set))
+                                                     (map #(assoc % :id id))
                                                      (map #(assoc % :app-ver app-ver))))]
+                           (async/pipe c-c2s s-c2s)
+                           (async/pipe s-s2c c-s2c)
+                           [s-c2s s-s2c]))
+                       :name-translator
+                       (fn [[c-c2s c-s2c] app-ver]
+                         (let [s-c2s (async/chan 10 (comp
+                                                     (map #(assoc % :trans-app-ver app-ver))))
+                               s-s2c (async/chan 10 (comp
+                                                     (map #(assoc % :trans-app-ver app-ver))))]
                            (async/pipe c-c2s s-c2s)
                            (async/pipe s-s2c c-s2c)
                            [s-c2s s-s2c]))
@@ -907,6 +929,12 @@ It also depends on the middleware resources [wrap-websocket-handler](#wrap-webso
                          (fn [req]
                            (-> req
                                (assoc :app-version :the-app-ver)
+                               handler)))
+                       :authenticator
+                       (fn [handler]
+                         (fn [req]
+                           (-> req
+                               (assoc :identity :the-user-id)
                                handler)))
                        :wrap-websocket-handler
                        (fn [handler]
@@ -932,12 +960,16 @@ To use `websocket-handler` with `wrap-websocket-handler` one needs to add a wrap
    (let [[ev chan] (async/alts!! [(first pair) (async/timeout 1000)])]
      chan => (first pair)
      (:foo ev) => :bar
-     (:app-ver ev) => :the-app-ver)
+     (:app-ver ev) => :the-app-ver
+     (:id ev) => :the-user-id
+     (:trans-app-ver ev) => :the-app-ver)
    (async/>!! (second pair) {:bar :foo})
    (let [[ev chan] (async/alts!! [s2c (async/timeout 1000)])]
      chan => s2c
      (:bar ev) => :foo
-     (:app-ver ev) => :the-app-ver)))
+     (:app-ver ev) => :the-app-ver
+     (:id ev) => :the-user-id
+     (:trans-app-ver ev) => :the-app-ver)))
 
 [[:section {:title "ring-handler"}]]
 "`ring-handler` is the main entry-point for the gateway tier."

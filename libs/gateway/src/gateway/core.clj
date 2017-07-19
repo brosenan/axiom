@@ -17,6 +17,11 @@
 (defn any? [list]
   (some? (some identity list)))
 
+(defn update-if-present [m k f]
+  (cond (contains? m k)
+        (update m k f)
+        :else m))
+
 (defn wrap-websocket-handler [handler]
   (fn [req]
     (if (:websocket? req)
@@ -58,8 +63,8 @@
 (defn translate-names [ev trans]
   (-> ev
       (assoc :name (translate-name (:name ev) trans))
-      (assoc :writers (translate-set (:writers ev) trans))
-      (assoc :readers (translate-set (:readers ev) trans))))
+      (update-if-present :writers #(translate-set % trans))
+      (update-if-present :readers #(translate-set % trans))))
 
 (defn get-translation-for-version [database-chan ver]
   (let [reply-chan (async/chan 2)]
@@ -161,17 +166,21 @@
                   [s-c2s s-s2c])))
 
   (di/provide $ websocket-handler [event-gateway
+                                   name-translator
                                    event-bridge
                                    wrap-websocket-handler
-                                   version-selector]
+                                   version-selector
+                                   authenticator]
               (-> (fn [{:keys [ws-channel-pair
-                               identity-set
+                               identity
                                app-version]}]
                     (-> ws-channel-pair
-                        (event-gateway identity-set app-version)
+                        (name-translator app-version)
+                        (event-gateway identity app-version)
                         event-bridge))
                   wrap-websocket-handler
-                  version-selector))
+                  version-selector
+                  authenticator))
 
   (di/provide $ ring-handler [static-handler
                               websocket-handler]
