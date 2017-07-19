@@ -174,6 +174,10 @@
               (-> (fn [{:keys [ws-channel-pair
                                identity
                                app-version]}]
+                    (async/>!! (second ws-channel-pair)
+                               {:kind :init
+                                :name "axiom/client-info"
+                                :identity identity})
                     (-> ws-channel-pair
                         (name-translator app-version)
                         (event-gateway identity app-version)

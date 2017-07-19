@@ -951,27 +951,36 @@ It also depends on the middleware resources [wrap-websocket-handler](#wrap-webso
 which has the form `[c2s s2c]`, where `c2s` contains messages went from the client to the server,
 and `s2c` can take messages from the server to the client.
 (Please not that chord's `wrap-websocket-handler` provides only one channel (`:ws-channel`), which is bidirectional.
-We use our own `wrap-websocket-handler` middleware similar to chord's, which supports a 3-parameter handler and provides the channel as a pair).
+We use our own `wrap-websocket-handler` middleware similar to chord's, which provides the channel as a pair).
 To use `websocket-handler` with `wrap-websocket-handler` one needs to add a wrapper that converts `:ws-channel` to `:ws-channel-pair`.)"
+
+"In the following example, we call the `websocket-handler` we constructed above.
+The first thing it does once active is pass to the client an `:init` event, containing the user's `:identity`.
+Then we pass two events through the channels -- one from client to server and one from server to client.
+We note that the event processors we mocked add the correct data."
 (fact
  (let [[c2s s2c] ws-pair]
    (websocket-handler {})
+   ;; `:init` event
+   (read-from-chan s2c) => {:kind :init
+                            :name "axiom/client-info"
+                            :identity :the-user-id}
+   ;; Client to server
    (async/>!! c2s {:foo :bar})
-   (let [[ev chan] (async/alts!! [(first pair) (async/timeout 1000)])]
-     chan => (first pair)
+   (let [ev (read-from-chan (first pair))]
      (:foo ev) => :bar
      (:app-ver ev) => :the-app-ver
      (:id ev) => :the-user-id
      (:trans-app-ver ev) => :the-app-ver)
+   ;; Server to client
    (async/>!! (second pair) {:bar :foo})
-   (let [[ev chan] (async/alts!! [s2c (async/timeout 1000)])]
-     chan => s2c
+   (let [ev (read-from-chan s2c)]
      (:bar ev) => :foo
      (:app-ver ev) => :the-app-ver
      (:id ev) => :the-user-id
      (:trans-app-ver ev) => :the-app-ver)))
 
-[[:section {:title "ring-handler"}]]
+[[:chapter {:title "ring-handler"}]]
 "`ring-handler` is the main entry-point for the gateway tier."
 
 "It is a DI resource that depends on [websocket-handler](#websocket-handler) and [static-handler](#static-handler) -- the two handlers it serves."
