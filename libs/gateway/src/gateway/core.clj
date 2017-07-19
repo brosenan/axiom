@@ -10,7 +10,8 @@
             [clojure.edn :as edn]
             [compojure.core :refer :all]
             [chord.http-kit :as chord]
-            [org.httpkit.server :as htsrv]))
+            [org.httpkit.server :as htsrv]
+            [clojure.walk :as walk]))
 
 
 (defn any? [list]
@@ -37,6 +38,37 @@
      :name (str (symbol ns name))
      :key (cond key
                 (-> key codec/url-decode edn/read-string))}))
+
+(defn translate-name [n trans]
+  (let [sym (symbol n)
+        ns (namespace sym)
+        ns-sym (symbol ns)
+        ns (cond (contains? trans ns-sym)
+                 (str (trans ns-sym))
+                 :else ns)]
+    (str (symbol ns (name sym)))))
+
+(defn translate-set [s trans]
+  (let [name-trans
+        (into {} (for [g (interset/enum-groups s)
+                       :when (vector? g)]
+                   [(first g) (keyword (translate-name (-> g first str (subs 1)) trans))]))]
+    (walk/postwalk-replace name-trans s)))
+
+(defn translate-names [ev trans]
+  (-> ev
+      (assoc :name (translate-name (:name ev) trans))
+      (assoc :writers (translate-set (:writers ev) trans))
+      (assoc :readers (translate-set (:readers ev) trans))))
+
+(defn get-translation-for-version [database-chan ver]
+  (let [reply-chan (async/chan 2)]
+    (async/>!! database-chan [{:kind :fact
+                               :name "axiom/perm-versions"
+                               :key ver} reply-chan])
+    (let [{:keys [data]} (async/<!! reply-chan)
+          [trans] data]
+      trans)))
 
 (defn module [$]
   (di/provide $ authenticator [use-dummy-authenticator]
@@ -185,4 +217,15 @@
                                           (swap! id-set conj (vec (cons (first g) (:data ev))))
                                           (recur)))))
                                   (swap! rules conj (first g))))
-                              (interset/subset? @id-set s)))))))))
+                              (interset/subset? @id-set s))))))))
+
+  (di/provide $ name-translator [database-chan]
+              (fn [[c-c2s c-s2c] ver]
+                (let [trans (get-translation-for-version database-chan ver)
+                      inv-trans (into {} (for [[k v] trans]
+                                           [v k]))
+                      s-c2s (async/chan 2 (map #(translate-names % trans)))
+                      s-s2c (async/chan 2 (map #(translate-names % inv-trans)))]
+                  (async/pipe c-c2s s-c2s)
+                  (async/pipe s-s2c c-s2c)
+                  [s-c2s s-s2c]))))

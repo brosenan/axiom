@@ -716,6 +716,165 @@ in the event's `:readers` set, that is, if all possible users who can identify t
    ;; We expect a timeout...
    chan => to))
 
+[[:chapter {:title "name-translator"}]]
+"Axiom uses [content addressing](permacode.html#content-addressing) as a way to handle multiple versions of an application.
+While content addressing has its clear advantages, it also has the caveat that referencing content-addressed artifacts requires knowing the version hash."
+
+"Recall that Axiom uses rules to [specify user groups](#identity-pred).
+In the above examples we used rule names such as `perm.AAA/friend` and `perm.BBB/group-owner`.
+The namespaces depicted as `perm.AAA` and `perm.BBB` are in reality long and change for every version of the rule's definition.
+This makes it impractical to be included in the client code."
+
+"To solve this problem we place a `name-translator` between the client and the [event-gateway](#event-gateway) (which consults these rules).
+The `name-translator` translates between rule-namespaces as they appear in the application's source code,
+while the `event-gateway` receives them with permacode hashes as namespaces."
+
+"`name-translator` is a DI resource that depends on `database-chan` for retreiving the translation map for a specific application version."
+(fact
+ (let [$ (di/injector {:database-chan db-chan})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [name-translator]
+                (def name-translator name-translator))))
+
+"The `name-translator`, like the `event-gateway`, is a bidirectional event processor.
+It takes as its first argument a tuple `[c2s s2c]` of `core.async` channels.
+As a second argument it expects the application version identifier (the `:app-version` key provided by the [version-selector](#version-selector))."
+(fact
+ (def c-c2s (async/chan 10))
+ (def c-s2c (async/chan 10))
+ (def fut (future (name-translator [c-c2s c-s2c] "ver123"))))
+
+"Upon invocation, `name-translator` will perform a query for the `axiom/perm-versions` fact related to the given version."
+(fact
+ (let [[query ch] (get-query)]
+   query => {:kind :fact
+             :name "axiom/perm-versions"
+             :key "ver123"}
+   (async/>!! ch {:kind :fact
+                  :name "axiom/perm-versions"
+                  :key "ver123"
+                  :data [{'foo.core 'perm.AAA
+                          'bar.core 'perm.BBB}
+                         {"/foo.html" "some-hash"}]})))
+
+"It returns a pair of channels, similar to the one it received as its first argument."
+(fact
+ (let [[s-c2s s-s2c] @fut]
+   (def s-c2s s-c2s)
+   (def s-s2c s-s2c)))
+
+"Events that do not mention a namespace associated with the version are passed as-is from side to side."
+(fact
+ (defn read-from-chan [ch]
+   (let [[item read-ch] (async/alts!! [ch (async/timeout 1000)])]
+     (when-not (= read-ch ch)
+       (throw (Exception. "Timed out trying to read from channel")))
+     item))
+ (async/>!! c-c2s {:kind :fact
+                   :name "some/name"
+                   :key 123
+                   :data [1 2 3]
+                   :writers #{"someone"}
+                   :readers #{}})
+  (read-from-chan s-c2s) => {:kind :fact
+                            :name "some/name"
+                            :key 123
+                            :data [1 2 3]
+                            :writers #{"someone"}
+                             :readers #{}}
+  (async/>!! s-s2c {:kind :fact
+                    :name "some/name"
+                    :key 123
+                    :data [1 2 3]
+                    :writers #{"someone"}
+                    :readers #{}})
+  (read-from-chan c-s2c) => {:kind :fact
+                             :name "some/name"
+                             :key 123
+                             :data [1 2 3]
+                             :writers #{"someone"}
+                             :readers #{}})
+
+"Names in events coming from the client are translated using the translation map in the `axiom/perm-versions` event."
+(fact
+ (async/>!! c-c2s {:kind :fact
+                   :name "some/name"
+                   :key 123
+                   :data [1 2 3]
+                   :writers #{"someone"}
+                   :readers #{[:foo.core/friend "someone"]}})
+ (read-from-chan s-c2s) => {:kind :fact
+                            :name "some/name"
+                            :key 123
+                            :data [1 2 3]
+                            :writers #{"someone"}
+                            :readers #{[:perm.AAA/friend "someone"]}})
+
+"Names in events coming from the server are translated in the other direction."
+(fact
+ (async/>!! s-s2c {:kind :fact
+                   :name "some/name"
+                   :key 123
+                   :data [1 2 3]
+                   :writers #{"someone"}
+                   :readers #{[:perm.AAA/friend "someone"]}})
+ (read-from-chan c-s2c) => {:kind :fact
+                            :name "some/name"
+                            :key 123
+                            :data [1 2 3]
+                            :writers #{"someone"}
+                            :readers #{[:foo.core/friend "someone"]}})
+
+[[:section {:title "Under the Hood"}]]
+"Internally, `name-translator` uses a helper function: `traslate-names`, which takes an event and a traslation map, and returns an event with all names traslated."
+
+"When there is nothing to translate, `traslate-names` returns the event unchanged."
+(fact
+ (translate-names {:kind :fact
+                   :name "some/name"
+                   :key 123
+                   :data [1 2 3]
+                   :writers #{"someone"}
+                   :readers #{}} {'foo.core 'perm.AAA})
+ => {:kind :fact
+     :name "some/name"
+     :key 123
+     :data [1 2 3]
+     :writers #{"someone"}
+     :readers #{}})
+
+"When the namespace of the `:name` field of the event appears in the translation table, it is translated accordingly."
+(fact
+ (translate-names {:kind :fact
+                   :name "foo.core/something"
+                   :key 123
+                   :data [1 2 3]
+                   :writers #{"someone"}
+                   :readers #{}} {'foo.core 'perm.AAA})
+ => {:kind :fact
+     :name "perm.AAA/something"
+     :key 123
+     :data [1 2 3]
+     :writers #{"someone"}
+     :readers #{}})
+
+"Similarly, rule names inside `:writers` and `:readers` are translated."
+(fact
+ (translate-names {:kind :fact
+                   :name "foo.core/something"
+                   :key 123
+                   :data [1 2 3]
+                   :writers #{"someone" [:foo.core/bar 8]}
+                   :readers #{[:foo.core/baz 15]}}
+                  {'foo.core 'perm.AAA})
+ => {:kind :fact
+     :name "perm.AAA/something"
+     :key 123
+     :data [1 2 3]
+     :writers #{"someone" [:perm.AAA/bar 8]}
+     :readers #{[:perm.AAA/baz 15]}})
+
 [[:chapter {:title "websocket-handler"}]]
 "The gateway tier exposes Axiom's information tier through [WebSockets](https://en.wikipedia.org/wiki/WebSocket).
 The `websocket-handler` is a RING handler that provides this functionality.
