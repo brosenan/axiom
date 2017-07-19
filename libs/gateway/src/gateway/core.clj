@@ -147,14 +147,20 @@
                                identity-pred]
               (fn [[c-c2s c-s2c] identity app-version]
                 (let [user-in-set? (identity-pred identity)
-                      s-c2s (async/chan 10 (filter #(or
-                                                     (and
-                                                      (= (:kind %) :fact)
-                                                      (user-in-set? (:writers %)))
-                                                     (and
-                                                      (= (:kind %) :reg)
-                                                      (contains? % :name)
-                                                      (contains? % :key)))))
+                      s-c2s (async/chan 10 (comp
+                                            (filter #(or
+                                                      (and
+                                                       (= (:kind %) :fact)
+                                                       (user-in-set? (:writers %)))
+                                                      (and
+                                                       (= (:kind %) :reg)
+                                                       (contains? % :name)
+                                                       (contains? % :key))))
+                                            (map #(update % :readers (fn [x]
+                                                                       (cond (user-in-set? x)
+                                                                             x
+                                                                             :else
+                                                                             (interset/union x #{identity})))))))
                       s-s2c (async/chan 10 (filter #(and
                                                      (or
                                                       (user-in-set? (:writers %))

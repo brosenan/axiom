@@ -42,5 +42,11 @@
                 b)))
       a)))
 
+ (defn union [a b]
+   (let [a (canonical a)]
+     (concat a (for [b' (canonical b)
+                     :when (not (subset? b' a))]
+                 b'))))
+ 
  (defn enum-groups [s]
    (mapcat (fn [x] (into [] x)) (canonical s))))

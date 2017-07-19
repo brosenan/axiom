@@ -695,6 +695,24 @@ in the event's `:readers` set, that is, if all possible users who can identify t
    ;; We expect a timeout...
    chan => to))
 
+[[:section {:title "Ensuring Readability"}]]
+"One potential probelm that may occur in Axiom is that an event created by a user is created with a `:readers` set that does not allow that same user to read it.
+To eliminate this problem, the `event-gateway` checks each event created by the client,
+and in case the `:readers` does not include the user, the `:readers` set is modified to include the user."
+(fact
+ (defn read-from-chan [ch]
+   (let [[item read-ch] (async/alts!! [ch (async/timeout 1000)])]
+     (when-not (= read-ch ch)
+       (throw (Exception. "Timed out trying to read from channel")))
+     item))
+ (async/>!! c-c2s {:kind :fact
+                   :name "foo"
+                   :writers #{"alice"}
+                   :readers #{[:perm.AAA/friend "alice"]}}) ;; Alice is not a friend of herself
+ (read-from-chan s-c2s) => {:kind :fact
+                            :name "foo"
+                            :writers #{"alice"}
+                            :readers [#{[:perm.AAA/friend "alice"]} #{"alice"}]})
 [[:section {:title "Registration Events"}]]
 "Valid `:reg`istration events should pass from client to server."
 (fact
@@ -766,11 +784,6 @@ As a second argument it expects the application version identifier (the `:app-ve
 
 "Events that do not mention a namespace associated with the version are passed as-is from side to side."
 (fact
- (defn read-from-chan [ch]
-   (let [[item read-ch] (async/alts!! [ch (async/timeout 1000)])]
-     (when-not (= read-ch ch)
-       (throw (Exception. "Timed out trying to read from channel")))
-     item))
  (async/>!! c-c2s {:kind :fact
                    :name "some/name"
                    :key 123
@@ -913,10 +926,8 @@ It also depends on the middleware resources [wrap-websocket-handler](#wrap-webso
                            [s-c2s s-s2c]))
                        :name-translator
                        (fn [[c-c2s c-s2c] app-ver]
-                         (let [s-c2s (async/chan 10 (comp
-                                                     (map #(assoc % :trans-app-ver app-ver))))
-                               s-s2c (async/chan 10 (comp
-                                                     (map #(assoc % :trans-app-ver app-ver))))]
+                         (let [s-c2s (async/chan 10 (map #(assoc % :trans-app-ver app-ver)))
+                               s-s2c (async/chan 10 (map #(assoc % :trans-app-ver app-ver)))]
                            (async/pipe c-c2s s-c2s)
                            (async/pipe s-s2c c-s2c)
                            [s-c2s s-s2c]))

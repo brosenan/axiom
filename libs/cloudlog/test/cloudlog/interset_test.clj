@@ -79,6 +79,17 @@ The fourth combination -- the intersection of `alice` and `bob` is omitted, beca
      #{"bob" [:some-app/friend "alice"]}
      #{"alice" [:some-app/friend "bob"]}])
 
+[[:chapter {:title "union"}]]
+"A union of two inrsets can be acheived by concatenating their canonical forms.
+For example, a set containing either `alice` or `bob` is derived the following way:"
+(fact
+ (interset/union #{"alice"} #{"bob"}) => [#{"alice"} #{"bob"}])
+
+"However, a union can be more minimal than that.
+If any of the components of the second arguments are subsets of the first argument, they are omitted."
+(fact
+ (interset/union [#{"alice"} #{"bob"}] #{"bob" [:some-app/friend "alice"]}) => [#{"alice"} #{"bob"}])
+
 [[:chapter {:title "subset?"}]]
 "The `subset?` predicate checks if one interset is a subset of the other.  For example:"
 (fact
