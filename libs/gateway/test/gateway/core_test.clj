@@ -577,10 +577,14 @@ It is depends on the following:
 "`event-gateway` is a function that sets up a bidirectional event filter for events flowing between a client and a server.
 It is intended to support confidentiality and integrity, protecting both the connected client and the rest of the users against this client."
 
-"It is a DI resource that depends on [rule-version-verifier](#rule-version-verifier)."
+"It is a DI resource that depends on [rule-version-verifier](#rule-version-verifier) and [identity-pred](#identity-pred)."
 (let [$ (di/injector {:rule-version-verifier
                       (fn [ver writers]
-                        (contains? writers (str "hash-in-" ver)))})]
+                        (contains? writers (str "hash-in-" ver)))
+                      :identity-pred
+                      (fn [id]
+                        (fn [s]
+                          (interset/subset? #{id :some-cred} s)))})]
   (module $)
   (di/startup $)
   (di/do-with! $ [event-gateway]
@@ -591,11 +595,11 @@ and `s2c` stands for *server to client*.
 `event-gateway` takes such a pair as its first parameter, and returns such a pair.
 The pair it is given is intended to connect the gateway to the client (`[c-c2s c-s2c]`),
 and the returned pair (`[s-c2s s-s2c]`) is intended to connect the gateway to the server (e.g., to [an event bridge](rabbit-microservices.html#event-bridge)).
-Apart for a channel-pair, `event-gateway` takes the [identity set](#identity-set) of the connected user and the `:app-version` of the application the user logged on to."
+Apart for a channel-pair, `event-gateway` takes the `:identity` of the connected user and the `:app-version` of the application the user logged on to."
 (fact
  (def c-c2s (async/chan 10))
  (def c-s2c (async/chan 10))
- (let [[s-c2s s-s2c] (event-gateway [c-c2s c-s2c] #{"alice" :some-cred} "ver123")]
+ (let [[s-c2s s-s2c] (event-gateway [c-c2s c-s2c] "alice" "ver123")]
    (def s-c2s s-c2s)
    (def s-s2c s-s2c)))
 
@@ -720,8 +724,7 @@ which translates WebSockets to `core.async` channels."
 
 "`websocket-handler` is a DI resource that depends on [event-gateway](#event-gateway) to filter events,
 and `event-bridge` (e.g., [this](rabbit-microservices.html#event-bridge)) to interact with the information tier.
-It also depends on the middleware resources [wrap-websocket-handler](#wrap-websocket-handler), [wrap-authorization](#wrap-authorization)
-and [version-selector](#version-selector)."
+It also depends on the middleware resources [wrap-websocket-handler](#wrap-websocket-handler) and [version-selector](#version-selector)."
 (fact
  (def pair [(async/chan 10) (async/chan 10)])
  (def ws-pair [(async/chan 10) (async/chan 10)])
@@ -740,12 +743,6 @@ and [version-selector](#version-selector)."
                        (fn [[c2s s2c]]
                          (async/pipe c2s (first pair))
                          (async/pipe (second pair) s2c))
-                       :wrap-authorization
-                       (fn [handler]
-                         (fn [req]
-                           (-> req
-                               (assoc :identity-set :the-id-set)
-                               handler)))
                        :version-selector
                        (fn [handler]
                          (fn [req]
@@ -776,13 +773,11 @@ To use `websocket-handler` with `wrap-websocket-handler` one needs to add a wrap
    (let [[ev chan] (async/alts!! [(first pair) (async/timeout 1000)])]
      chan => (first pair)
      (:foo ev) => :bar
-     (:id-set ev) => :the-id-set
      (:app-ver ev) => :the-app-ver)
    (async/>!! (second pair) {:bar :foo})
    (let [[ev chan] (async/alts!! [s2c (async/timeout 1000)])]
      chan => s2c
      (:bar ev) => :foo
-     (:id-set ev) => :the-id-set
      (:app-ver ev) => :the-app-ver)))
 
 [[:section {:title "ring-handler"}]]

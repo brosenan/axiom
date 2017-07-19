@@ -106,22 +106,24 @@
                   (any? (for [perm (get-perms-for-version app-ver)]
                           (interset/subset? writers #{(str perm)}))))))
 
-  (di/provide $ event-gateway [rule-version-verifier]
-              (fn [[c-c2s c-s2c] identity-set app-version]
-                (let [s-c2s (async/chan 10 (filter #(or
+  (di/provide $ event-gateway [rule-version-verifier
+                               identity-pred]
+              (fn [[c-c2s c-s2c] identity app-version]
+                (let [user-in-set? (identity-pred identity)
+                      s-c2s (async/chan 10 (filter #(or
                                                      (and
                                                       (= (:kind %) :fact)
-                                                      (interset/subset? identity-set (:writers %)))
+                                                      (user-in-set? (:writers %)))
                                                      (and
                                                       (= (:kind %) :reg)
                                                       (contains? % :name)
                                                       (contains? % :key)))))
                       s-s2c (async/chan 10 (filter #(and
                                                      (or
-                                                      (interset/subset? identity-set (:writers %))
+                                                      (user-in-set? (:writers %))
                                                       (rule-version-verifier app-version (:writers %))
                                                       (interset/subset? (:writers %) #{(-> % :name symbol namespace)}))
-                                                     (interset/subset? identity-set (:readers %)))))]
+                                                     (user-in-set? (:readers %)))))]
                   (async/pipe c-c2s s-c2s)
                   (async/pipe s-s2c c-s2c)
                   [s-c2s s-s2c])))
@@ -129,7 +131,6 @@
   (di/provide $ websocket-handler [event-gateway
                                    event-bridge
                                    wrap-websocket-handler
-                                   wrap-authorization
                                    version-selector]
               (-> (fn [{:keys [ws-channel-pair
                                identity-set
@@ -138,7 +139,6 @@
                         (event-gateway identity-set app-version)
                         event-bridge))
                   wrap-websocket-handler
-                  wrap-authorization
                   version-selector))
 
   (di/provide $ ring-handler [static-handler
