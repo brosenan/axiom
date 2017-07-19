@@ -37,7 +37,7 @@ This makes it fully capable of deciding who can see what, and who can do what."
 Among its roles are authenticating users, querying the information tier for user rights and filtering results according to these rights.
 It implements an HTTP server that provides access to [events](cloudlog-events.html#introduction) -- both creating and querying them."
 
-[[:chapter {:title "identity-set"}]]
+[[:chapter {:title "identity-pred"}]]
 "Axiom has a unique method for managing user rights.
 Instead of checking, for each action, if a user may or may not perform that action,
 Axiom marks [each event that flows through its information tier](cloudlog-events.html#introduction) with two annotations:
@@ -52,36 +52,32 @@ We use [intersets](cloudlog.interset.html) for that.
 The intersets are expressed in terms of *user groups*, which are (mathematical) sets of users that are provided by name, and not by content.
 Without further information it is impossible to determine if a user `u` is or is not a member of a writer set or a reader set attached to an event."
 
-"Instead of asking the question *which users belong in a readers/writers set*, the `identity-set` function
-answers the opposite question: *what is the smallest known user set that `u` belongs to?*"
+"Instead of asking the question *which users belong in a readers/writers set*, the `identity-pred` function
+answers the opposite question: *does user `u` belong to a given readers/writers set?*"
 
-"`identity-set` is a [DI resource](di.html) that depends on the following resource:
+"`identity-pred` is a [DI resource](di.html) that depends on the following resource:
 - `database-chan` -- A `core.async` channel for retreiving events stored in a database (e.g., [DynamoDB](dynamo.html#database-chan))."
 
-"`identity-set` is an *async function*, meaning that instead of returning an result it returns a channel to which a result will be
-posted in the future."
-
-"For an unauthenticated user (user ID of `nil`), `identity-set` returns a [universal interset](cloudlog.interset.html#universe),
-that is to say that the user can be any user and we do not have any information about who that might be."
+"`identity-pred` is a higher-order function. It takes a user identity as parameter, and returns a predicate on user sets."
 (fact
- (let [$ (di/injector {:database-chan (async/chan)})]
+ (def db-chan (async/chan))
+ (let [$ (di/injector {:database-chan db-chan})]
    (module $)
    (di/startup $)
-   (di/do-with! $ [identity-set]
-                (async/<!! (identity-set nil [:this :is :ignored])) => interset/universe)))
+   (di/do-with! $ [identity-pred]
+                (def nobody-in-set? (identity-pred nil))
+                (def alice-in-set? (identity-pred "alice")))))
 
-"Given a valid identity, but with no further information (an empty collection as a second argument that we will discuss later), 
-`identity-set` returns (via a channel) a set containing only the user ID.
-We treat strings as singleton sets, so the user group `\"alice\"` is a group of users containing only one user -- `alice`."
+"For an unauthenticated user (user ID of `nil`), the predicate returned by `identity-pred` always returns `false`.
+that is to say that the user does not belong to any set."
 (fact
- (let [$ (di/injector {:database-chan (async/chan)})]
-   (module $)
-   (di/startup $)
-   (di/do-with! $ [identity-set]
-                (async/<!! (identity-set "alice" [])) => #{"alice"})))
+ (nobody-in-set? [:this :is :ignored]) => false)
 
-"A user can belong to many groups, and is therefore a member of the intersection of all these groups with his or her own singleton group
-(represented by his or her user ID).
+"A porper (not `nil`) user belongs to his or her *singleton group* -- a group containing only that user."
+(fact
+ (alice-in-set? #{"alice"}) => true)
+
+"A user can belong to many groups, and is therefore a member of the intersection of all these groups with his or her own singleton group.
 But how do we determine which user belongs to which group?"
 
 "Axiom has an original solution for that as well.
@@ -91,19 +87,17 @@ Axiom uses [rules](cloudlog.html#defrule) to define user groups."
 "Any rule that create derived facts of the form `[rule-name user args...]` defines a user group of the form `[rule-name args...]`,
 which contains any `user` for which such a derived fact exists."
 
-"`identity-set` takes as its second argument a list of *rule names* based on which we would like to search for identities.
-Let us consider a Facebook-like application, in which users can have rights based on who their friends are, and which groups they own.
+"Let us consider a Facebook-like application, in which users can have rights based on who their friends are, and which groups they own.
 Two rules: `perm.AAA/friend` and `perm.BBB/group-owner` convey this relationships, respectively.
-Now consider we query for user `alice`'s identity set with respect to these two rules."
+Now consider we wish to find out if `alice` is *either* a `perm.AAA/friend` of `bob` or a `perm.BBB/group-owner` of \"Cats for Free Speach\"."
 
 (fact
- (def db-chan (async/chan))
  (let [$ (di/injector {:database-chan db-chan})]
    (module $)
    (di/startup $)
-   (def res
-     (di/do-with! $ [identity-set]
-                  (identity-set "alice" ["perm.AAA/friend" "perm.BBB/group-owner"])))))
+   (def res (async/thread
+              (alice-in-set? [#{[:perm.AAA/friend "bob"]}
+                              #{[:perm.BBB/group-owner "Cats for Free Speach"]}])))))
 
 "We will use the following function to safely retrieve request made to our mock database:"
 (defn get-query []
@@ -113,7 +107,7 @@ Now consider we query for user `alice`'s identity set with respect to these two 
       (throw (Exception. "Timed out waiting for DB request")))
     req))
 
-"`identity-set` queries the database for all derived facts created by these rules, where `:key` is `alice`."
+"`alice-in-set?`, the predicate we got from `identity-pred`, queries the database for all derived facts created by these rules, where `:key` is `alice`."
 (fact
  (let [[query reply-chan] (get-query)]
    query => {:kind :fact
@@ -134,25 +128,28 @@ Now consider we query for user `alice`'s identity set with respect to these two 
    query => {:kind :fact
              :name "perm.BBB/group-owner"
              :key "alice"}
-   ;; Alice owns one group: "cats for free wifi"
-   (async/>!! reply-chan {:kind :fact
-                          :name "perm.BBB/group-owner"
-                          :key "alice"
-                          :data ["cats for free wifi"]
-                          :ts 2000
-                          :change 1
-                          :readers #{}
-                          :writers #{"perm.BBB"}})
+   ;; Alice owns two groups
+   (doseq [grp ["Dogs for Free Wifi"
+                "Hansters for Free Time"]]
+     (async/>!! reply-chan {:kind :fact
+                            :name "perm.BBB/group-owner"
+                            :key "alice"
+                            :data [grp]
+                            :ts 2000
+                            :change 1
+                            :readers #{}
+                            :writers #{"perm.BBB"}}))
    (async/close! reply-chan)))
 
-"`alice`'s identity set is now the intersection between her own singleton set (`\"alice\"`),
-and the groups of `bob`'s and `charlie`'s friends, as well as the owners of `cats for free wifi`."
+"Because `alice` is a friend of `bob`, the result we get is `true`."
 (fact
- (async/<!! res) => (reduce interset/intersection interset/universe
-                            [#{"alice"}
-                             #{[:perm.AAA/friend "bob"]}
-                             #{[:perm.AAA/friend "charlie"]}
-                             #{[:perm.BBB/group-owner "cats for free wifi"]}]))
+ (async/<!! res) => true)
+
+"The predicate function caches the query results, so further calls concerning the same type of groups
+(in our case, `perm.AAA/friend` and `perm.BBB/group-owner`), are answered immediately."
+(fact
+ (alice-in-set? #{[:perm.AAA/friend "eve"]}) => false
+ (alice-in-set? #{[:perm.BBB/group-owner "Dogs for Free Wifi"]}) => true)
 
 [[:section {:title "Accumulation"}]]
 "Axiom is an [event sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) system.

@@ -117,6 +117,24 @@ Clojure set `B` is a subset of Clojure set `A`."
   (interset/subset? [#{"alice" [:some-app/friend "bob"]} #{[:some-app/friend "charlie"]}]
                     #{[:some-app/friend "bob"]}) => false)
 
+
+[[:chapter {:title "enum-groups"}]]
+"Sometimes we wish to iterate over all groups mentioned in an interset.
+`enum-groups` allows us to do so by returning a sequence of these groups."
+
+"For an empty or universal intersets, an empty sequence is returned."
+(fact
+ (interset/enum-groups interset/universe) => []
+ (interset/enum-groups interset/empty-set) => [])
+
+"For a simple interset, all compoments are returned."
+(fact
+ (interset/enum-groups #{[:foo "bar"] [:bar "foo"]}) => [[:foo "bar"] [:bar "foo"]])
+
+"For a cannonical interset, all components of all elements are returned."
+(fact
+ (interset/enum-groups [#{[:foo "bar"]} #{[:bar "foo"]}]) => [[:foo "bar"] [:bar "foo"]])
+
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "canonical"}]]
 "`canonical` takes an interset of any kind, and returns a canonical interset."

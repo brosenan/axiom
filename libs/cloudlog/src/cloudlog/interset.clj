@@ -40,4 +40,7 @@
                 (fn [b]
                   (set/subset? b a))
                 b)))
-      a))))
+      a)))
+
+ (defn enum-groups [s]
+   (mapcat (fn [x] (into [] x)) (canonical s))))

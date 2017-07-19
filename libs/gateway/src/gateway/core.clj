@@ -188,4 +188,28 @@
                                           params/wrap-params
                                           cookies/wrap-cookies) http-config)]
                 {:resource (meta srv)
-                 :shutdown srv})))
+                 :shutdown srv}))
+
+  (di/provide $ identity-pred [database-chan]
+              (fn [id]
+                (let [id-set (atom #{id})
+                      rules (atom #{})]
+                  (fn [s]
+                    (cond (nil? id)
+                          false
+                          :else
+                          (do
+                            (doseq [g (interset/enum-groups s)]
+                              (when (and (vector? g)
+                                         (not (contains? @rules (first g))))
+                                (let [reply-chan (async/chan 2)]
+                                  (async/>!! database-chan [{:kind :fact
+                                                             :name (-> g first str (subs 1))
+                                                             :key id} reply-chan])
+                                  (loop []
+                                    (let [ev (async/<!! reply-chan)]
+                                      (when ev
+                                        (swap! id-set conj (vec (cons (first g) (:data ev))))
+                                        (recur)))))
+                                (swap! rules conj (first g))))
+                            (interset/subset? @id-set s))))))))
