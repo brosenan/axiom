@@ -39,30 +39,6 @@
                 (-> key codec/url-decode edn/read-string))}))
 
 (defn module [$]
-  (di/provide $ identity-set [database-chan]
-              (let [database-chan (ev/accumulate-db-chan database-chan)]
-                (fn [user relations]
-                  (async/go
-                    (cond (nil? user)
-                        interset/universe
-                        :else
-                        (let [chanmap (into {} (for [rel relations]
-                                                 [rel (async/chan 2)]))]
-                          (doseq [[rel chan] chanmap]
-                            (async/>! database-chan [{:kind :fact
-                                                      :name rel
-                                                      :key user} chan]))
-                          (let [xform (comp
-                                       (filter (fn [ev] (interset/subset? (:writers ev) #{(-> ev
-                                                                                               :name
-                                                                                               keyword
-                                                                                               namespace)})))
-                                       (filter (fn [ev] (interset/subset? #{user} (:readers ev))))
-                                       (map (fn [ev] (vec (cons (keyword (:name ev)) (:data ev))))))
-                                trans-chan (async/chan 1 xform)]
-                            (async/pipe (async/merge (vals chanmap)) trans-chan)
-                            (async/<! (async/reduce conj #{user} trans-chan)))))))))
-
   (di/provide $ authenticator [use-dummy-authenticator]
               (fn [handler]
                 (fn[req]
@@ -108,16 +84,6 @@
                                  :body (clojure.java.io/input-stream content)})))))
                   ctype/wrap-content-type
                   version-selector))
-
-  (di/provide $ wrap-authorization [identity-set
-                                    authenticator]
-              (fn [handler]
-                (-> (fn [req]
-                      (let [rule-list (or (get-in req [:headers "Axiom-Id-Rules"])
-                                          [])
-                            id-set (async/<!! (identity-set (:identity req) rule-list))]
-                        (handler (assoc req :identity-set id-set))))
-                    authenticator)))
 
   (di/provide $ rule-version-verifier [database-chan]
               (let [cache (atom {})
@@ -191,25 +157,32 @@
                  :shutdown srv}))
 
   (di/provide $ identity-pred [database-chan]
-              (fn [id]
-                (let [id-set (atom #{id})
-                      rules (atom #{})]
-                  (fn [s]
-                    (cond (nil? id)
-                          false
-                          :else
-                          (do
-                            (doseq [g (interset/enum-groups s)]
-                              (when (and (vector? g)
-                                         (not (contains? @rules (first g))))
-                                (let [reply-chan (async/chan 2)]
-                                  (async/>!! database-chan [{:kind :fact
-                                                             :name (-> g first str (subs 1))
-                                                             :key id} reply-chan])
-                                  (loop []
-                                    (let [ev (async/<!! reply-chan)]
-                                      (when ev
-                                        (swap! id-set conj (vec (cons (first g) (:data ev))))
-                                        (recur)))))
-                                (swap! rules conj (first g))))
-                            (interset/subset? @id-set s))))))))
+              (let [database-chan (ev/accumulate-db-chan database-chan)]
+                (fn [id]
+                  (let [id-set (atom #{id})
+                        rules (atom #{})
+                        xform (comp
+                               (filter (fn [ev] (interset/subset? (:writers ev) #{(-> ev
+                                                                                      :name
+                                                                                      keyword
+                                                                                      namespace)})))
+                               (filter (fn [ev] (interset/subset? #{id} (:readers ev)))))]
+                    (fn [s]
+                      (cond (nil? id)
+                            false
+                            :else
+                            (do
+                              (doseq [g (interset/enum-groups s)]
+                                (when (and (vector? g)
+                                           (not (contains? @rules (first g))))
+                                  (let [reply-chan (async/chan 2 xform)]
+                                    (async/>!! database-chan [{:kind :fact
+                                                               :name (-> g first str (subs 1))
+                                                               :key id} reply-chan])
+                                    (loop []
+                                      (let [ev (async/<!! reply-chan)]
+                                        (when ev
+                                          (swap! id-set conj (vec (cons (first g) (:data ev))))
+                                          (recur)))))
+                                  (swap! rules conj (first g))))
+                              (interset/subset? @id-set s)))))))))

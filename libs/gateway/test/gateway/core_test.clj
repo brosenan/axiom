@@ -162,14 +162,16 @@ and not at the individual events,
 that is, the current state of each group and not the individual changes in this state."
 
 "For example, consider `alice` was once a friend of `eve` and then they parted ways.
-This friendship will not appear in `alice`'s identity set."
+When checking if `alice` belongs to `eve`'s friends, the answer will be `false`."
 (fact
   (let [$ (di/injector {:database-chan db-chan})]
    (module $)
    (di/startup $)
-   (let [res
-         (di/do-with! $ [identity-set]
-                      (identity-set "alice" ["perm.AAA/friend"]))
+   (let [alice-in-set?
+         (di/do-with! $ [identity-pred]
+                      (identity-pred "alice"))
+         res (async/thread
+               (alice-in-set? #{[:perm.AAA/friend "eve"]}))
          [query reply-chan] (get-query)]
      (doseq [[ts change] [[1000 1] ;; Became friends at time 1000
                           [2000 -1] ;; Parted ways at time 2000
@@ -183,8 +185,7 @@ This friendship will not appear in `alice`'s identity set."
                               :writers #{"perm.AAA"}
                               :readers #{}}))
      (async/close! reply-chan)
-     (async/<!! res) => #{"alice"} ;; No mention of friendship with eve
-     )))
+     (async/<!! res) => false)))
 
 [[:section {:title "Integrity"}]]
 "Integrity and confidentiality are important to take into consideration when calculating a user's identity set."
@@ -192,7 +193,7 @@ This friendship will not appear in `alice`'s identity set."
 "Integrity is important because we do not want users to be able to assume permissions they are not entitled to.
 This could happen if they publish a fact that looks like a derived fact from a rule giving them access to something the wouldn't have otherwise."
 
-"To avoid this kind of problem we require that facts taken into consideration by `identity-set` are created by rules, 
+"To avoid this kind of problem we require that facts taken into consideration by `identity-pred` are created by rules, 
 so that their [writer sets include the fact's namespace](cloudlog.html#integrity)."
 
 "Imagine `eve` wishing to gain access to `alice`'s inner-circle by forging an event that makes her one of `alice`'s friends."
@@ -206,30 +207,32 @@ so that their [writer sets include the fact's namespace](cloudlog.html#integrity
    :writers #{"eve"}
    :readers #{}})
 
-"Note that `eve`'s identity set does not include `perm.AAA` (the fact's namespace), so the `:writers` set does not contain it.
-It may contain other groups `eve` is a member of, but they are irrelevant to this discussion."
+"Note the `:writers` set in this event.
+`eve` can only set it to a set she is a member of.
+Specifically, she cannot pose as `perm.AAA` -- the identity associated with the rule."
 
 "When `eve` tries to access Axiom and perform operations (such as reading statuses on our Facebook-like application),
-the gateway tier will first call `identity-set` to see which groups she belongs to.
-In her request she will ask to identify as a friend of whoever possible, by placing `perm.AAA/friend` in the `rule-names` argument.
-However, `identity-set` will know to ignore the forged fact and will not consider her a friend of `alice`."
+the gateway tier will first consult `identity-pred` to see whether or not she has access to the requested content.
+As she will try to pose as `alice`'s friend, the predicate function will query `perm.AAA/friend` facts.
+However, it will only consider facts created by the `perm.AAA/friend` *rule*, by checking for `perm.AAA` in the `:writers` set."
 (fact
  (let [$ (di/injector {:database-chan db-chan})]
    (module $)
    (di/startup $)
-   (let [res
-         (di/do-with! $ [identity-set]
-                      (identity-set "eve" ["perm.AAA/friend"]))
+   (let [eve-in-set?
+         (di/do-with! $ [identity-pred]
+                      (identity-pred "eve"))
+         res (async/thread
+               (eve-in-set? #{[:perm.AAA/friend "alice"]}))
          [query reply-chan] (get-query)]
      (async/>!! reply-chan forged-event)
      (async/close! reply-chan)
-     (async/<!! res) => #{"eve"} ;; No mention of friendship with alice
-     )))
+     (async/<!! res) => false)))
 
 [[:section {:title "Confidentiality"}]]
 "The role confidentiality plays here is a bit less obvious.
-The identity set returned by `identity-set` is not directly visible to users.
-However, if we do not take special measures to prefent this,
+While the results of the queries made by the predicate function are not visible to users directly,
+if we do not take special measures to prefent this,
 users can indirectly learn about things they should not."
 
 "Consider a private message written by `alice` to `bob`:"
@@ -252,7 +255,7 @@ To do so she creates her own application, and submits code containing the follow
   [:social-app/message "bob" "alice" msg] (clg/by "alice"))
 
 "Note that although the message facts were created by a different application,
-Axiom does not restrict that fact to be used only by that application.
+Axiom does not restrict facts to be used only by that application.
 This is a fundemental principle in Axiom: User data belongs to *users*, not *applications*."
 
 "If we apply `eve`'s rule to `bob`'s message we get the following event:"
@@ -271,7 +274,7 @@ This is a fundemental principle in Axiom: User data belongs to *users*, not *app
 "Axiom's confidentiality mechanism made sure that although it was `eve`'s evil rule that created this event,
 `eve` herself cannot read it, as its `:readers` set contains only `bob`."
 
-"But this is where `identity-set` could (potentially) help `eve` with her plan.
+"But this is where `identity-pred` could (potentially) help `eve` with her plan.
 Her exploit consists of the following facts she stores in Axiom:"
 (comment
   [{:kind :fact
@@ -304,23 +307,24 @@ Each of these facts will be visible to her if `alice` sent `bob` a message with 
 
 "Now all `eve` has to do is make a query (through the gateway) and look for a fact `eve-the-evil/exploit` with key `love-life`, 
 providing `gateway.core-test/evil-plan` in the rule-list.
-Then she just needs to wait and see if any of her guesses got lucky."
+Then she just needs to wait and see if any of her guesses got lucky (or unlucky...)."
 
 "To make sure `eve`'s evel plan cannot succeed, 
-`identity-set` only takes into consideration results for which the user for which the query is made is allowed to know about.
+predicate functions returned by `identity-pred` only takes into consideration results for which the user for which the query is made is allowed to know about.
 In our case, `eve` is not allowed to know about the different `gateway.core-test/evil-plan` results,
-and therefore they are not added to her identity set."
+and therefore she is not considered a member of these groups."
 (fact
   (let [$ (di/injector {:database-chan db-chan})]
    (module $)
    (di/startup $)
-   (let [res
-         (di/do-with! $ [identity-set]
-                      (identity-set "eve" ["perm.AAA/friend"]))
+   (let [eve-in-set?
+         (di/do-with! $ [identity-pred]
+                      (identity-pred "eve"))
+         res (async/thread
+               (eve-in-set? #{[:gateway.core-test/evil-plan "I like you!"]}))
          [query reply-chan] (get-query)]
      (async/pipe (async/to-chan evil-facts) reply-chan)
-     (async/<!! res) => #{"eve"} ;; No results from evil-plan
-     )))
+     (async/<!! res) => false)))
 
 "One subtle point to note is the potentially circular relationship between a user's identity set and the confidentiality requirement.
 We need to know what a user's identity set is in order to know what facts to consider for the identity set.
@@ -329,7 +333,7 @@ For the purpose of group membership (the identity set) we only consider facts th
 without looking up group membership."
 
 [[:chapter {:title "authenticator"}]]
-"The starting point for [identity-set](#identity-set) is an authenticated user identity.
+"The starting point for [identity-pred](#identity-pred) is an authenticated user identity.
 But how do we get one?
 In practice, user authentication is a difficult problem with many possibilities and serious trade-offs between them.
 In this library we defer this problem.
@@ -425,53 +429,6 @@ Additionally, the new value is stored in a cookie for future reference."
    (app {:cookies {}
          :params {}})
    => {:body "Hello"}))
-
-[[:chapter {:title "wrap-authorization"}]]
-"`wrap-authorization` is a DI resource that combines [authenticator](#authenticator) and [identity-set](#identity-set) to one middleware function
-that authenticates a user and stores his or her identity set as the :identity-set field in the request."
-
-"`wrap-authorization` depends on `authenticator` and `identity-set`.
-`authenticator` provides an `:identity` field, and `identity-set` converts this identity to an identity set.
-In order to do so, it must be given a `rule-list` parameter.
-By default, this parameter will be an empty list."
-(fact
- (let [$ (di/injector {:use-dummy-authenticator true
-                       :identity-set (fn [id rules]
-                                       (async/go
-                                         #{id rules}))})]
-   (module $)
-   (di/startup $)
-   (di/do-with! $ [wrap-authorization]
-                (let [req-with-id-set (async/chan 10)
-                      handler (fn [req]
-                                (async/>!! req-with-id-set req)
-                                {:status 200})
-                      app (wrap-authorization handler)]
-                  (app {:cookies {"user_identity" {:value "foo"}}})
-                  (let [[result chan] (async/alts!! [req-with-id-set
-                                                     (async/timeout 1000)])]
-                    chan => req-with-id-set
-                    (:identity-set result) => #{"foo" []})))))
-
-"If a header named `Axiom-Id-Rules` exists, its content is decoded as EDN and treated as the `rule-list`."
-(fact
- (let [$ (di/injector {:use-dummy-authenticator true
-                       :identity-set (fn [id rules]
-                                       (async/go
-                                         #{id rules}))})]
-   (module $)
-   (di/startup $)
-   (di/do-with! $ [wrap-authorization]
-                (let [req-with-id-set (async/chan 10)
-                      handler (fn [req]
-                                (async/>!! req-with-id-set req)
-                                {:status 200})
-                      app (wrap-authorization handler)]
-                  (app {:cookies {"user_identity" {:value "foo"}}
-                        :headers {"Axiom-Id-Rules" ['foo-rule 'bar-rule]}})
-                  (let [[result chan] (async/alts!! [req-with-id-set
-                                                     (async/timeout 1000)])]
-                    (:identity-set result) => #{"foo" ['foo-rule 'bar-rule]})))))
 
 [[:chapter {:title "version-selector"}]]
 "Axiom is intended to be multi-tenant.
