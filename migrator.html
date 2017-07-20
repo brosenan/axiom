@@ -266,20 +266,38 @@
    [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 2 3) [14]] ;; =&gt; 17
    [:add-task :plan-node `(migration-end-notifier 'migrator.core-test/trending
                                                   #{:some-writers}) [15 16 17]] ;; =&gt; 18
-   [:mark-as-ready :plan-node]]</code></pre></div><div><span id="clause-migrator"></span><h2><b>5 &nbsp;&nbsp; clause-migrator</b></h2></div><div><p>Clauses, unlike rules, do not require migration. When a new clause is introduced we need to declare its input queues (for the query and all contributing facts), and then we need to initiate a topology by publishing an <code>axiom/rule-ready</code> event.</p></div><div><p><code>clause-migrator</code> is a microservice that registers to <code>axiom/perms-exist</code> events. It depends on <code>publish</code> (e.g., <a href='rabbit-microservices.html#publish'>this</a> for publishing the <code>axiom/perms-exist</code> events, and on <code>declare-service</code> and <code>assign-service</code> for registering itself. <code>declare-service</code> is also used for declaring the input queues for the clause's topology.</p></div><div class="code"><pre><code class="clojure">(def published (atom []))
- (let [decl (transient {})
+   [:mark-as-ready :plan-node]]</code></pre></div><div><span id="clause-migrator"></span><h2><b>5 &nbsp;&nbsp; clause-migrator</b></h2></div><div><p>Clauses, unlike rules, do not require migration. When a new clause is introduced we need to declare its input queues (for the query and all contributing facts), and then we need to initiate a topology by publishing an <code>axiom/rule-ready</code> event.</p></div><div><p><code>clause-migrator</code> is a microservice that registers to <code>axiom/perms-exist</code> events. It depends on <code>publish</code> (e.g., <a href='rabbit-microservices.html#publish'>this</a> for publishing the <code>axiom/perms-exist</code> events, and on <code>declare-service</code> and <code>assign-service</code> for registering itself. <code>declare-service</code> is also used for declaring the input queues for the clause's topology.</p></div><div class="code"><pre><code class="clojure">(def declared-queues (atom {}))
+ (def published (atom []))
+ (let [decl (atom {})
      assign (transient {})
      $ (di/injector
         {:publish (partial swap! published conj)
          :declare-service (fn [key part]
-                            (assoc! decl key part))
+                            (swap! declared-queues assoc key part))
          :assign-service (fn [key func]
                            (assoc! assign key func))})]
  (module $)
  (di/startup $)
- ((persistent! decl) &quot;migrator.core/clause-migrator&quot;) =&gt; {:kind :fact
-                                                          :name &quot;axiom/perms-exist&quot;}
- (def clause-migrator ((persistent! assign) &quot;migrator.core/clause-migrator&quot;)))</code></pre></div><div><span id="usage-example"></span><h2><b>6 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>In this example we will migrate the rules provided in our <a href='https://github.com/brosenan/tweetlog-clj'>tweetlog example</a>.</p></div><div><p>First, we need to provide configuration to connect to Zookeeper, RabbitMQ, DynamoDB (local) and S3  (where we provide coordinates using environment variables).</p></div><div class="code"><pre><code class="clojure">(def config
+ (@declared-queues &quot;migrator.core/clause-migrator&quot;) =&gt; {:kind :fact
+                                                        :name &quot;axiom/perms-exist&quot;}
+ (def clause-migrator ((persistent! assign) &quot;migrator.core/clause-migrator&quot;)))</code></pre></div><div><p>In response to an <code>axiom/perms-exist</code> event with a positive <code>:change</code> value, <code>clause-migrator</code> look up all clauses in the new perms.</p></div><div class="code"><pre><code class="clojure">(clause-migrator {:kind :fact
+                 :name &quot;axiom/perms-exist&quot;
+                 :key &quot;ABCD1234&quot;
+                 :data [#{'perm.ABC1234 'perm.DEF5678}]
+                 :writers #{:some-writers}
+                 :change 1}) =&gt; nil
+ (provided
+(extract-version-clauses 'perm.ABC1234) =&gt; [multi-keyword-search]
+(extract-version-clauses 'perm.DEF5678) =&gt; [])</code></pre></div><div><p>Then it declares a queue associated with the facts that feed each link of each clause:</p></div><div class="code"><pre><code class="clojure">(loop [link multi-keyword-search
+      n 0]
+ (when link
+   (@declared-queues (str &quot;fact-for-rule/migrator.core-test/multi-keyword-search!&quot; n))
+   =&gt; {:kind :fact
+       :name (-&gt; link meta :source-fact first)}
+   (recur (-&gt; link meta :continuation) (inc n))))</code></pre></div><div><p>Finally, it publishes an <code>axiom/rule-ready</code> event for each clause.</p></div><div class="code"><pre><code class="clojure">@published =&gt; [{:kind :fact
+               :name &quot;axiom/rule-ready&quot;
+               :key 'migrator.core-test/multi-keyword-search
+               :data []}]</code></pre></div><div><span id="usage-example"></span><h2><b>6 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>In this example we will migrate the rules provided in our <a href='https://github.com/brosenan/tweetlog-clj'>tweetlog example</a>.</p></div><div><p>First, we need to provide configuration to connect to Zookeeper, RabbitMQ, DynamoDB (local) and S3  (where we provide coordinates using environment variables).</p></div><div class="code"><pre><code class="clojure">(def config
   {:zookeeper-config {:url &quot;127.0.0.1:2181&quot;}
    :zk-plan-config {:num-threads 5
                     :parent &quot;/my-plans&quot;}
