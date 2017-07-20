@@ -88,6 +88,13 @@
                                   (not (str/ends-with? (first src) "?"))))))
        vals))
 
+(defn extract-version-clauses [version]
+  (->> (perm/module-publics version)
+       (filter (fn [[k v]] (let [src (-> v meta :source-fact)]
+                             (and src
+                                  (str/ends-with? (first src) "?")))))
+       vals))
+
 
 (defn to-bin-seq [f]
   (let [len (.length f)
@@ -230,6 +237,11 @@
                                                      static-hashes]}))
                                   (sh "rm" "-rf" dir))
                                 nil)))
+
+  (di/do-with $ [publish declare-service assign-service]
+              (declare-service "migrator.core/clause-migrator" {:kind :fact
+                                                                :name "axiom/perms-exist"}))
+  
   (di/provide $ hash-static-file [hasher]
               (let [[hash unhash] hasher]
                 (fn [f]

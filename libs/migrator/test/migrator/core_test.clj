@@ -21,7 +21,7 @@
 "`migrator` is a microservice that listens to events describing new rules being published,
 and initiates data migration using [zk-plan](zk-plan.html)."
 
-"Consider for example the following two clause originally introduced in our [cloudlog documentation](cloudlog.html)."
+"Consider for example the following definitions originally introduced in our [cloudlog documentation](cloudlog.html)."
 (clg/defrule timeline [user author tweet]
   [:test/follows user author] (clg/by-anyone)
   [:test/tweeted author tweet] (clg/by-anyone))
@@ -29,6 +29,23 @@ and initiates data migration using [zk-plan](zk-plan.html)."
 (clg/defrule trending [tweet]
   [:test/influencer influencer] (clg/by-anyone)
   [timeline influencer tweet] (clg/by-anyone))
+
+(def stop-words #{"a" "is" "to" "the"})
+(clg/defrule index-docs [word id]
+  [:test/doc id text] (clg/by-anyone)
+  (for [word (clojure.string/split text #"[,!.? ]+")])
+  (let [word (clojure.string/lower-case word)])
+  (when-not (contains? stop-words word)))
+
+(clg/defclause multi-keyword-search
+  [:test/multi-keyword-search keywords -> text]
+  (let [keywords (map clojure.string/lower-case keywords)
+        first-kw (first keywords)])
+  [index-docs first-kw id]
+  [:test/doc id text] (clg/by-anyone)
+  (let [lc-text (clojure.string/lower-case text)])
+  (when (every? #(clojure.string/includes? lc-text %)
+                (rest keywords))))
 
 "If we introduce these rules when `:test/follows`, `:test/tweeted` and `:test/influencer` facts already exist, a migration process is necessary to do the following:
 1. Create timeline entries for all the tweets that already have followers.
@@ -234,27 +251,28 @@ We will mock this module with functions that record their own operation, so that
 We also provides it a `migration-config` resource containing the `:number-of-shards` parameter, determining how much parallelism we wish to have.
 The `hasher` resource is used to retrieve the content of the permacode modules."
 (fact
+ (def published (atom []))
  (let [calls-chan (async/chan 10)
-       $ (di/injector {:declare-service (fn [key reg] (async/>!! calls-chan [:declare-service key reg]))
-                       :assign-service (fn [key func] (async/>!! calls-chan [:assign-service key func]))
+       decl (transient {})
+       assign (transient {})
+       $ (di/injector {:declare-service (fn [key reg]
+                                          (assoc! decl key reg))
+                       :assign-service (fn [key func]
+                                         (assoc! assign key func))
                        :zk-plan mock-zk-plan
                        :migration-config {:number-of-shards 3
                                           :plan-prefix "/my-plans"}
                        :hasher [:my-hasher]})]
    (module $)
    (di/startup $)
-   (async/alts!! [calls-chan
-                  (async/timeout 1000)]) => [[:declare-service "migrator.core/rule-migrator" {:kind :fact
-                                                                                              :name "axiom/perms-exist"}] calls-chan]
-   (let [[call ch] (async/alts!! [calls-chan
-                                  (async/timeout 1000)])]
-     ch => calls-chan
-     (take 2 call) => [:assign-service "migrator.core/rule-migrator"]
-     (def migrate-rules (call 2)))))
+   ((persistent! decl) "migrator.core/rule-migrator")
+   => {:kind :fact
+       :name "axiom/perms-exist"}
+   (def migrate-rules ((persistent! assign) "migrator.core/rule-migrator"))))
 
 "Now, if we call the migration function `migrate-rules` on a rule, it will create a migration plan.
-First, it will extract the rules out of the given permacode modules.
-Then it will sort them according to their dependencies.
+First, it will extract the rules out of the given permacode modules by calling [extract-version-rules](#extract-version-rules).
+Then it will sort them according to their dependencies by calling [sort-rules](cloudlog.html#under-the-hood-0).
 Finally, it will create a migration plan that will cover all rule functions in these modules, to be migrated one by one, in topological order."
 
 "The plan will include, for each rule, a singleton [fact-declarer](#fact-declarer) tasks that will start collecting events to be processed by the given rule
@@ -281,7 +299,8 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
      [:add-task :plan-node `(link-migrator 'migrator.core-test/timeline 1 0 3) [5]] ;; => 6
      [:add-task :plan-node `(link-migrator 'migrator.core-test/timeline 1 1 3) [5]] ;; => 7
      [:add-task :plan-node `(link-migrator 'migrator.core-test/timeline 1 2 3) [5]] ;; => 8
-     [:add-task :plan-node `(migration-end-notifier 'migrator.core-test/timeline #{:some-writers}) [6 7 8]] ;; => 9
+     [:add-task :plan-node `(migration-end-notifier 'migrator.core-test/timeline
+                                                    #{:some-writers}) [6 7 8]] ;; => 9
      [:add-task :plan-node `(fact-declarer 'migrator.core-test/trending 0) [9]] ;; => 10
      [:add-task :plan-node `(initial-migrator 'migrator.core-test/trending 0 3) [10]] ;; => 11
      [:add-task :plan-node `(initial-migrator 'migrator.core-test/trending 1 3) [10]] ;; => 12
@@ -290,8 +309,34 @@ and any number of [link-migrator](#link-migrator) phases to process the rest of 
      [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 0 3) [14]] ;; => 15
      [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 1 3) [14]] ;; => 16
      [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 2 3) [14]] ;; => 17
-     [:add-task :plan-node `(migration-end-notifier 'migrator.core-test/trending #{:some-writers}) [15 16 17]] ;; => 18
+     [:add-task :plan-node `(migration-end-notifier 'migrator.core-test/trending
+                                                    #{:some-writers}) [15 16 17]] ;; => 18
      [:mark-as-ready :plan-node]])
+
+[[:chapter {:title "clause-migrator"}]]
+"Clauses, unlike rules, do not require migration.
+When a new clause is introduced we need to declare its input queues (for the query and all contributing facts),
+and then we need to initiate a topology by publishing an `axiom/rule-ready` event."
+
+"`clause-migrator` is a microservice that registers to `axiom/perms-exist` events.
+It depends on `publish` (e.g., [this](rabbit-microservices.html#publish) for publishing the `axiom/perms-exist` events,
+and on `declare-service` and `assign-service` for registering itself.
+`declare-service` is also used for declaring the input queues for the clause's topology."
+(fact
+ (def published (atom []))
+ (let [decl (transient {})
+       assign (transient {})
+       $ (di/injector
+          {:publish (partial swap! published conj)
+           :declare-service (fn [key part]
+                              (assoc! decl key part))
+           :assign-service (fn [key func]
+                             (assoc! assign key func))})]
+   (module $)
+   (di/startup $)
+   ((persistent! decl) "migrator.core/clause-migrator") => {:kind :fact
+                                                            :name "axiom/perms-exist"}
+   (def clause-migrator ((persistent! assign) "migrator.core/clause-migrator"))))
 
 [[:chapter {:title "Usage Example"}]]
 "In this example we will migrate the rules provided in our [tweetlog example](https://github.com/brosenan/tweetlog-clj)."
@@ -784,7 +829,7 @@ corresponding `:axiom/rule` events."
    (provided
     (perm/module-publics 'perm.1234ABC) => {'foo foo
                                             'bar bar
-                                            'baz baz} ; baz will not be published
+                                            'baz baz} ; baz will not be returned
     )))
 
 "It excludes clauses, for which the `:source-fact` ends with a question mark (`?`)."
@@ -794,8 +839,21 @@ corresponding `:axiom/rule` events."
    (extract-version-rules 'perm.1234ABC) => [foo]
    (provided
     (perm/module-publics 'perm.1234ABC) => {'foo foo
-                                            'bar bar} ; bar will not be published
+                                            'bar bar} ; bar will not be returned
     )))
+
+[[:section {:title "extract-version-clauses"}]]
+"Like [extract-version-rules](#extract-version-rules), `extract-version-rules` takes a symbol representing a permacode namespace,
+and returns a collection of clauses defined in that namespace."
+(fact
+ (let [foo (with-meta (fn []) {:source-fact ["foo" 1]}) ;; not a clause
+       bar (with-meta (fn []) {:source-fact ["bar?" 1]})
+       baz (fn [])] ;; not a clause
+   (extract-version-clauses 'perm.1234ABC) => [bar]
+   (provided
+    (perm/module-publics 'perm.1234ABC) => {'foo foo
+                                            'bar bar
+                                            'baz baz})))
 
 [[:section {:title "hash-static-file"}]]
 "When a new version is pushed we wish to scan everything under its `/static` directory (if exists),
