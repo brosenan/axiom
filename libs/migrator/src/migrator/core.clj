@@ -240,7 +240,23 @@
 
   (di/do-with $ [publish declare-service assign-service]
               (declare-service "migrator.core/clause-migrator" {:kind :fact
-                                                                :name "axiom/perms-exist"}))
+                                                                :name "axiom/perms-exist"})
+              (assign-service "migrator.core/clause-migrator"
+                              (fn [{:keys [data]}]
+                                (let [[perms] data
+                                      clauses (mapcat extract-version-clauses perms)]
+                                  (doseq [clause clauses]
+                                    (loop [link clause
+                                           n 0]
+                                      (when link
+                                        (declare-service (str "fact-for-rule/" (-> clause meta :ns str) "/" (-> clause meta :name) "!" n)
+                                                         {:kind :fact
+                                                          :name (-> link meta :source-fact first)})
+                                        (recur (-> link meta :continuation) (inc n))))
+                                    (publish {:kind :fact
+                                              :name "axiom/rule-ready"
+                                              :key (symbol (-> clause meta :ns str) (-> clause meta :name))
+                                              :data []}))))))
   
   (di/provide $ hash-static-file [hasher]
               (let [[hash unhash] hasher]

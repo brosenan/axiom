@@ -323,20 +323,50 @@ It depends on `publish` (e.g., [this](rabbit-microservices.html#publish) for pub
 and on `declare-service` and `assign-service` for registering itself.
 `declare-service` is also used for declaring the input queues for the clause's topology."
 (fact
+ (def declared-queues (atom {}))
  (def published (atom []))
- (let [decl (transient {})
+ (let [decl (atom {})
        assign (transient {})
        $ (di/injector
           {:publish (partial swap! published conj)
            :declare-service (fn [key part]
-                              (assoc! decl key part))
+                              (swap! declared-queues assoc key part))
            :assign-service (fn [key func]
                              (assoc! assign key func))})]
    (module $)
    (di/startup $)
-   ((persistent! decl) "migrator.core/clause-migrator") => {:kind :fact
-                                                            :name "axiom/perms-exist"}
+   (@declared-queues "migrator.core/clause-migrator") => {:kind :fact
+                                                          :name "axiom/perms-exist"}
    (def clause-migrator ((persistent! assign) "migrator.core/clause-migrator"))))
+
+"In response to an `axiom/perms-exist` event with a positive `:change` value, `clause-migrator` look up all clauses in the new perms."
+(fact
+ (clause-migrator {:kind :fact
+                   :name "axiom/perms-exist"
+                   :key "ABCD1234"
+                   :data [#{'perm.ABC1234 'perm.DEF5678}]
+                   :writers #{:some-writers}
+                   :change 1}) => nil
+ (provided
+  (extract-version-clauses 'perm.ABC1234) => [multi-keyword-search]
+  (extract-version-clauses 'perm.DEF5678) => []))
+
+"Then it declares a queue associated with the facts that feed each link of each clause:"
+(fact
+ (loop [link multi-keyword-search
+        n 0]
+   (when link
+     (@declared-queues (str "fact-for-rule/migrator.core-test/multi-keyword-search!" n))
+     => {:kind :fact
+         :name (-> link meta :source-fact first)}
+     (recur (-> link meta :continuation) (inc n)))))
+
+"Finally, it publishes an `axiom/rule-ready` event for each clause."
+(fact
+ @published => [{:kind :fact
+                 :name "axiom/rule-ready"
+                 :key 'migrator.core-test/multi-keyword-search
+                 :data []}])
 
 [[:chapter {:title "Usage Example"}]]
 "In this example we will migrate the rules provided in our [tweetlog example](https://github.com/brosenan/tweetlog-clj)."

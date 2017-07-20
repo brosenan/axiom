@@ -80,3 +80,7 @@ We therefore make `for` a special case."
 (fact
  (symbols '(for [x foo] (* x 2))) => #{'foo '*})
 
+"Reader macros annonimous functions are supported."
+(fact
+ (symbols '#(+ 1 %)) => #{'+}
+ (symbols '(fn* [x] (+ 1 x))) => #{'+})

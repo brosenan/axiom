@@ -56,9 +56,13 @@
 (defn ^:private fn-bindings [bindings]
   (if (empty? bindings)
     #{}
-    (let [[args & body] (first bindings)]
-      (union (difference (symbols body) (symbols args))
-             (fn-bindings (rest bindings))))))
+    ;; else
+    (if (vector? (first bindings))
+      (fn-bindings (list bindings))
+      ;; else
+      (let [[args & body] (first bindings)]
+        (union (difference (symbols body) (symbols args))
+               (fn-bindings (rest bindings)))))))
 
 (defmethod list-symbols 'fn*
   ([_ & bindings]
