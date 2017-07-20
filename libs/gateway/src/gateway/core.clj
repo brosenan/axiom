@@ -247,4 +247,7 @@
                       s-s2c (async/chan 2 (map #(translate-names % inv-trans)))]
                   (async/pipe c-c2s s-c2s)
                   (async/pipe s-s2c c-s2c)
-                  [s-c2s s-s2c]))))
+                  [s-c2s s-s2c])))
+
+  (di/provide $ wrap-websocket-handler []
+              wrap-websocket-handler))

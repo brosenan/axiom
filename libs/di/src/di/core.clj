@@ -1,7 +1,8 @@
 (ns di.core
   (:require [loom.graph :as graph]
             [loom.alg :as alg]
-            [clojure.set :as set]))
+            [clojure.set :as set]
+            [clojure.java.shell :as shell]))
 
 (defn log-with-sev [res sev]
   (fn [event]
@@ -37,7 +38,7 @@
    (with-meta (fn [res] (log-with-sev res "II"))
      {:resource :info
       :deps [:log]})
-   (with-meta (fn [res] clojure.java.shell/sh)
+   (with-meta (fn [res] shell/sh)
      {:resource :sh
       :deps [:log]})
    (with-meta (fn [res]

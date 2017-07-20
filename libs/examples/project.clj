@@ -4,6 +4,7 @@
   :permacode-paths ["src"]
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [axiom-clj/permacode "MONOLITH-SNAPSHOT"]]
+  :plugins [[axiom-clj/lein-axiom "MONOLITH-SNAPSHOT"]]
   :profiles {:dev {:dependencies [[midje "1.7.0"]
                                   [axiom-clj/cloudlog "MONOLITH-SNAPSHOT"]]}
              ;; You can add dependencies that apply to `lein midje` below.

@@ -7,7 +7,8 @@
             [langohr.exchange  :as le]
             [taoensso.nippy :as nippy]
             [di.core :as di]
-            [clojure.core.async :as async]))
+            [clojure.core.async :as async]
+            [clojure.repl :as repl]))
 
 
 (def facts-exch "facts")
@@ -73,7 +74,7 @@
                     (lb/publish chan facts-exch (event-routing-key ev) (nippy/freeze (merge event ev)) meta-attrs)))
         ack (fn [] (my-ack chan (:delivery-tag meta-attrs)))]
     (info {:source "rabbit"
-           :desc (str "handling: " event " by: " (clojure.repl/demunge (str func)))})
+           :desc (str "handling: " event " by: " (repl/demunge (str func)))})
     (case (arg-count func)
       1 (func event)
       2 (func event publish)
