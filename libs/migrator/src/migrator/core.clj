@@ -262,10 +262,22 @@
               (let [[hash unhash] hasher]
                 (fn [f]
                   (hash (to-bin-seq f)))))
+
   (di/provide $ hash-static-files [hash-static-file]
               (fn [root]
                 (let [root-path-len (count (.getPath root))]
                   (->> (for [f (file-seq root)
                              :when (.isFile f)]
                          [(subs (.getPath f) root-path-len) (hash-static-file f)])
-                       (into {}))))))
+                       (into {})))))
+
+  (di/provide $ deploy-dir [hasher
+                            hash-static-files]
+              (fn [ver dir publish]
+                (let [perms (permpub/hash-all (io/file dir "src"))
+                      statics (hash-static-files (io/file dir "static"))]
+                  (publish {:kind :fact
+                            :name "axiom/perm-versions"
+                            :key ver
+                            :data [perms statics]})
+                  nil))))

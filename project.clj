@@ -109,4 +109,8 @@
                     "axiom-cljs.macros"
                     {:input "libs/axiom-cljs/test/axiom_cljs/macros_test.cljs"
                      :title "axiom-cljs.macros"
-                     :subtitle "Client-side Macros"}}})
+                     :subtitle "Client-side Macros"}
+                    "lein-axiom"
+                    {:input "libs/lein-axiom/test/leiningen/axiom_test.clj"
+                     :title "leiningen.axiom"
+                     :subtitle "Leiningen tasks for Axiom"}}})

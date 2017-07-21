@@ -1,5 +1,8 @@
 (defproject axiom-clj/examples "MONOLITH-SNAPSHOT"
   :description "Axiom usage examples"
+  :url "https://github.com/brosenan/axiom"
+  :license {:name "Eclipse Public License"
+            :url "http://www.eclipse.org/legal/epl-v10.html"}
   :monolith/inherit true
   :permacode-paths ["src"]
   :dependencies [[org.clojure/clojure "1.8.0"]

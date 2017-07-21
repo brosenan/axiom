@@ -948,3 +948,43 @@ It returns a map from relative paths to hash values."
                 => {"/a.html" "hash-for-/tmp/mock-static/a.html"
                     "/b.css" "hash-for-/tmp/mock-static/b.css"
                     "/c.js" "hash-for-/tmp/mock-static/c.js"})))
+
+[[:section {:title "deploy-dir"}]]
+"`deploy-dir` is a function that takes a base directory and publishes an `axiom/perm-versions` event containing 
+all permacode source files and all static content in this directory.
+It is a DI resource based on a `hasher`, [hash-static-files](#hash-static-files) and `publish`."
+(fact
+ (def staticdir (atom nil))
+ (let [$ (di/injector {:hasher [:my-hasher]
+                       :hash-static-files (fn [root]
+                                            (reset! staticdir root)
+                                            {"/a.html" "hash1"
+                                             "/b.css" "hash2"
+                                             "/c.js" "hash3"})})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [deploy-dir]
+                (def deploy-dir deploy-dir))))
+
+"This function takes version identifier, a root directory and a `publish` function, and does the following:
+- Calls `permacode.publish/hash-all` on its `src` sub-directory with the `hasher` bound as the `*hasher*`, to get a source-code map.
+- Calls `hash-static-files` on the `static` sub-directory to get a map for the static files."
+(fact
+ (def published (atom []))
+ (deploy-dir "some-ver" "/path/to/deploy" (partial swap! published conj)) => nil
+ (provided
+  (permacode.publish/hash-all (io/file "/path/to/deploy" "src")) => {'foo 'perm.AAA
+                                                                     'bar 'perm.BBB}
+  (io/file "/path/to/deploy" "static") => ..static..)
+ @staticdir => ..static..)
+
+"Then it uses the given `publish` function to publish an `axiom/perm-versions` event containing both maps."
+(fact
+ @published => [{:kind :fact
+                 :name "axiom/perm-versions"
+                 :key "some-ver"
+                 :data [{'foo 'perm.AAA
+                         'bar 'perm.BBB}
+                        {"/a.html" "hash1"
+                         "/b.css" "hash2"
+                         "/c.js" "hash3"}]}])
