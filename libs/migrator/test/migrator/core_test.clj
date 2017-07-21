@@ -72,9 +72,8 @@ The origin of such operation could be a handler for a [GitHub webhook](#https://
 It relies on the following resources:
 1. `sh`: A shell to run `git` commands in.
 2. `migration-config`: where the `:clone-location` -- the directory where all clones are performed, is specified, and the `:clone-depth`.
-3. `hasher`: to be used for storing the versions loaded from git.
-4. `declare-service` and `assign-service`: which registers this function with the `:axiom/app-version` event.
-5. [hash-static-files](#hash-static-files): intended to store all static content under the `/static` sub-directory."
+3. [deploy-dir](#deploy-dir): which publishes the contents of the git repo in the Axiom instance.
+4. `declare-service` and `assign-service`: which registers this function with the `:axiom/app-version` event."
 (fact
  (def cmds (transient []))
  (def staticdir (atom nil))
@@ -87,16 +86,13 @@ It relies on the following resources:
                               :err ""})
                        :migration-config {:clone-location "/my/clone/location"
                                           :clone-depth 12}
-                       :hasher [:my-hasher]
                        :declare-service (fn [q partial]
                                           (assoc! decl q partial))
                        :assign-service (fn [q func]
                                          (assoc! assign q func))
-                       :hash-static-files (fn [root]
-                                            (reset! staticdir root)
-                                            {"/a.html" "hash1"
-                                             "/b.css" "hash2"
-                                             "/c.js" "hash3"})})]
+                       :deploy-dir (fn [ver dir publish]
+                                     (publish {:ver ver
+                                               :dir dir}))})]
    (module $)
    (di/startup $)
    ((persistent! decl) "migrator.core/push-handler") => {:kind :fact
@@ -116,29 +112,18 @@ Then `permacode.publish/hash-all` and `hash-static-files` are called on the loca
                (fn [ev]
                  (conj! published ev))) => nil
  (provided
-  (rand-int 1000000000) => 12345
-  (io/file "/my/clone/location/repo12345/src") => ..dir..
-  (io/file "/my/clone/location/repo12345/static") => ..staticdir..
-  (permpub/hash-all [:my-hasher] ..dir..) => {'foo 'perm.ABCD123
-                                              'bar 'perm.EFGH456})
+  (rand-int 1000000000) => 12345)
  (persistent! cmds) => [["git" "clone" "--depth" "12" "https://example.com/some/repo" "/my/clone/location/repo12345"]
                         ["git" "checkout" "ABCD1234" :dir "/my/clone/location/repo12345"]
-                        ["rm" "-rf" "/my/clone/location/repo12345"]]
- @staticdir => ..staticdir..)
+                        ["rm" "-rf" "/my/clone/location/repo12345"]])
 
 "The handler publishes an `:axiom/perm-versions` event, for which the key is the new version, 
 and the data consists of two maps:
 1. A mapping between namespaces in the logic code to their permacode hashes, and
 2. A mapping between static resouce paths to their permacode hashes."
 (fact
- (persistent! published) => [{:kind :fact
-                              :name "axiom/perm-versions"
-                              :key "ABCD1234"
-                              :data [{'foo 'perm.ABCD123
-                                      'bar 'perm.EFGH456}
-                                     {"/a.html" "hash1"
-                                      "/b.css" "hash2"
-                                      "/c.js" "hash3"}]}])
+ (persistent! published) => [{:ver "ABCD1234"
+                              :dir "/my/clone/location/repo12345"}])
 
 [[:chapter {:title "perm-tracker"}]]
 "`perm-tracker` registers to `:axiom/perm-versions` and tracks the quantity of each [permacode module](permacode.html) by summing the `:change`
@@ -973,7 +958,7 @@ It is a DI resource based on a `hasher`, [hash-static-files](#hash-static-files)
  (def published (atom []))
  (deploy-dir "some-ver" "/path/to/deploy" (partial swap! published conj)) => nil
  (provided
-  (permacode.publish/hash-all (io/file "/path/to/deploy" "src")) => {'foo 'perm.AAA
+  (permacode.publish/hash-all [:my-hasher] (io/file "/path/to/deploy" "src")) => {'foo 'perm.AAA
                                                                      'bar 'perm.BBB}
   (io/file "/path/to/deploy" "static") => ..static..)
  @staticdir => ..static..)

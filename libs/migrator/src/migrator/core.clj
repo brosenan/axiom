@@ -214,7 +214,7 @@
                                           (recur (rest ruleseq) last-task))))
                                     (mark-as-ready plan)))
                                 nil)))
-  (di/do-with $ [declare-service assign-service sh migration-config hasher hash-static-files]
+  (di/do-with $ [declare-service assign-service sh migration-config deploy-dir]
               (declare-service "migrator.core/push-handler"
                                {:kind :fact
                                 :name "axiom/app-version"})
@@ -228,13 +228,7 @@
                                       (:key ev)
                                       dir)
                                   (sh "git" "checkout" version :dir dir)
-                                  (let [hashes (permpub/hash-all hasher (io/file (str dir "/src")))
-                                        static-hashes (hash-static-files (io/file (str dir "/static")))]
-                                    (publish {:kind :fact
-                                              :name "axiom/perm-versions"
-                                              :key version
-                                              :data [hashes
-                                                     static-hashes]}))
+                                  (deploy-dir version dir publish)
                                   (sh "rm" "-rf" dir))
                                 nil)))
 
@@ -274,7 +268,7 @@
   (di/provide $ deploy-dir [hasher
                             hash-static-files]
               (fn [ver dir publish]
-                (let [perms (permpub/hash-all (io/file dir "src"))
+                (let [perms (permpub/hash-all hasher (io/file dir "src"))
                       statics (hash-static-files (io/file dir "static"))]
                   (publish {:kind :fact
                             :name "axiom/perm-versions"
