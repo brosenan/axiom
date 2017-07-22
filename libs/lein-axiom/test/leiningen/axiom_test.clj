@@ -1,6 +1,7 @@
 (ns leiningen.axiom-test
   (:require [midje.sweet :refer :all]
-            [leiningen.axiom :refer :all]))
+            [leiningen.axiom :refer :all]
+            [org.httpkit.client :as http]))
 
 [[:chapter {:title "Introduction"}]]
 "`lein-axiom` is a [leiningen](https://leiningen.org) plugin for automating Axiom-related tasks.
@@ -32,3 +33,17 @@ This event is then handled by Axiom's [migrator](migrator.html) to deploy the co
     (rand-int 10000000) => 5555)
    @published => [{:ver "dev-5555"
                    :dir "."}]))
+
+[[:chapter {:title "run"}]]
+"`lein axiom run` starts an instance of Axiom based on the `:axiom-config`.
+It will remain running until interrupted (Ctrl+C) by the user."
+(fact
+ (let [project {:axiom-config {:ring-handler (fn [req] {:status 200
+                                                        :body "Hello"})
+                               :http-config {:port 33333}}}
+       fut (future
+             (axiom project "run"))]
+   (Thread/sleep 100)
+   (let [res @(http/get "http://localhost:33333")]
+     (:status res) => 200
+     (-> res :body slurp) => "Hello")))
