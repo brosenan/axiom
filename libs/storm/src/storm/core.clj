@@ -163,21 +163,36 @@
       (str/replace #"[\\/:]" "_")))
 
 (defn module [$ config]
+  (di/provide $ rule-topology [storm-cluster]
+              (fn [ev]
+                (let [rule (-> ev :data first)
+                      topo-name (convert-topology-name (str rule))]
+                  (when (> (:change ev) 0)
+                    (let [topology (topology rule config)]
+                      ((:run storm-cluster) topo-name topology)
+                      nil))
+                  (when (< (:change ev) 0)
+                    ((:kill storm-cluster) topo-name)))
+                nil))
   (di/do-with $ [declare-service
                  assign-service
-                 storm-cluster]
+                 rule-topology]
               (declare-service "storm.core/rule-topology" {:kind :fact
                                                            :name "axiom/rule-ready"})
               (assign-service "storm.core/rule-topology"
-                              (fn [ev]
-                                (let [topo-name (convert-topology-name (-> ev :key str))]
-                                  (when (> (:change ev) 0)
-                                    (let [topology (topology (:key ev) config)]
-                                      ((:run storm-cluster) topo-name topology)
-                                      nil))
-                                  (when (< (:change ev) 0)
-                                    ((:kill storm-cluster) topo-name)))
-                                nil)))
+                              rule-topology))
+
+  (di/do-with $ [database-chan
+                 rule-topology]
+              (let [database-chan (ev/accumulate-db-chan database-chan)
+                    reply-chan (async/chan 2)]
+                (async/>!! database-chan [{:kind :fact
+                                           :name "axiom/rule-ready"
+                                           :key 0} reply-chan])
+                (loop []
+                  (when-let [reply (async/<!! reply-chan)]
+                    (rule-topology reply)
+                    (recur)))))
   
   (di/provide $ storm-cluster [local-storm-cluster]
               (let [cluster (org.apache.storm.LocalCluster.)]

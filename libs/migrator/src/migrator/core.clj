@@ -74,8 +74,8 @@
     (di/do-with! $ [publish]
       (publish {:kind :fact
                 :name "axiom/rule-ready"
-                :key rule
-                :data []
+                :key 0
+                :data [rule]
                 :ts (.getTime (java.util.Date.))
                 :change 1
                 :writers writers})
@@ -249,8 +249,8 @@
                                         (recur (-> link meta :continuation) (inc n))))
                                     (publish {:kind :fact
                                               :name "axiom/rule-ready"
-                                              :key (symbol (-> clause meta :ns str) (-> clause meta :name))
-                                              :data []}))))))
+                                              :key 0
+                                              :data [(symbol (-> clause meta :ns str) (-> clause meta :name))]}))))))
   
   (di/provide $ hash-static-file [hasher]
               (let [[hash unhash] hasher]

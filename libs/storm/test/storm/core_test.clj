@@ -353,31 +353,36 @@ We will provide the `fact-spout` an `ack` method to acknowledge incoming events,
 "Unlike most `module` functions, the `storm.core/module` function takes an extra `config` parameter, intended to be the original configuration
 that was used to create original injector.
 It defines `rule-topology` based on these resources:
-- `declare-service` and `assign-service`, to register itself to `axiom/rule-ready` events,
 - `storm-cluster`, a storm cluster to load the topology on,
 - `hasher`, to resolve [permacode](permacode.html) symbols (the rule name is one such symbol)."
 (fact
  (def running-topologies (atom {}))
- (let [decl (transient {})
-       assign (transient {})
-       config {:declare-service (fn [name partial]
-                                  (assoc! decl name partial))
-               :assign-service (fn [name func]
-                                 (assoc! assign name func))
-               :storm-cluster {:run (fn [name top]
+ (let [config {:storm-cluster {:run (fn [name top]
                                       (swap! running-topologies assoc name top))
                                :kill (fn [name]
-                                       (swap! running-topologies dissoc name))}
-               :hasher [:hash :unhash]}
+                                       (swap! running-topologies dissoc name))}}
        $ (di/injector config)]
    (def config config)
    (module $ config)
    (di/startup $)
+   (di/do-with! $ [rule-topology]
+                (def rule-topology rule-topology))))
+
+"The `rule-topology` function is assigned as a handler for `axiom/rule-ready` events."
+(fact
+ (let [decl (transient {})
+       assign (transient {})
+       config {:declare-service (fn [name partial]
+                                          (assoc! decl name partial))
+                       :assign-service (fn [name func]
+                                         (assoc! assign name func))
+                       :rule-topology :the-rule-topology-func}
+       $ (di/injector config)]
+   (module $ config)
+   (di/startup $)
    ((persistent! decl) "storm.core/rule-topology") => {:kind :fact
                                                        :name "axiom/rule-ready"}
-   (let [assign (persistent! assign)]
-     (assign "storm.core/rule-topology") => fn?
-     (def rule-topology (assign "storm.core/rule-topology")))))
+   ((persistent! assign) "storm.core/rule-topology") => :the-rule-topology-func))
 
 "When an `axiom/rule-ready` event with a positive `:change` (introduction of a rule) arrives, 
 `rule-topology` calls [topology](#topology) to create a topology for the rule, 
@@ -386,8 +391,8 @@ The topology name is converted to avoid names not allowed by Storm."
 (fact
  (rule-topology {:kind :fact
                  :name "axiom/rule-ready"
-                 :key 'perm.ABCD1234/timeline
-                 :data []
+                 :key 0
+                 :data ['perm.ABCD1234/timeline]
                  :ts 1000
                  :change 1
                  :writers #{}
@@ -402,8 +407,8 @@ we kill the associated topology."
 (fact
  (rule-topology {:kind :fact
                  :name "axiom/rule-ready"
-                 :key 'perm.ABCD1234/timeline
-                 :data []
+                 :key 0
+                 :data ['perm.ABCD1234/timeline]
                  :ts 1000
                  :change -1
                  :writers #{}
@@ -412,7 +417,79 @@ we kill the associated topology."
   (convert-topology-name "perm.ABCD1234/timeline") => "some-name")
  (@running-topologies "some-name") => nil)
 
-[[:chapter {:title "storm-cluster"}]]
+[[:section {:title "Persistence"}]]
+"In a production environment we expect Storm to always be online, and therefore once a topology is created it is expected to continue running until explicitly stopped.
+However, in a testing environment, when ran, e.g., using [lein axiom run](http://axiom-clj.org/lein-axiom.html#run), the user may shut down Axiom but its state persists.
+When a user then launches the Axiom environment once again, we expect topologies that were running before to run again.
+The persistence feature will make sure of that."
+
+"Given a `database-chan` (see [here](dynamo.html#database-chan)), a [storm-cluster](#storm-cluster) and a `hasher`,
+the `rule-topology` function will be called at startup for any `axiom/rule-ready` value with positive value in the database."
+(fact
+ (let [calls (atom [])
+       db-chan (async/chan 10)
+       config {:rule-topology (partial swap! calls conj)
+               :database-chan db-chan}
+       $ (di/injector config)]
+   (module $ config)
+   (let [started (future (di/startup $))
+         [[query reply-chan] chan] (async/alts!! [db-chan (async/timeout 1000)])]
+     chan => db-chan
+     query => {:kind :fact
+               :name "axiom/rule-ready"
+               :key 0}
+     (async/>!! reply-chan {:kind :fact
+                            :name "axiom/rule-ready"
+                            :key 0
+                            :data ['perm.AAA/some-rule]
+                            :change 1
+                            :ts 1000
+                            :writers #{}
+                            :readers #{}})
+     (async/>!! reply-chan {:kind :fact
+                            :name "axiom/rule-ready"
+                            :key 0
+                            :data ['perm.BBB/some-other-rule]
+                            :change 1
+                            :ts 1000
+                            :writers #{}
+                            :readers #{}})
+     (async/>!! reply-chan {:kind :fact
+                            :name "axiom/rule-ready"
+                            :key 0
+                            :data ['perm.CCC/rule-that-was-canceled]
+                            :change 1
+                            :ts 1000
+                            :writers #{}
+                            :readers #{}})
+     (async/>!! reply-chan {:kind :fact
+                            :name "axiom/rule-ready"
+                            :key 0
+                            :data ['perm.CCC/rule-that-was-canceled]
+                            :change -1
+                            :ts 1000
+                            :writers #{}
+                            :readers #{}})
+     (async/close! reply-chan)
+     @started
+     @calls => [{:kind :fact
+                 :name "axiom/rule-ready"
+                 :key 0
+                 :data ['perm.AAA/some-rule]
+                 :change 1
+                 :ts 1000
+                 :writers #{}
+                 :readers #{}}
+                {:kind :fact
+                 :name "axiom/rule-ready"
+                 :key 0
+                 :data ['perm.BBB/some-other-rule]
+                 :change 1
+                 :ts 1000
+                 :writers #{}
+                 :readers #{}}]))
+
+ [[:chapter {:title "storm-cluster"}]])
 "A `storm-cluster` resource represents an [Apache Storm](http://storm.apache.org) cluster.
 It is a map with two fields:
 - `:run` -- a function that takes a name and a topology, and deploys the topology on the cluster with the given name, and

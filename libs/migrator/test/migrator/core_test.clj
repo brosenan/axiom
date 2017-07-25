@@ -350,8 +350,8 @@ and on `declare-service` and `assign-service` for registering itself.
 (fact
  @published => [{:kind :fact
                  :name "axiom/rule-ready"
-                 :key 'migrator.core-test/multi-keyword-search
-                 :data []}])
+                 :key 0
+                 :data ['migrator.core-test/multi-keyword-search]}])
 
 [[:chapter {:title "Usage Example"}]]
 "In this example we will migrate the rules provided in our [tweetlog example](https://github.com/brosenan/tweetlog-clj)."
@@ -825,8 +825,8 @@ From the injector it takes the `publish` resource to publish the desired event."
      first
      (dissoc :ts)) => {:kind :fact
                        :name "axiom/rule-ready"
-                       :key 'perm.ABC123/my-rule
-                       :data []
+                       :key 0
+                       :data ['perm.ABC123/my-rule]
                        :change 1
                        :writers #{:some-writer}})
 
