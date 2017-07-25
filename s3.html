@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 22 July 2017</h5>
+              <h5>Date: 25 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.2</h5></div></div>
           <hr/>
@@ -100,7 +100,23 @@
                 (retr &quot;abcd&quot;) =&gt; content
                 (provided
                  (s3/get-object config &quot;foo&quot; &quot;abcd&quot;) =&gt; {:content ..inp2..}
-                 (hasher/slurp-bytes ..inp2..) =&gt; content))))</code></pre></div><div><span id="hasher"></span><h2><b>3 &nbsp;&nbsp; hasher</b></h2></div><div><p>The <code>hasher</code> resource is a <a href='permacode.hasher.html#nippy-multi-hasher'>nippy-multi-hasher</a> based on the <code>storage</code> resource as its storage.</p></div><div class="code"><pre><code class="clojure">(let [calls (transient [])
+                 (hasher/slurp-bytes ..inp2..) =&gt; content))))</code></pre></div><div class="code"><pre><code class="clojure">[[:section &quot;Local Storage with S3 Fallback&quot;]]</code></pre></div><div><p>Developers working in their own environments often want their solution local, without the need to provide credentials. An alternative <code>storage</code> resource provides just that.</p></div><div><p>If the resources <code>storage-local-path</code> and <code>storage-fetch-url</code> exist, a <code>storage</code> resource is provided.</p></div><div class="code"><pre><code class="clojure">(def path (str &quot;/tmp/store&quot; (rand-int 1000000)))
+ (-&gt; (io/file path) .mkdirs)
+ (let [$ (di/injector {:storage-local-path path
+                     :storage-fetch-url &quot;http://some.url&quot;})]
+ (module $)
+ (di/startup $)
+ (di/do-with! $ [storage]
+              (def storage storage)))</code></pre></div><div><p>This <code>storage</code> will read and write content from and to a local file, located directly under the path specified by <code>storage-local-path</code>.</p></div><div class="code"><pre><code class="clojure">(let [[store retr] storage]
+ (store &quot;abcd&quot; (.getBytes &quot;Foo Bar&quot;))
+ (slurp (str path &quot;/abcd&quot;)) =&gt; &quot;Foo Bar&quot;
+
+ (let [bytes (retr &quot;abcd&quot;)]
+   (-&gt; bytes class str) =&gt; &quot;class [B&quot;
+   (String. bytes) =&gt; &quot;Foo Bar&quot;))</code></pre></div><div><p>If we retreive a key and it does not exist in the local directory, an HTTP GET request is made to a URL made of the <code>storage-fetch-url</code> and the key.</p></div><div class="code"><pre><code class="clojure">(let [[store retr] storage]
+ (retr &quot;hash-that-does-not-exist&quot;) =&gt; ..content..
+ (provided
+  (http-get &quot;http://some.url/hash-that-does-not-exist&quot;) =&gt; ..content..))</code></pre></div><div><span id="hasher"></span><h2><b>3 &nbsp;&nbsp; hasher</b></h2></div><div><p>The <code>hasher</code> resource is a <a href='permacode.hasher.html#nippy-multi-hasher'>nippy-multi-hasher</a> based on the <code>storage</code> resource as its storage.</p></div><div class="code"><pre><code class="clojure">(let [calls (transient [])
      $ (di/injector {:storage [(fn [k v]
                                  (conj! calls [:store k v]))
                                (fn [k])]})]

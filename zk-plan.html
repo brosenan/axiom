@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 22 July 2017</h5>
+              <h5>Date: 25 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.2</h5></div></div>
           <hr/>
@@ -98,7 +98,7 @@
  (def plan-completed? (:plan-completed? zk-plan))
  plan-completed? =&gt; fn?</code></pre></div><div><p>The <code>module</code> also spawns worker threads when the <code>zk-plan-config</code> resource is available as a map containing the number of threads to spawn and the parent node under which plans are created. See our <a href='#usage-example'>usage example</a> to see how it is being used.</p></div><div><span id="create-plan"></span><h2><b>3 &nbsp;&nbsp; create-plan</b></h2></div><div><p><strong>Parameters:</strong></p><ul><li><strong>parent:</strong> the parent node for the new plan</li></ul><p><strong>Returns:</strong> the path to the plan It calls zk/createn to create a new zookeeper node</p></div><div class="code"><pre><code class="clojure">(create-plan ..parent..) =&gt; ..node..
  (provided
-(zk/create :zk ..prefix.. :persistent? true :sequential? true) =&gt; ..node..
+(zk/create-all :zk ..prefix.. :persistent? true :sequential? true) =&gt; ..node..
 (str ..parent.. &quot;/plan-&quot;) =&gt; ..prefix..)</code></pre></div><div><span id="add-task"></span><h2><b>4 &nbsp;&nbsp; add-task</b></h2></div><div><p><strong>Parameters:</strong></p><ul><li><strong>plan:</strong> the path to the plan</li><li><strong>fn:</strong> the function to be executed</li><li><strong>arg-tasks:</strong> a sequence of task paths, which return values are to become arguments for fn</li></ul><p><strong>Returns:</strong> path to the new task</p></div><div><p>It creates a sequential node under the plan</p></div><div class="code"><pre><code class="clojure">(add-task ..plan.. ..fn.. []) =&gt; ..task..
     (provided
      (zk/create :zk ..prefix.. :persistent? true :sequential? true) =&gt; ..task..

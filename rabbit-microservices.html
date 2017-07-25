@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 22 July 2017</h5>
+              <h5>Date: 25 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.2</h5></div></div>
           <hr/>
@@ -119,13 +119,18 @@
  (provided
 (lc/subscribe :some-chan &quot;foobar&quot; irrelevant {:auto-ack true}) =&gt; irrelevant)</code></pre></div><div><p>Auto acknowledgement is disabled when the provided function has three parameters. The third of which is expected to be bound to an explicit <code>ack</code> function.</p></div><div class="code"><pre><code class="clojure">(defn my-other-service [event publish ack])</code></pre></div><div class="code"><pre><code class="clojure">(assign-service &quot;foobar&quot; my-other-service) =&gt; nil
  (provided
-(lc/subscribe :some-chan &quot;foobar&quot; irrelevant {:auto-ack false}) =&gt; irrelevant)</code></pre></div><div><p>The <code>lc/subscribe</code> function is given a closure returned by <a href='#handle-event'>handle-event</a>. Please refer to it for more information.</p></div><div><span id="publish"></span><h2><b>5 &nbsp;&nbsp; publish: Publish an Event from the Outside</b></h2></div><div><p><code>publish</code> is a service that allows its users to publish events from outside the context of a service. It depends on <code>rabbitmq-service</code>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:rabbitmq-service {:chan :some-chan}})]
+(lc/subscribe :some-chan &quot;foobar&quot; irrelevant {:auto-ack false}) =&gt; irrelevant)</code></pre></div><div><p>The <code>lc/subscribe</code> function is given a closure returned by <a href='#handle-event'>handle-event</a>. Please refer to it for more information.</p></div><div><span id="publish"></span><h2><b>5 &nbsp;&nbsp; publish: Publish an Event from the Outside</b></h2></div><div><p><code>publish</code> is a service that allows its users to publish events from outside the context of a service. It depends on <code>rabbitmq-service</code> for publishing, and <code>time</code> for filling in the <code>:ts</code> field if one is not specified.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:rabbitmq-service {:chan :some-chan}
+                     :time (constantly 12345)})]
  (module $)
  (di/startup $)
- (def publish (di/do-with! $ [publish] publish)))</code></pre></div><div class="code"><pre><code class="clojure">(publish ..ev..) =&gt; nil
+ (def publish (di/do-with! $ [publish] publish)))</code></pre></div><div class="code"><pre><code class="clojure">(publish {:some :event}) =&gt; nil
  (provided
-(nippy/freeze ..ev..) =&gt; ..bin..
-(event-routing-key ..ev..) =&gt; ..routing-key..
+(nippy/freeze {:some :event
+               :ts 12345
+               :change 1
+               :writers #{}
+               :readers #{}}) =&gt; ..bin..
+(event-routing-key {:some :event}) =&gt; ..routing-key..
 (lb/publish :some-chan facts-exch ..routing-key.. ..bin.. {}) =&gt; irrelevant)</code></pre></div><div><span id="poll-events"></span><h2><b>6 &nbsp;&nbsp; poll-events: Pull Mode</b></h2></div><div><p>The most efficient and conveinent way to receive messages from a queue is in <em>push mode</em>, where the AMQP broker has control. In this approach (as implemented by <a href='#assign-service'>assign-service</a>), we implement a function that is called whenever a new event arrives.</p></div><div><p>However, sometimes we need to work the other way. We need to have control, and consume messages off a queue when <em>we</em> decide to do so.</p></div><div><p>An example for such a situation is where we respond to a user request. In such a case, without the user request we have nothing to do with the data,  so it does not make sense to have a service function handling all messages. When a user request comes in, we wish to read all messages currently on the queue and return them to the user. This is exactly what the <code>poll-events</code> function does.</p></div><div><p><code>poll-events</code> is a DI resource which is based on <code>rabbitmq-service</code>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:rabbitmq-service {:chan :some-chan}})]
  (module $)
  (di/startup $)
