@@ -282,8 +282,8 @@
        :name (-&gt; link meta :source-fact first str)}
    (recur (-&gt; link meta :continuation) (inc n))))</code></pre></div><div><p>Finally, it publishes an <code>axiom/rule-ready</code> event for each clause.</p></div><div class="code"><pre><code class="clojure">@published =&gt; [{:kind :fact
                :name &quot;axiom/rule-ready&quot;
-               :key 'migrator.core-test/multi-keyword-search
-               :data []}]</code></pre></div><div><span id="usage-example"></span><h2><b>6 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>In this example we will migrate the rules provided in our <a href='https://github.com/brosenan/tweetlog-clj'>tweetlog example</a>.</p></div><div><p>First, we need to provide configuration to connect to Zookeeper, RabbitMQ, DynamoDB (local) and S3  (where we provide coordinates using environment variables).</p></div><div class="code"><pre><code class="clojure">(def config
+               :key 0
+               :data ['migrator.core-test/multi-keyword-search]}]</code></pre></div><div><span id="usage-example"></span><h2><b>6 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>In this example we will migrate the rules provided in our <a href='https://github.com/brosenan/tweetlog-clj'>tweetlog example</a>.</p></div><div><p>First, we need to provide configuration to connect to Zookeeper, RabbitMQ, DynamoDB (local) and S3  (where we provide coordinates using environment variables).</p></div><div class="code"><pre><code class="clojure">(def config
   {:zookeeper-config {:url &quot;127.0.0.1:2181&quot;}
    :zk-plan-config {:num-threads 5
                     :parent &quot;/my-plans&quot;}
@@ -564,8 +564,8 @@
    first
    (dissoc :ts)) =&gt; {:kind :fact
                      :name &quot;axiom/rule-ready&quot;
-                     :key 'perm.ABC123/my-rule
-                     :data []
+                     :key 0
+                     :data ['perm.ABC123/my-rule]
                      :change 1
                      :writers #{:some-writer}}</code></pre></div><div><span id="extract-version-rules"></span><h3>7.6 &nbsp;&nbsp; extract-version-rules</h3></div><div><p><code>extract-version-rules</code> extracts all the rule functions from such a version and publishes corresponding <code>:axiom/rule</code> events.</p></div><div><p>It returns only rule functions, identified by having a <code>:source-fact</code> meta field.</p></div><div class="code"><pre><code class="clojure">(let [foo (with-meta (fn []) {:source-fact [&quot;foo&quot; 1]})
      bar (with-meta (fn []) {:source-fact [&quot;bar&quot; 1]})
