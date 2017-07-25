@@ -8,7 +8,8 @@
   [project]
   (let [ver (str "dev-" (rand-int 10000000))
         $ (axiom/injector (-> (:axiom-config project)
-                              (dissoc :http-config)))]
+                              (dissoc :http-config)
+                              (dissoc :migrator-config)))]
     (di/startup $)
     (di/do-with! $ [deploy-dir publish]
                  (deploy-dir ver "." publish))

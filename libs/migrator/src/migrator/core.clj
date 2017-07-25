@@ -124,7 +124,7 @@
                                      (throw e)))))
                          :else
                          (do
-                           (zk/create zookeeper path :persistent? true)
+                           (zk/create-all zookeeper path :persistent? true)
                            (zkp/set-initial-clj-data zookeeper path change)
                            change))))
                 ([path change]
@@ -245,7 +245,7 @@
                                       (when link
                                         (declare-service (str "fact-for-rule/" (-> clause meta :ns str) "/" (-> clause meta :name) "!" n)
                                                          {:kind :fact
-                                                          :name (-> link meta :source-fact first)})
+                                                          :name (-> link meta :source-fact first str)})
                                         (recur (-> link meta :continuation) (inc n))))
                                     (publish {:kind :fact
                                               :name "axiom/rule-ready"

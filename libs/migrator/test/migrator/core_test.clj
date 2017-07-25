@@ -343,7 +343,7 @@ and on `declare-service` and `assign-service` for registering itself.
    (when link
      (@declared-queues (str "fact-for-rule/migrator.core-test/multi-keyword-search!" n))
      => {:kind :fact
-         :name (-> link meta :source-fact first)}
+         :name (-> link meta :source-fact first str)}
      (recur (-> link meta :continuation) (inc n)))))
 
 "Finally, it publishes an `axiom/rule-ready` event for each clause."
@@ -512,7 +512,7 @@ The new value, which is the given number, is returned."
  (zookeeper-counter-add "/rules/foobar" 3) => 3
  (provided
   (zk/exists :zk "/rules/foobar") => nil
-  (zk/create :zk "/rules/foobar" :persistent? true) => "/rules/foobar"
+  (zk/create-all :zk "/rules/foobar" :persistent? true) => "/rules/foobar"
   (zkp/set-initial-clj-data :zk "/rules/foobar" 3) => irrelevant))
 
 "If a node exists, its value is updated to add the given number."

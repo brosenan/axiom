@@ -5,7 +5,7 @@
             [clojure.core.async :as async]))
 
 (defn ^:private create-plan [zk parent]
-  (zk/create zk (str parent "/plan-") :persistent? true :sequential? true))
+  (zk/create-all zk (str parent "/plan-") :persistent? true :sequential? true))
 
 (defn to-bytes [str]
   (.getBytes str "UTF-8"))

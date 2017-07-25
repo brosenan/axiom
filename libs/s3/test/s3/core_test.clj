@@ -6,7 +6,8 @@
             [permacode.hasher :as hasher]
             [taoensso.nippy :as nippy]
             [multihash.digest :as digest]
-            [multihash.core :as multihash]))
+            [multihash.core :as multihash]
+            [clojure.java.io :as io]))
 
 [[:chapter {:title "Introduction"}]]
 "This library provides a [hasher](permacode.hasher.html) that stores its content in [Amazon's S3](https://aws.amazon.com/s3/)."
@@ -40,6 +41,38 @@ as well as credentials for accessing S3.  See [clj-aws-s3 documentation](https:/
                    (s3/get-object config "foo" "abcd") => {:content ..inp2..}
                    (hasher/slurp-bytes ..inp2..) => content)))))
 
+
+[[:section "Local Storage with S3 Fallback"]]
+"Developers working in their own environments often want their solution local, without the need to provide credentials.
+An alternative `storage` resource provides just that."
+
+"If the resources `storage-local-path` and `storage-fetch-url` exist, a `storage` resource is provided."
+(fact
+ (def path (str "/tmp/store" (rand-int 1000000)))
+ (-> (io/file path) .mkdirs)
+ (let [$ (di/injector {:storage-local-path path
+                       :storage-fetch-url "http://some.url"})]
+   (module $)
+   (di/startup $)
+   (di/do-with! $ [storage]
+                (def storage storage))))
+
+"This `storage` will read and write content from and to a local file, located directly under the path specified by `storage-local-path`."
+(fact
+ (let [[store retr] storage]
+   (store "abcd" (.getBytes "Foo Bar"))
+   (slurp (str path "/abcd")) => "Foo Bar"
+
+   (let [bytes (retr "abcd")]
+     (-> bytes class str) => "class [B"
+     (String. bytes) => "Foo Bar")))
+
+"If we retreive a key and it does not exist in the local directory, an HTTP GET request is made to a URL made of the `storage-fetch-url` and the key."
+(fact
+ (let [[store retr] storage]
+   (retr "hash-that-does-not-exist") => ..content..
+   (provided
+    (http-get "http://some.url/hash-that-does-not-exist") => ..content..)))
 
 [[:chapter {:title "hasher"}]]
 "The `hasher` resource is a [nippy-multi-hasher](permacode.hasher.html#nippy-multi-hasher) based on the `storage` resource as its storage."

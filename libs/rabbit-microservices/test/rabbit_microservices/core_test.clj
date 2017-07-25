@@ -107,18 +107,23 @@ Please refer to it for more information."
 
 [[:chapter {:title "publish: Publish an Event from the Outside" :tag "publish"}]]
 "`publish` is a service that allows its users to publish events from outside the context of a service.
-It depends on `rabbitmq-service`."
+It depends on `rabbitmq-service` for publishing, and `time` for filling in the `:ts` field if one is not specified."
 (fact
- (let [$ (di/injector {:rabbitmq-service {:chan :some-chan}})]
+ (let [$ (di/injector {:rabbitmq-service {:chan :some-chan}
+                       :time (constantly 12345)})]
    (module $)
    (di/startup $)
    (def publish (di/do-with! $ [publish] publish))))
 
 (fact
- (publish ..ev..) => nil
+ (publish {:some :event}) => nil
  (provided
-  (nippy/freeze ..ev..) => ..bin..
-  (event-routing-key ..ev..) => ..routing-key..
+  (nippy/freeze {:some :event
+                 :ts 12345
+                 :change 1
+                 :writers #{}
+                 :readers #{}}) => ..bin..
+  (event-routing-key {:some :event}) => ..routing-key..
   (lb/publish :some-chan facts-exch ..routing-key.. ..bin.. {}) => irrelevant))
 
 [[:chapter {:title "poll-events: Pull Mode" :tag "poll-events"}]]

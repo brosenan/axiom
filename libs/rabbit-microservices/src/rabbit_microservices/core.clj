@@ -56,8 +56,11 @@
 (defn arg-count [func]
   (-> func class .getDeclaredMethods first .getParameterTypes alength))
 
-(defn publisher [srv info ev]
-  (let [bin (nippy/freeze ev)
+(defn publisher [srv info time ev]
+  (let [bin (nippy/freeze (merge ev {:ts (time)
+                                     :change 1
+                                     :writers #{}
+                                     :readers #{}}))
         rk (event-routing-key ev)]
     (info {:source "rabbit"
            :desc (str "Publishing " ev " on " rk)})
@@ -124,8 +127,8 @@
                 (lc/subscribe (:chan rabbitmq-service) key (partial handle-event func (:alive rabbitmq-service) info) {:auto-ack (< (arg-count func) 3)})
                 nil))
 
-  (di/provide $ publish [rabbitmq-service info]
-              (partial publisher rabbitmq-service info))
+  (di/provide $ publish [rabbitmq-service info time]
+              (partial publisher rabbitmq-service info time))
 
   (di/provide $ poll-events [rabbitmq-service]
               (fn [queue]

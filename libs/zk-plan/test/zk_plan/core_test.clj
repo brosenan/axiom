@@ -51,7 +51,7 @@ It calls zk/createn to create a new zookeeper node"
 (fact
  (create-plan ..parent..) => ..node..
  (provided
-  (zk/create :zk ..prefix.. :persistent? true :sequential? true) => ..node..
+  (zk/create-all :zk ..prefix.. :persistent? true :sequential? true) => ..node..
   (str ..parent.. "/plan-") => ..prefix..))
 
 

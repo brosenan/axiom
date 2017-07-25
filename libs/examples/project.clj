@@ -31,9 +31,8 @@
                                     :plan-prefix "/my-plans"
                                     :clone-location "/tmp"
                                     :clone-depth 10}
-                 :s3-config {:bucket-name (System/getenv "PERMACODE_S3_BUCKET")
-                             :access-key (System/getenv "AWS_ACCESS_KEY")
-                             :secret-key (System/getenv "AWS_SECRET_KEY")}
+                 :storage-local-path "/tmp/axiom-perms"
+                 :storage-fetch-url "https://s3.amazonaws.com/brosenan-test"
                  :local-storm-cluster true
                  :fact-spout {:include [:rabbitmq-config]}
                  :store-bolt {:include [:dynamodb-event-storage-num-threads
