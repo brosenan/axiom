@@ -97,7 +97,8 @@ For each such event it will set the `app-version` cookie to contain the new vers
                     :change 1})
         (is (= (.get goog.net.cookies "app-version") new-ver))))
 
-"This only applies to events with a positive `:change` (introduction of new versions)."
+"This only applies to events with a positive `:change` (introduction of new versions), 
+and only applies to development versions (that begin with `dev-`)."
 (fact update-on-dev-ver-2
       (let [ps (ax/pubsub :name)
             host (->  {:sub (:sub ps)
@@ -112,7 +113,12 @@ For each such event it will set the `app-version` cookie to contain the new vers
                     :name "axiom/perm-versions"
                     :key new-ver
                     :change -1})
-        (is (not= (.get goog.net.cookies "app-version") new-ver))))
+        ((:pub ps) {:kind :fact
+                    :name "axiom/perm-versions"
+                    :key (str "not" new-ver)
+                    :change 1})
+        (is (not= (.get goog.net.cookies "app-version") new-ver))
+        (is (not= (.get goog.net.cookies "app-version") (str "not" new-ver)))))
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "pubsub"}]]

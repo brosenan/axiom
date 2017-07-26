@@ -1,6 +1,7 @@
 (ns axiom-cljs.core
   (:require-macros [cljs.core.async.macros :refer [go go-loop]])
   (:require [cljs.core.async :as async]
+            [clojure.string :as str]
             [chord.client :refer [ws-ch]]))
 
 (defn pubsub [f]
@@ -45,7 +46,8 @@
 (defn update-on-dev-ver [host]
   ((:sub host) "axiom/perm-versions"
    (fn [ev]
-     (when (> (:change ev) 0)
+     (when (and (> (:change ev) 0)
+                (str/starts-with? (:key ev) "dev-"))
        (.set goog.net.cookies "app-version" (:key ev)))))
   ((:pub host) {:kind :reg
                 :name "axiom/perm-versions"}))
