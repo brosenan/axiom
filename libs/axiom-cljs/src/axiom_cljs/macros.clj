@@ -48,23 +48,24 @@
            (-> (cond (contains? @state# ~args)
                      (-> (->> (for [[ev# c#] (@state# ~args)
                                     :when (> c# 0)]
-                                (-> (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
-                                      ~(symbol-map fact))
-                                    (assoc :-readers (:readers ev#))
-                                    (assoc :-writers (:writers ev#))
-                                    (assoc :-delete! #((:pub ~host)
-                                                       (-> ev#
-                                                           (assoc :ts ((:time ~host)))
-                                                           (assoc :change (- c#)))))
-                                    (assoc :-swap! (fn [func# & args#]
-                                                     ((:pub ~host)
-                                                      (-> ev#
-                                                          (assoc :ts ((:time ~host)))
-                                                          (assoc :change c#)
-                                                          (assoc :removed (:data ev#))
-                                                          (assoc :data
-                                                                 (let [{:keys [~@(symbols (drop 2 fact))]} (apply func# ev# args#)]
-                                                                   ~(vec (drop 2 fact))))))))))
+                                (let [varmap# (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
+                                                ~(symbol-map fact))]
+                                  (-> varmap#
+                                      (assoc :-readers (:readers ev#))
+                                      (assoc :-writers (:writers ev#))
+                                      (assoc :-delete! #((:pub ~host)
+                                                         (-> ev#
+                                                             (assoc :ts ((:time ~host)))
+                                                             (assoc :change (- c#)))))
+                                      (assoc :-swap! (fn [func# & args#]
+                                                       ((:pub ~host)
+                                                        (-> ev#
+                                                            (assoc :ts ((:time ~host)))
+                                                            (assoc :change c#)
+                                                            (assoc :removed (:data ev#))
+                                                            (assoc :data
+                                                                   (let [{:keys [~@(symbols (drop 2 fact))]} (apply func# varmap# args#)]
+                                                                     ~(vec (drop 2 fact)))))))))))
                               (sort ~(comparator fact order-by)))
                          (ax/merge-meta {:pending false}))
                      :else

@@ -267,13 +267,13 @@ event from the original state to the state reflected by the modified value map."
                       :time (constantly 34567)})
       (defview my-tweets4 [user]
         host4
-        [:tweetlog/tweeted user tweet]
+        [:tweetlog/tweeted user tweet ts]
         :store-in my-atom4)
       (swap! my-atom4 assoc-in [["alice"]
                                 {:kind :fact
                                  :name "tweetlog/tweeted"
                                  :key "alice"
-                                 :data ["hello"]
+                                 :data ["hello" 12345]
                                  :readers #{}
                                  :writers #{"alice"}}] 3)
       (let [valmap (first (my-tweets4 "alice"))]
@@ -283,8 +283,8 @@ event from the original state to the state reflected by the modified value map."
                [{:kind :fact
                   :name "tweetlog/tweeted"
                   :key "alice"
-                  :removed ["hello"]
-                  :data ["world"]
+                  :removed ["hello" 12345]
+                  :data ["world" 12345]
                   :ts 34567
                   :change 3
                   :readers #{}
