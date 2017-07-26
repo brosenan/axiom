@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 25 July 2017</h5>
+              <h5>Date: 26 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.2</h5></div></div>
           <hr/>
@@ -328,7 +328,18 @@
  (let [[res chan] (async/alts!! [response
                                (async/timeout 1000)])]
  chan =&gt; response
- (:status res) =&gt; 404)</code></pre></div><div><span id="event-gateway"></span><h2><b>6 &nbsp;&nbsp; event-gateway</b></h2></div><div><p><code>event-gateway</code> is a function that sets up a bidirectional event filter for events flowing between a client and a server. It is intended to support confidentiality and integrity, protecting both the connected client and the rest of the users against this client.</p></div><div><p>It is a DI resource that depends on <a href='#rule-version-verifier'>rule-version-verifier</a> and <a href='#identity-pred'>identity-pred</a>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:rule-version-verifier
+ (:status res) =&gt; 404)</code></pre></div><div><p>If the version record cannot be found, a status of <code>404</code> is returned as well.</p></div><div class="code"><pre><code class="clojure">(def response
+ (async/thread
+   (static-handler {:cookies {}
+                    :uri &quot;/bar.html&quot;})))
+ (let [[query resp-chan] (get-query)]
+ ;; No response...
+ (async/close! resp-chan))
+ (let [[res chan] (async/alts!! [response
+                               (async/timeout 1000)])]
+ chan =&gt; response
+ (:status res) =&gt; 404
+ (:body res) =&gt; &quot;No Such Version: ver123&quot;)</code></pre></div><div><span id="event-gateway"></span><h2><b>6 &nbsp;&nbsp; event-gateway</b></h2></div><div><p><code>event-gateway</code> is a function that sets up a bidirectional event filter for events flowing between a client and a server. It is intended to support confidentiality and integrity, protecting both the connected client and the rest of the users against this client.</p></div><div><p>It is a DI resource that depends on <a href='#rule-version-verifier'>rule-version-verifier</a> and <a href='#identity-pred'>identity-pred</a>.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:rule-version-verifier
                       (fn [ver writers]
                         (contains? writers (str &quot;hash-in-&quot; ver)))
                       :identity-pred

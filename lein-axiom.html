@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 25 July 2017</h5>
+              <h5>Date: 26 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.2</h5></div></div>
           <hr/>
@@ -99,7 +99,8 @@
  (provided
   (rand-int 10000000) =&gt; 5555)
  @published =&gt; [{:ver &quot;dev-5555&quot;
-                 :dir &quot;.&quot;}])</code></pre></div><div><span id="run"></span><h2><b>3 &nbsp;&nbsp; run</b></h2></div><div><p><code>lein axiom run</code> starts an instance of Axiom based on the <code>:axiom-config</code>. It will remain running until interrupted (Ctrl+C) by the user.</p></div><div class="code"><pre><code class="clojure">(let [project {:axiom-config {:ring-handler (fn [req] {:status 200
+                 :dir &quot;.&quot;}]
+ @output =&gt; &quot;Deployed a new version: dev-5555&quot;)</code></pre></div><div><span id="run"></span><h2><b>3 &nbsp;&nbsp; run</b></h2></div><div><p><code>lein axiom run</code> starts an instance of Axiom based on the <code>:axiom-config</code>. It will remain running until interrupted (Ctrl+C) by the user.</p></div><div class="code"><pre><code class="clojure">(let [project {:axiom-config {:ring-handler (fn [req] {:status 200
                                                       :body &quot;Hello&quot;})
                              :http-config {:port 33333}}}
      fut (future

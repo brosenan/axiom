@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 25 July 2017</h5>
+              <h5>Date: 26 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.1.2</h5></div></div>
           <hr/>
@@ -589,7 +589,7 @@
  (provided
   (perm/module-publics 'perm.1234ABC) =&gt; {'foo foo
                                           'bar bar
-                                          'baz baz}))</code></pre></div><div><span id="hash-static-file"></span><h3>7.8 &nbsp;&nbsp; hash-static-file</h3></div><div><p>When a new version is pushed we wish to scan everything under its <code>/static</code> directory (if exists), and store all these files in a way that will allow the <a href='gateway.html'>gateway tier</a> to retrieve them.</p></div><div><p>We use the <code>hasher</code> resource (e.g., the one provided for <a href='s3.html#hasher'>S3</a>) to store the content of files. This way, if a file is not modifed, we store only one copy of it.</p></div><div><p>The resource <code>hash-static-file</code> depends on a <code>hasher</code>. It is a function that takes a path to a file in the local file system, reads its content and <a href='permacode.hasher.html#introduction'>hashes it</a>.</p></div><div><p>To demonstrate how it works we create a temporary file:</p></div><div class="code"><pre><code class="clojure">(with-open [f (clojure.java.io/writer &quot;/tmp/foo.txt&quot;)]
+                                          'baz baz}))</code></pre></div><div><span id="hash-static-file"></span><h3>7.8 &nbsp;&nbsp; hash-static-file</h3></div><div><p>When a new version is pushed we wish to scan everything under its <code>/resources/public</code> directory (if exists), and store all these files in a way that will allow the <a href='gateway.html'>gateway tier</a> to retrieve them.</p></div><div><p>We use the <code>hasher</code> resource (e.g., the one provided for <a href='s3.html#hasher'>S3</a>) to store the content of files. This way, if a file is not modifed, we store only one copy of it.</p></div><div><p>The resource <code>hash-static-file</code> depends on a <code>hasher</code>. It is a function that takes a path to a file in the local file system, reads its content and <a href='permacode.hasher.html#introduction'>hashes it</a>.</p></div><div><p>To demonstrate how it works we create a temporary file:</p></div><div class="code"><pre><code class="clojure">(with-open [f (clojure.java.io/writer &quot;/tmp/foo.txt&quot;)]
  (doseq [i (range 1000)]
    (.write f (str &quot;This is line number &quot; i &quot;&#92;n&quot;))))</code></pre></div><div><p>Now, when we call <code>hash-static-file</code> it will use the <code>hash</code> part of the <code>hasher</code> to store the content of the file, given as a binary array.</p></div><div class="code"><pre><code class="clojure">(let [content (atom nil)
      hash (fn [c]
@@ -606,7 +606,7 @@
  (-&gt; @content
      String.
      (str/split #&quot;&#92;n&quot;)
-     (get 745)) =&gt; &quot;This is line number 745&quot;)</code></pre></div><div><span id="hash-static-files"></span><h3>7.9 &nbsp;&nbsp; hash-static-files</h3></div><div><p>To recursively store all files under a given directory (the <code>/static</code> directory in the repo), the function <code>hash-static-files</code> applies <code>hash-static-file</code> to each file in the subtree under the given root. It returns a map from relative paths to hash values.</p></div><div><p>To demonstrate this we will create a directory under <code>/tmp</code> and populate it with three file &ndash; <code>a.html</code>, <code>b.css</code> and <code>c.js</code>.</p></div><div class="code"><pre><code class="clojure">(let [dir (io/file &quot;/tmp/mock-static&quot;)]
+     (get 745)) =&gt; &quot;This is line number 745&quot;)</code></pre></div><div><span id="hash-static-files"></span><h3>7.9 &nbsp;&nbsp; hash-static-files</h3></div><div><p>To recursively store all files under a given directory (the <code>/resources/public</code> directory in the repo), the function <code>hash-static-files</code> applies <code>hash-static-file</code> to each file in the subtree under the given root. It returns a map from relative paths to hash values.</p></div><div><p>To demonstrate this we will create a directory under <code>/tmp</code> and populate it with three file &ndash; <code>a.html</code>, <code>b.css</code> and <code>c.js</code>.</p></div><div class="code"><pre><code class="clojure">(let [dir (io/file &quot;/tmp/mock-static&quot;)]
  (.mkdirs dir)
  (with-open [a (io/writer (io/file dir &quot;a.html&quot;))]
    (.write a &quot;Some html...&quot;))
@@ -632,12 +632,12 @@
  (module $)
  (di/startup $)
  (di/do-with! $ [deploy-dir]
-              (def deploy-dir deploy-dir)))</code></pre></div><div><p>This function takes version identifier, a root directory and a <code>publish</code> function, and does the following:</p><ul><li>Calls <code>permacode.publish/hash-all</code> on its <code>src</code> sub-directory with the <code>hasher</code> bound as the <code>&#42;hasher&#42;</code>, to get a source-code map.</li><li>Calls <code>hash-static-files</code> on the <code>static</code> sub-directory to get a map for the static files.</li></ul></div><div class="code"><pre><code class="clojure">(def published (atom []))
+              (def deploy-dir deploy-dir)))</code></pre></div><div><p>This function takes version identifier, a root directory and a <code>publish</code> function, and does the following:</p><ul><li>Calls <code>permacode.publish/hash-all</code> on its <code>src</code> sub-directory with the <code>hasher</code> bound as the <code>&#42;hasher&#42;</code>, to get a source-code map.</li><li>Calls <code>hash-static-files</code> on the <code>/resources/public</code> sub-directory to get a map for the static files.</li></ul></div><div class="code"><pre><code class="clojure">(def published (atom []))
  (deploy-dir &quot;some-ver&quot; &quot;/path/to/deploy&quot; (partial swap! published conj)) =&gt; nil
  (provided
 (permacode.publish/hash-all [:my-hasher] (io/file &quot;/path/to/deploy&quot; &quot;src&quot;)) =&gt; {'foo 'perm.AAA
                                                                    'bar 'perm.BBB}
-(io/file &quot;/path/to/deploy&quot; &quot;static&quot;) =&gt; ..static..)
+(io/file &quot;/path/to/deploy&quot; &quot;resources/public&quot;) =&gt; ..static..)
  @staticdir =&gt; ..static..</code></pre></div><div><p>Then it uses the given <code>publish</code> function to publish an <code>axiom/perm-versions</code> event containing both maps.</p></div><div class="code"><pre><code class="clojure">@published =&gt; [{:kind :fact
                :name &quot;axiom/perm-versions&quot;
                :key &quot;some-ver&quot;
