@@ -228,7 +228,7 @@
                                  :ts 2345
                                  :change 1
                                  :writers #{&quot;alice&quot; [:tweetlog/has-alias &quot;alice123&quot;]}
-                                 :readers #{[:tweetlog/has-alias &quot;charlie678&quot;]}})))</code></pre></div><div><p>In value maps where the user is a writer, a <code>:-delete!</code> entry contains a function that deletes the corresponding fact. It creates an event with all the same values, but with a new <code>:ts</code> and a <code>:change</code> value equal to the negative of the count value of the original event.</p></div><div class="code"><pre><code class="clojure">defview-ev-2
+                                 :readers #{[:tweetlog/has-alias &quot;charlie678&quot;]}})))</code></pre></div><div><p>In value maps where the user is a writer, a <code>:del!</code> entry contains a function that deletes the corresponding fact. It creates an event with all the same values, but with a new <code>:ts</code> and a <code>:change</code> value equal to the negative of the count value of the original event.</p></div><div class="code"><pre><code class="clojure">defview-ev-2
     (defonce my-atom3 (atom nil))
     (defonce published3 (atom nil))
     (reset! published3 nil)
@@ -247,8 +247,8 @@
                                :readers #{}
                                :writers #{&quot;alice&quot;}}] 3)
     (let [valmap (first (my-tweets3 &quot;alice&quot;))]
-      (is (fn? (:-delete! valmap)))
-      ((:-delete! valmap))
+      (is (fn? (:del! valmap)))
+      ((:del! valmap))
       (is (= @published3
              [{:kind :fact
                 :name &quot;tweetlog/tweeted&quot;
@@ -257,7 +257,7 @@
                 :ts 23456
                 :change -3
                 :readers #{}
-                :writers #{&quot;alice&quot;}}])))</code></pre></div><div><p>A <code>:-swap!</code> function provides a way to update a value map. It takes a function (and optionally arguments) that is applied to the value map, and emits an <a href='cloudlog-events.html#atomic-updates'>atomic update</a> event from the original state to the state reflected by the modified value map.</p></div><div class="code"><pre><code class="clojure">defview-ev-3
+                :writers #{&quot;alice&quot;}}])))</code></pre></div><div><p>A <code>:swap!</code> function provides a way to update a value map. It takes a function (and optionally arguments) that is applied to the value map, and emits an <a href='cloudlog-events.html#atomic-updates'>atomic update</a> event from the original state to the state reflected by the modified value map.</p></div><div class="code"><pre><code class="clojure">defview-ev-3
     (defonce my-atom4 (atom nil))
     (defonce published4 (atom nil))
     (reset! published4 nil)
@@ -266,24 +266,24 @@
                     :time (constantly 34567)})
     (defview my-tweets4 [user]
       host4
-      [:tweetlog/tweeted user tweet]
+      [:tweetlog/tweeted user tweet ts]
       :store-in my-atom4)
     (swap! my-atom4 assoc-in [[&quot;alice&quot;]
                               {:kind :fact
                                :name &quot;tweetlog/tweeted&quot;
                                :key &quot;alice&quot;
-                               :data [&quot;hello&quot;]
+                               :data [&quot;hello&quot; 12345]
                                :readers #{}
                                :writers #{&quot;alice&quot;}}] 3)
     (let [valmap (first (my-tweets4 &quot;alice&quot;))]
-      (is (fn? (:-swap! valmap)))
-      ((:-swap! valmap) assoc :tweet &quot;world&quot;)
+      (is (fn? (:swap! valmap)))
+      ((:swap! valmap) assoc :tweet &quot;world&quot;)
       (is (= @published4
              [{:kind :fact
                 :name &quot;tweetlog/tweeted&quot;
                 :key &quot;alice&quot;
-                :removed [&quot;hello&quot;]
-                :data [&quot;world&quot;]
+                :removed [&quot;hello&quot; 12345]
+                :data [&quot;world&quot; 12345]
                 :ts 34567
                 :change 3
                 :readers #{}

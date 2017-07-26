@@ -233,15 +233,25 @@
  (let [[[query reply-chan] chan] (async/alts!! [database-chan
                                                 (async/timeout 1000)])]
    chan =&gt; database-chan
-   (def reply-chan reply-chan)))</code></pre></div><div><p>Results returned from the database are pushed to the <code>s2c</code> channel.</p></div><div class="code"><pre><code class="clojure">(let [[c2s s2c] chan-pair]
+   (def reply-chan reply-chan)))</code></pre></div><div><p>Aggregated results returned from the database are pushed to the <code>s2c</code> channel.</p></div><div class="code"><pre><code class="clojure">(let [[c2s s2c] chan-pair]
  (async/&gt;!! reply-chan {:kind :fact
                         :name &quot;some&quot;
                         :key &quot;event&quot;
-                        :data [1 2 3]})
+                        :data [1 2 3]
+                        :ts 1000
+                        :change 1})
  (async/&gt;!! reply-chan {:kind :fact
                         :name &quot;some&quot;
                         :key &quot;other event&quot;
-                        :data [2 3 4]})
+                        :data [2 3 4]
+                        :ts 2000
+                        :change 1})
+ (async/&gt;!! reply-chan {:kind :fact
+                        :name &quot;some&quot;
+                        :key &quot;event&quot;
+                        :data [1 2 3]
+                        :ts 3000
+                        :change 1})
  (async/close! reply-chan)
  (let [[ev chan] (async/alts!! [s2c
                                 (async/timeout 1000)])]
@@ -249,14 +259,18 @@
    ev =&gt; {:kind :fact
           :name &quot;some&quot;
           :key &quot;event&quot;
-          :data [1 2 3]})
+          :data [1 2 3]
+          :ts 3000
+          :change 2})
  (let [[ev chan] (async/alts!! [s2c
                                 (async/timeout 1000)])]
    chan =&gt; s2c
    ev =&gt; {:kind :fact
           :name &quot;some&quot;
           :key &quot;other event&quot;
-          :data [2 3 4]}))</code></pre></div><div><p>When the <code>c2s</code> channel is closed, <code>event-bridge</code> deletes its queue.</p></div><div class="code"><pre><code class="clojure">(let [[c2s s2c] chan-pair]
+          :data [2 3 4]
+          :ts 2000
+          :change 1}))</code></pre></div><div><p>When the <code>c2s</code> channel is closed, <code>event-bridge</code> deletes its queue.</p></div><div class="code"><pre><code class="clojure">(let [[c2s s2c] chan-pair]
  (async/close! c2s)
  (get-call) =&gt; [:delete-queue &quot;some-random-queue&quot;])</code></pre></div><div><span id="usage-example"></span><h2><b>8 &nbsp;&nbsp; Usage Example</b></h2></div><div><p>To demonstrate how the above functions work together we build a small usage example.</p></div><div><p>In our example we have the following service functions:</p><ol><li>Function <code>sum-foo</code> that sums the values in the data of events of name "foo" and emits events named "foo-sum".</li><li>Function <code>count-ev</code> that counts the events of the different names and emits events of type "count" (it does not count "count" events).</li><li>Function <code>foo-from-count</code> that listens on "count" events and emits corresponding "foo" events with the same value.</li></ol></div><div class="code"><pre><code class="clojure">:integ ; Integration test.  Does not run during continouts integration
  (def foo-sum (atom 0))
