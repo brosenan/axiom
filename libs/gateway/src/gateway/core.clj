@@ -166,7 +166,7 @@
                                                                        (cond (user-in-set? x)
                                                                              x
                                                                              :else
-                                                                             (interset/union x #{identity})))))))
+                                                                             (vec (interset/union x #{identity}))))))))
                       s-s2c (async/chan 10 (filter #(and
                                                      (or
                                                       (user-in-set? (:writers %))

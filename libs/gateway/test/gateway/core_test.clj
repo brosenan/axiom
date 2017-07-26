@@ -724,10 +724,13 @@ and in case the `:readers` does not include the user, the `:readers` set is modi
                    :name "foo"
                    :writers #{"alice"}
                    :readers #{[:perm.AAA/friend "alice"]}}) ;; Alice is not a friend of herself
- (read-from-chan s-c2s) => {:kind :fact
-                            :name "foo"
-                            :writers #{"alice"}
-                            :readers [#{[:perm.AAA/friend "alice"]} #{"alice"}]})
+ (let [ev (read-from-chan s-c2s)]
+   ev => {:kind :fact
+          :name "foo"
+          :writers #{"alice"}
+          :readers [#{[:perm.AAA/friend "alice"]} #{"alice"}]}
+   (:readers ev) => vector? ;; Midje doesn't check this by itself...
+   ))
 [[:section {:title "Registration Events"}]]
 "Valid `:reg`istration events should pass from client to server."
 (fact
