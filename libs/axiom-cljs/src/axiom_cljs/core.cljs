@@ -79,3 +79,20 @@
                 :name "axiom/perm-versions"})
   host)
 
+(defn wrap-feed-forward [host]
+  (let [{:keys [pub sub]} host
+        ps (pubsub :name)
+        limbo (atom #{})]
+    (-> host
+        (assoc :pub (fn [ev]
+                      ((:pub ps) ev)
+                      (pub ev)
+                      (swap! limbo conj ev)))
+        (assoc :sub (fn [disp f]
+                      ((:sub ps) disp f)
+                      (let [f (fn [ev]
+                                (cond (contains? @limbo ev)
+                                      (swap! limbo disj ev)
+                                      :else
+                                      (f ev)))]
+                        (sub disp f)))))))

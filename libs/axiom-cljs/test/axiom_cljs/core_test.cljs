@@ -171,6 +171,126 @@ and only applies to development versions (that begin with `dev-`)."
         (is (not= (.get goog.net.cookies "app-version") new-ver))
         (is (not= (.get goog.net.cookies "app-version") (str "not" new-ver)))))
 
+[[:chapter {:title "wrap-feed-forward"}]]
+"Valid events that are `:pub`lished by the client later return from the server almost unchanged.
+`:sub`scribers will receive these events with a certain delay.
+Unfortunately, this delay may cause undesired behavior, when updates to the desplay are delayed until the events return from the server-side.
+To overcome this problem, the `wrap-feed-forward` middleware propagates events immediately from publishers to subscribers, on the client."
+
+"`wrap-feed-forward` wraps a connection map.
+It preserves the connection's properties, such that events `:pub`lished on the client are forwarded to the server,
+and events coming from the server are received by `:sub`scribers on the client."
+(fact wrap-feed-forward-1
+ (let [ps (ax/pubsub :name)
+       published (atom [])
+       subscribed (atom [])
+       host (-> {:pub (partial swap! published conj)
+                 :sub (:sub ps)}
+                ax/wrap-feed-forward)]
+   ;; Events coming from the server
+   ((:sub host) "foo" (partial swap! subscribed conj))
+   ((:pub ps) {:kind :fact
+               :name "foo"
+               :key 1
+               :data [2 3]
+               :ts 1000
+               :change 1
+               :readers #{}
+               :writers #{}})
+   (is (= @subscribed [{:kind :fact
+                        :name "foo"
+                        :key 1
+                        :data [2 3]
+                        :ts 1000
+                        :change 1
+                        :readers #{}
+                        :writers #{}}]))
+   ;; Event published by the client
+   ((:pub host) {:kind :fact
+                 :name "bar"
+                 :key 1
+                 :data [2 3]
+                 :ts 1000
+                 :change 1
+                 :readers #{}
+                 :writers #{}})
+   (is (= @published [{:kind :fact
+                       :name "bar"
+                       :key 1
+                       :data [2 3]
+                       :ts 1000
+                       :change 1
+                       :readers #{}
+                       :writers #{}}]))))
+
+"However, for events published by the client, subscribers on the client get immediate response."
+(fact wrap-feed-forward-2
+ (let [ps (ax/pubsub :name)
+       subscribed (atom [])
+       host (-> {:pub (fn [& _])
+                 :sub (:sub ps)}
+                ax/wrap-feed-forward)]
+   ((:sub host) "foo" (partial swap! subscribed conj))
+   ;; Event published by the client
+   ((:pub host) {:kind :fact
+                 :name "foo"
+                 :key 1
+                 :data [2 3]
+                 :ts 1000
+                 :change 1
+                 :readers #{}
+                 :writers #{}})
+   ;; is received by the client
+   (is (= @subscribed [{:kind :fact
+                        :name "foo"
+                        :key 1
+                        :data [2 3]
+                        :ts 1000
+                        :change 1
+                        :readers #{}
+                        :writers #{}}]))))
+
+"`wrap-feed-forward` de-duplicates, so that once an event that was forwarded comes back from the server, it is not forwarded again to subscribers."
+(fact wrap-feed-forward-3
+ (let [ps (ax/pubsub :name)
+       subscribed (atom [])
+       host (-> {:pub (fn [& _])
+                 :sub (:sub ps)}
+                ax/wrap-feed-forward)]
+   ((:sub host) "foo" (partial swap! subscribed conj))
+   ;; Event published by the client
+   ((:pub host) {:kind :fact
+                 :name "foo"
+                 :key 1
+                 :data [2 3]
+                 :ts 1000
+                 :change 1
+                 :readers #{}
+                 :writers #{}})
+   ;; and received from the server
+   ((:pub ps) {:kind :fact
+               :name "foo"
+               :key 1
+               :data [2 3]
+               :ts 1000
+               :change 1
+               :readers #{}
+               :writers #{}})
+   ;; is received only once by subscribers
+   (is (= (count @subscribed) 1))
+   ;; However, if the event is received again it is not blocked.
+   ((:pub ps) {:kind :fact
+               :name "foo"
+               :key 1
+               :data [2 3]
+               :ts 1000
+               :change 1
+               :readers #{}
+               :writers #{}})
+   (is (= (count @subscribed) 2))))
+
+
+
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "pubsub"}]]
 "`pubsub` is a simple synchronous publish/subscribe mechanism.
