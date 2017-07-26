@@ -269,7 +269,7 @@
                             hash-static-files]
               (fn [ver dir publish]
                 (let [perms (permpub/hash-all hasher (io/file dir "src"))
-                      statics (hash-static-files (io/file dir "static"))]
+                      statics (hash-static-files (io/file dir "resources/public"))]
                   (publish {:kind :fact
                             :name "axiom/perm-versions"
                             :key ver

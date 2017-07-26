@@ -3,7 +3,8 @@
             [devcards.core :refer-macros [deftest]]
             [axiom-cljs.core :as ax]
             [cljs.core.async :as async]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [goog.net.cookies :as cookies])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [axiom-cljs.tests :refer [fact]]))
 
@@ -61,6 +62,58 @@ It returns a map containing the following keys:
              (is (not= ((:uuid host)) ((:uuid host))))
              (done)))))
 
+[[:chapter {:title "ws-url"}]]
+"The [connection](#connection) function receives as parameter a WebSocket URL to connect to.
+By default, this will be of the form `ws://<host>/ws`, where `<host>` represents the value of `js/document.location.host`."
+
+"`ws-url` takes a host value and returns a WebSocket URL according to the above pattern."
+(fact ws-url-1
+      (is (= (ax/ws-url "localhost:8080") "ws://localhost:8080/ws")))
+
+"In one case, where the host value corresponds to figwheel running on the local host,
+we use `localhost:8080` instead of the original host, to direct WebSockets to Axiom rather than figwheel."
+(fact ws-url-2
+      (is (= (ax/ws-url "localhost:3449") "ws://localhost:8080/ws")))
+
+[[:chapter {:title "refresh-on-dev-ver"}]]
+"When in development, [Figwheel](https://github.com/bhauman/lein-figwheel) can be used to update client-side artifacts as they are being modified, 
+without having to reload the page.
+However, when updating the [Cloudlog](cloudlog.html) logic, we wish to update content of the [views]axiom-cljs.macros.html#defview) and [queries](axiom-cljs.macros.html#defquery), and that cannot be done without refreshing."
+
+"`update-on-dev-ver` is a middleware function that can be called on a connection, that subscribes to `axiom/perm-versions`.
+For each such event it will set the `app-version` cookie to contain the new version, so that refreshing the browser will capture the new version."
+(fact update-on-dev-ver-1
+      (let [ps (ax/pubsub :name)
+            published (atom [])
+            host (->  {:sub (:sub ps)
+                       :pub (partial swap! published conj)}
+                      ax/update-on-dev-ver)
+            new-ver (str "dev-" (rand-int 1000000))]
+        (is (=@published [{:kind :reg
+                           :name "axiom/perm-versions"}]))
+        ((:pub ps) {:kind :fact
+                    :name "axiom/perm-versions"
+                    :key new-ver
+                    :change 1})
+        (is (= (.get goog.net.cookies "app-version") new-ver))))
+
+"This only applies to events with a positive `:change` (introduction of new versions)."
+(fact update-on-dev-ver-2
+      (let [ps (ax/pubsub :name)
+            host (->  {:sub (:sub ps)
+                       :pub (fn [& _])}
+                      ax/update-on-dev-ver)
+            new-ver (str "dev-" (rand-int 1000000))]
+        ((:pub ps) {:kind :fact
+                    :name "axiom/perm-versions"
+                    :key new-ver
+                    :change 0})
+        ((:pub ps) {:kind :fact
+                    :name "axiom/perm-versions"
+                    :key new-ver
+                    :change -1})
+        (is (not= (.get goog.net.cookies "app-version") new-ver))))
+
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "pubsub"}]]
 "`pubsub` is a simple synchronous publish/subscribe mechanism.
@@ -87,3 +140,4 @@ When the dispatch function returns that dispatch value, the `:sub`scribed functi
         ((:pub ps) {:name "alice" :age 28})
         ((:pub ps) {:name "bob" :age 31})
         (is (= @val {:name "alice" :age 28}))))
+

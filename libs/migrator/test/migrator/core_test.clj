@@ -871,7 +871,7 @@ and returns a collection of clauses defined in that namespace."
                                             'baz baz})))
 
 [[:section {:title "hash-static-file"}]]
-"When a new version is pushed we wish to scan everything under its `/static` directory (if exists),
+"When a new version is pushed we wish to scan everything under its `/resources/public` directory (if exists),
 and store all these files in a way that will allow the [gateway tier](gateway.html) to retrieve them."
 
 "We use the `hasher` resource (e.g., the one provided for [S3](s3.html#hasher)) to store the content of files.
@@ -906,7 +906,7 @@ It is a function that takes a path to a file in the local file system, reads its
        (get 745)) => "This is line number 745"))
 
 [[:section {:title "hash-static-files"}]]
-"To recursively store all files under a given directory (the `/static` directory in the repo),
+"To recursively store all files under a given directory (the `/resources/public` directory in the repo),
 the function `hash-static-files` applies `hash-static-file` to each file in the subtree under the given root.
 It returns a map from relative paths to hash values."
 
@@ -953,14 +953,14 @@ It is a DI resource based on a `hasher`, [hash-static-files](#hash-static-files)
 
 "This function takes version identifier, a root directory and a `publish` function, and does the following:
 - Calls `permacode.publish/hash-all` on its `src` sub-directory with the `hasher` bound as the `*hasher*`, to get a source-code map.
-- Calls `hash-static-files` on the `static` sub-directory to get a map for the static files."
+- Calls `hash-static-files` on the `/resources/public` sub-directory to get a map for the static files."
 (fact
  (def published (atom []))
  (deploy-dir "some-ver" "/path/to/deploy" (partial swap! published conj)) => nil
  (provided
   (permacode.publish/hash-all [:my-hasher] (io/file "/path/to/deploy" "src")) => {'foo 'perm.AAA
                                                                      'bar 'perm.BBB}
-  (io/file "/path/to/deploy" "static") => ..static..)
+  (io/file "/path/to/deploy" "resources/public") => ..static..)
  @staticdir => ..static..)
 
 "Then it uses the given `publish` function to publish an `axiom/perm-versions` event containing both maps."

@@ -23,7 +23,6 @@
         (async/pipe to-host ch)
         (go-loop []
           (let [ev (async/<! ch)]
-            (prn ev)
             (when (= (:kind ev) :init)
               (reset! identity (:identity ev)))
             ((:pub ps) ev))
@@ -37,3 +36,16 @@
 
 (defn merge-meta [obj m]
   (with-meta obj (merge (meta obj) m)))
+
+(defn ws-url [host]
+  (let [host (cond (= host "localhost:3449") "localhost:8080"
+                   :else host)]
+    (str "ws://" host "/ws")))
+
+(defn update-on-dev-ver [host]
+  ((:sub host) "axiom/perm-versions"
+   (fn [ev]
+     (when (> (:change ev) 0)
+       (.set goog.net.cookies "app-version" (:key ev)))))
+  ((:pub host) {:kind :reg
+                :name "axiom/perm-versions"}))
