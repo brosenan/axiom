@@ -304,17 +304,27 @@ If such a field exists and is `true`, a request is made to the database (through
      chan => database-chan
      (def reply-chan reply-chan))))
 
-"Results returned from the database are pushed to the `s2c` channel."
+"Aggregated results returned from the database are pushed to the `s2c` channel."
 (fact
  (let [[c2s s2c] chan-pair]
    (async/>!! reply-chan {:kind :fact
                           :name "some"
                           :key "event"
-                          :data [1 2 3]})
+                          :data [1 2 3]
+                          :ts 1000
+                          :change 1})
    (async/>!! reply-chan {:kind :fact
                           :name "some"
                           :key "other event"
-                          :data [2 3 4]})
+                          :data [2 3 4]
+                          :ts 2000
+                          :change 1})
+   (async/>!! reply-chan {:kind :fact
+                          :name "some"
+                          :key "event"
+                          :data [1 2 3]
+                          :ts 3000
+                          :change 1})
    (async/close! reply-chan)
    (let [[ev chan] (async/alts!! [s2c
                                   (async/timeout 1000)])]
@@ -322,14 +332,18 @@ If such a field exists and is `true`, a request is made to the database (through
      ev => {:kind :fact
             :name "some"
             :key "event"
-            :data [1 2 3]})
+            :data [1 2 3]
+            :ts 3000
+            :change 2})
    (let [[ev chan] (async/alts!! [s2c
                                   (async/timeout 1000)])]
      chan => s2c
      ev => {:kind :fact
             :name "some"
             :key "other event"
-            :data [2 3 4]})))
+            :data [2 3 4]
+            :ts 2000
+            :change 1})))
 
 
 "When the `c2s` channel is closed, `event-bridge` deletes its queue."

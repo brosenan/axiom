@@ -7,6 +7,7 @@
             [langohr.exchange  :as le]
             [taoensso.nippy :as nippy]
             [di.core :as di]
+            [cloudlog-events.core :as ev]
             [clojure.core.async :as async]
             [clojure.repl :as repl]))
 
@@ -161,7 +162,8 @@
                               register-events-to-queue
                               delete-queue]
               (fn [[c2s s2c]]
-                (let [queue (declare-private-queue)]
+                (let [queue (declare-private-queue)
+                      database-chan (ev/accumulate-db-chan database-chan)]
                   (assign-service queue (fn [ev]
                                           (async/>!! s2c ev)))
                   (async/go-loop []
