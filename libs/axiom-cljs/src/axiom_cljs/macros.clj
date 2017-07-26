@@ -1,5 +1,4 @@
-(ns axiom-cljs.macros
-  (:require [cljs.core.async.macros :refer [go go-loop]]))
+(ns axiom-cljs.macros)
 
 
 (defn ^:private symbols [form]
@@ -37,8 +36,7 @@
                          writers #{'$user}}}]
   (let [fact-name (-> fact first str (subs 1))]
     `(defonce ~name
-       (let [sub-chan# (async/chan 1)
-             state# ~store-in]
+       (let [state# ~store-in]
          (reset! state# {})
          ((:sub ~host) ~fact-name
           (fn [ev#]
@@ -100,7 +98,6 @@
         pred-name (-> pred-name str (subs 1))]
     `(defonce ~name
        (let [id-map# (atom {})
-             sub-chan# (async/chan 1)
              state# ~store-in]
          (reset! ~store-in {})
          ((:sub ~host) ~(str pred-name "!")
