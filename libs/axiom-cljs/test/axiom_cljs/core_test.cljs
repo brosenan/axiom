@@ -21,7 +21,7 @@ It returns a map containing the following keys:
 3. A `:time` function which returns the current time in milliseconds.
 4. A `:uuid` function which returns some universally-unique identifier.
 5. An `:identity` atom, which will contain the user's identity once an `:init` event is received from the host."
-(fact connection
+(fact connection-1
   (async done
          (go
            (let [the-chan (async/chan 10)
@@ -34,9 +34,9 @@ It returns a map containing the following keys:
              (is (map? host))
              (is (= @(:identity host) nil)) ;; Initial value
              ;; The host sends an `:init` event
-             (async/>! the-chan {:kind :init
-                                 :name "some/name"
-                                 :identity "alice"})
+             (async/>! the-chan {:message {:kind :init
+                                           :name "some/name"
+                                           :identity "alice"}})
              (async/<! (async/timeout 1))
              (is (= @(:identity host) "alice"))
              
@@ -44,12 +44,12 @@ It returns a map containing the following keys:
              (is (fn? (:sub host)))
              (let [test-chan (async/chan 10)]
                ((:sub host) "foo" #(go (async/>! test-chan %)))
-               (async/>! the-chan {:name "bar" :some :event})
-               (async/>! the-chan {:name "foo" :other :event})
+               (async/>! the-chan {:message {:name "bar" :some :event}})
+               (async/>! the-chan {:message {:name "foo" :other :event}})
                (is (= (async/<! test-chan) {:name "foo" :other :event}))
                ;; Since our mock `ws-ch` creates a normal channel, publishing into this channel
                ;; will be captured by subscribers
-               ((:pub host) {:name "foo" :third :event})
+               ((:pub host) {:message {:name "foo" :third :event}})
                (is (= (async/<! test-chan) {:name "foo" :third :event})))
 
              (is (fn? (:time host)))
@@ -60,6 +60,42 @@ It returns a map containing the following keys:
              (is (fn? (:uuid host)))
              (is (= (count ((:uuid host))) 36))
              (is (not= ((:uuid host)) ((:uuid host))))
+             (done)))))
+
+"The connection map also has an `:status` field, which is an atom.
+It holds the value `:ok` as long as the WebSocket channel is open, and `:err` once the channel has been closed."
+(fact connection-2
+  (async done
+         (go
+           (let [the-chan (async/chan 10)
+                 mock-ws-ch (fn [url]
+                              (is (= url "ws://some-url"))
+                              (go
+                                {:ws-channel the-chan}))
+                 host (ax/connection "ws://some-url"
+                                     :ws-ch mock-ws-ch)]
+             (is (= @(:status host) :ok))
+             (async/close! the-chan)
+             (async/<! (async/timeout 1))
+             (is (= @(:status host) :err))
+             (done)))))
+
+"`connection` uses [wrap-atomic-updates](#wrap-atomic-updates) to handle atomic updates."
+(fact connection-3
+  (async done
+         (go
+           (let [the-chan (async/chan 10)
+                 mock-ws-ch (fn [url]
+                              (is (= url "ws://some-url"))
+                              (go
+                                {:ws-channel the-chan}))
+                 host (ax/connection "ws://some-url"
+                                     :ws-ch mock-ws-ch)]
+             (let [test-chan (async/chan 10)]
+               ((:sub host) "foo" #(go (async/>! test-chan %)))
+               (async/>! the-chan {:message {:name "foo" :data ["bar"] :removed ["baz"] :change 1}})
+               (is (= (async/<! test-chan) {:name "foo" :data ["baz"] :change -1}))
+               (is (= (async/<! test-chan) {:name "foo" :data ["bar"] :change 1})))
              (done)))))
 
 [[:chapter {:title "ws-url"}]]
@@ -80,7 +116,22 @@ we use `localhost:8080` instead of the original host, to direct WebSockets to Ax
 without having to reload the page.
 However, when updating the [Cloudlog](cloudlog.html) logic, we wish to update content of the [views]axiom-cljs.macros.html#defview) and [queries](axiom-cljs.macros.html#defquery), and that cannot be done without refreshing."
 
-"`update-on-dev-ver` is a middleware function that can be called on a connection, that subscribes to `axiom/perm-versions`.
+"`update-on-dev-ver` is a middleware function that can be called on a connection map, and returns a valid connection map."
+(fact update-on-dev-ver-0
+      (let [ps (ax/pubsub :name)
+            host (->  {:sub (:sub ps)
+                       :pub (fn [& _])}
+                      ax/update-on-dev-ver)
+            received (atom nil)]
+        ((:sub host) "foo/bar" (partial reset! received))
+        ((:pub ps) {:kind :fact
+                    :name "foo/bar"
+                    :key 1})
+        (is (= @received {:kind :fact
+                          :name "foo/bar"
+                          :key 1}))))
+
+"It subscribes to `axiom/perm-versions` events.
 For each such event it will set the `app-version` cookie to contain the new version, so that refreshing the browser will capture the new version."
 (fact update-on-dev-ver-1
       (let [ps (ax/pubsub :name)
@@ -147,3 +198,29 @@ When the dispatch function returns that dispatch value, the `:sub`scribed functi
         ((:pub ps) {:name "bob" :age 31})
         (is (= @val {:name "alice" :age 28}))))
 
+
+[[:section {:title "wrap-atomic-updates"}]]
+"`wrap-atomic-updates` is a connection middleware that handles [atomic updates](cloudlog-events.html#atomic-updates),
+by treating them as two separate events."
+
+"For normal events, `wrap-atomic-updates` does not modify the way `:sub` works."
+(fact wrap-atomic-updates-1
+      (let [ps (ax/pubsub :name)
+            host (-> {:sub (:sub ps)}
+                     ax/wrap-atomic-updates)
+            published (atom [])]
+        ((:sub host) "foo" (partial swap! published conj))
+        ((:pub ps) {:name "foo" :key "bar" :data [1 2 3] :change 1})
+        (is (= @published [{:name "foo" :key "bar" :data [1 2 3] :change 1}]))))
+
+"However, for atomic updates, the subscribed function is called twice: A first time with a negative `:change` and the `:removed` value in place of `:data`,
+and the a second time with the original value of `:change` and `:removed` removed."
+(fact wrap-atomic-updates-2
+      (let [ps (ax/pubsub :name)
+            host (-> {:sub (:sub ps)}
+                     ax/wrap-atomic-updates)
+            published (atom [])]
+        ((:sub host) "foo" (partial swap! published conj))
+        ((:pub ps) {:name "foo" :key "bar" :data [2 3 4] :removed [1 2 3] :change 1})
+        (is (= @published [{:name "foo" :key "bar" :data [1 2 3] :change -1}
+                           {:name "foo" :key "bar" :data [2 3 4] :change 1}]))))

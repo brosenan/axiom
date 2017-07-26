@@ -12,28 +12,54 @@
      :sub (fn [disp f]
             (swap! listeners update disp conj f))}))
 
+(defn wrap-atomic-updates [host]
+  (let [sub (:sub host)]
+    (-> host
+        (assoc :sub
+               (fn [disp f]
+                 (sub disp (fn [ev]
+                             (cond (contains? ev :removed)
+                                   (do
+                                     (f (-> ev
+                                            (assoc :data (:removed ev))
+                                            (assoc :change (- (:change ev)))
+                                            (dissoc :removed)))
+                                     (f (-> ev
+                                            (dissoc :removed))))
+                                   :else
+                                   (f ev)))))))))
+
 (defn connection [url & {:keys [ws-ch]
-                         :or {:ws-ch ws-ch}}]
-  (let [to-host (async/chan 2)
-        ps (pubsub :name)
-        identity (atom nil)]
-    (go
-      (let [ch (-> (ws-ch url)
-               async/<!
-               :ws-channel)]
-        (async/pipe to-host ch)
-        (go-loop []
-          (let [ev (async/<! ch)]
-            (when (= (:kind ev) :init)
-              (reset! identity (:identity ev)))
-            ((:pub ps) ev))
-          (recur))))
-    {:pub (fn [ev] (go
-                     (async/>! to-host ev)))
-     :sub (:sub ps)
-     :time (fn [] (.getTime (js/Date.)))
-     :uuid #(str (random-uuid))
-     :identity identity}))
+                         :or {ws-ch ws-ch}}]
+  (-> (let [to-host (async/chan 2)
+            ps (pubsub :name)
+            identity (atom nil)
+            status (atom :ok)]
+        (go
+          (let [ch (-> (ws-ch url)
+                       async/<!
+                       :ws-channel)]
+            (async/pipe to-host ch)
+            (go-loop []
+              (let [ev (:message (async/<! ch))]
+                (cond (nil? ev)
+                      (reset! status :err)
+                      :else
+                      (do
+                        (prn [:rcv ev])
+                        (when (= (:kind ev) :init)
+                          (reset! identity (:identity ev)))
+                        ((:pub ps) ev)
+                        (recur)))))))
+        {:pub (fn [ev] (go
+                         (prn [:snd ev])
+                         (async/>! to-host ev)))
+         :sub (:sub ps)
+         :time (fn [] (.getTime (js/Date.)))
+         :uuid #(str (random-uuid))
+         :identity identity
+         :status status})
+      wrap-atomic-updates))
 
 (defn merge-meta [obj m]
   (with-meta obj (merge (meta obj) m)))
@@ -50,4 +76,6 @@
                 (str/starts-with? (:key ev) "dev-"))
        (.set goog.net.cookies "app-version" (:key ev)))))
   ((:pub host) {:kind :reg
-                :name "axiom/perm-versions"}))
+                :name "axiom/perm-versions"})
+  host)
+
