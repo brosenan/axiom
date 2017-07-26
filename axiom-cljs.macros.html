@@ -64,7 +64,7 @@
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
               <h5>Date: 26 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
-              <h5>Version: 0.1.2</h5></div></div>
+              <h5>Version: 0.2.0</h5></div></div>
           <hr/>
           <div class="outline">
             <div class="toc">
@@ -98,8 +98,9 @@
       (is (= res []))
       (is (= (-&gt; res meta :pending) true))
       (is (= @published1 [{:kind :reg
-                            :name &quot;tweetlog/tweeted&quot;
-                            :key &quot;alice&quot;}])))</code></pre></div><div><p>An optional keyword parameter <code>:store-in</code> takes an atom and initially <code>reset!</code>s is to an empty map.</p></div><div class="code"><pre><code class="clojure">defview-4
+                           :name &quot;tweetlog/tweeted&quot;
+                           :key &quot;alice&quot;
+                           :get-existing true}])))</code></pre></div><div><p>An optional keyword parameter <code>:store-in</code> takes an atom and initially <code>reset!</code>s is to an empty map.</p></div><div class="code"><pre><code class="clojure">defview-4
     (defonce ps2 (ax/pubsub :name))
     (defonce published2 (atom nil))
     (reset! published2 nil)
