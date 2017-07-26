@@ -118,7 +118,8 @@
       nil))
 
   (di/provide $ declare-service [rabbitmq-service info]
-              (declare-declare-service rabbitmq-service info {:durable true}))
+              (declare-declare-service rabbitmq-service info {:durable true
+                                                              :auto-delete false}))
   (di/provide $ declare-volatile-service [rabbitmq-service info]
               (declare-declare-service rabbitmq-service info {:durable false}))
 

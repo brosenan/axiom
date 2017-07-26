@@ -56,7 +56,8 @@ It is provided a partial event, and calls the given function on any event that m
  (declare-service "foobar" {:kind :fact
                             :name "foo/bar"}) => nil
  (provided
-  (lq/declare :some-chan "foobar" {:durable true}) => irrelevant
+  (lq/declare :some-chan "foobar" {:durable true
+                                   :auto-delete false}) => irrelevant
   (lq/bind :some-chan "foobar"
            facts-exch {:routing-key "f.17cdeaefa5cc6022481c824e15a47a7726f593dd.#"})
   => irrelevant))

@@ -32,7 +32,8 @@ This event is then handled by Axiom's [migrator](migrator.html) to deploy the co
    (provided
     (rand-int 10000000) => 5555)
    @published => [{:ver "dev-5555"
-                   :dir "."}]))
+                   :dir "."}]
+   @output => "Deployed a new version: dev-5555"))
 
 [[:chapter {:title "run"}]]
 "`lein axiom run` starts an instance of Axiom based on the `:axiom-config`.

@@ -109,16 +109,22 @@
                                                  :key (:app-version req)} resp-chan])
                       (let [[ans] (->> resp-chan
                                        (async/reduce conj [])
-                                       (async/<!!))
-                            [perms static] (:data ans)
-                            hashcode (static (:uri req))]
-                        (cond (nil? hashcode)
+                                       (async/<!!))]
+                        (cond (nil? ans)
                               {:status 404
-                               :body "Not Found!"}
+                               :body (str "No Such Version: " (:app-version req))
+                               :headers {"content-type" "text/plain"}}
                               :else
-                              (let [content (unhash hashcode)]
-                                {:status 200
-                                 :body (clojure.java.io/input-stream content)})))))
+                              (let [[perms static] (:data ans)
+                                    hashcode (static (:uri req))]
+                                (cond (nil? hashcode)
+                                      {:status 404
+                                       :body "Not Found!"
+                                       :headers {"content-type" "text/plain"}}
+                                      :else
+                                      (let [content (unhash hashcode)]
+                                        {:status 200
+                                         :body (clojure.java.io/input-stream content)})))))))
                   ctype/wrap-content-type
                   version-selector))
 

@@ -11,8 +11,9 @@
                               (dissoc :http-config)
                               (dissoc :migrator-config)))]
     (di/startup $)
-    (di/do-with! $ [deploy-dir publish]
-                 (deploy-dir ver "." publish))
+    (di/do-with! $ [deploy-dir publish println]
+                 (deploy-dir ver "." publish)
+                 (println (str "Deployed a new version: " ver)))
     (di/shutdown $)))
 
 (defn run

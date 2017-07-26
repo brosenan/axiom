@@ -45,7 +45,7 @@
                                        :dynamodb-default-throughput
                                        :num-database-retriever-threads]}
                  :use-dummy-authenticator true ;; Completely remove this entry to avoid the dummy authenticator
-                 :dummy-version "12345"
+                 :dummy-version "dev-3211537"
                  :http-config {:port 8080}})
 
  

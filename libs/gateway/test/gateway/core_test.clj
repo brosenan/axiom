@@ -573,6 +573,21 @@ It is depends on the following:
    chan => response
    (:status res) => 404))
 
+"If the version record cannot be found, a status of `404` is returned as well."
+(fact
+ (def response
+   (async/thread
+     (static-handler {:cookies {}
+                      :uri "/bar.html"})))
+ (let [[query resp-chan] (get-query)]
+   ;; No response...
+   (async/close! resp-chan))
+ (let [[res chan] (async/alts!! [response
+                                 (async/timeout 1000)])]
+   chan => response
+   (:status res) => 404
+   (:body res) => "No Such Version: ver123"))
+
 [[:chapter {:title "event-gateway"}]]
 "`event-gateway` is a function that sets up a bidirectional event filter for events flowing between a client and a server.
 It is intended to support confidentiality and integrity, protecting both the connected client and the rest of the users against this client."
