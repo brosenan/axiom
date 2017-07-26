@@ -111,7 +111,7 @@ we use `localhost:8080` instead of the original host, to direct WebSockets to Ax
 (fact ws-url-2
       (is (= (ax/ws-url "localhost:3449") "ws://localhost:8080/ws")))
 
-[[:chapter {:title "refresh-on-dev-ver"}]]
+[[:chapter {:title "update-on-dev-ver"}]]
 "When in development, [Figwheel](https://github.com/bhauman/lein-figwheel) can be used to update client-side artifacts as they are being modified, 
 without having to reload the page.
 However, when updating the [Cloudlog](cloudlog.html) logic, we wish to update content of the [views]axiom-cljs.macros.html#defview) and [queries](axiom-cljs.macros.html#defquery), and that cannot be done without refreshing."

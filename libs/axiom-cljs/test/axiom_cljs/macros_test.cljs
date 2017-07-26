@@ -222,7 +222,7 @@ and the `:readers` set to contain the user being followed by alias."
                                    :writers #{"alice" [:tweetlog/has-alias "alice123"]}
                                    :readers #{[:tweetlog/has-alias "charlie678"]}}))))
 
-"In value maps where the user is a writer, a `:-delete!` entry contains a function that deletes the corresponding fact.
+"In value maps where the user is a writer, a `:del!` entry contains a function that deletes the corresponding fact.
 It creates an event with all the same values, but with a new `:ts` and a `:change` value equal to the negative of the count value of the original event."
 (fact defview-ev-2
       (defonce my-atom3 (atom nil))
@@ -243,8 +243,8 @@ It creates an event with all the same values, but with a new `:ts` and a `:chang
                                  :readers #{}
                                  :writers #{"alice"}}] 3)
       (let [valmap (first (my-tweets3 "alice"))]
-        (is (fn? (:-delete! valmap)))
-        ((:-delete! valmap))
+        (is (fn? (:del! valmap)))
+        ((:del! valmap))
         (is (= @published3
                [{:kind :fact
                   :name "tweetlog/tweeted"
@@ -255,7 +255,7 @@ It creates an event with all the same values, but with a new `:ts` and a `:chang
                   :readers #{}
                   :writers #{"alice"}}]))))
 
-"A `:-swap!` function provides a way to update a value map.
+"A `:swap!` function provides a way to update a value map.
 It takes a function (and optionally arguments) that is applied to the value map, and emits an [atomic update](cloudlog-events.html#atomic-updates)
 event from the original state to the state reflected by the modified value map."
 (fact defview-ev-3
@@ -277,8 +277,8 @@ event from the original state to the state reflected by the modified value map."
                                  :readers #{}
                                  :writers #{"alice"}}] 3)
       (let [valmap (first (my-tweets4 "alice"))]
-        (is (fn? (:-swap! valmap)))
-        ((:-swap! valmap) assoc :tweet "world")
+        (is (fn? (:swap! valmap)))
+        ((:swap! valmap) assoc :tweet "world")
         (is (= @published4
                [{:kind :fact
                   :name "tweetlog/tweeted"
