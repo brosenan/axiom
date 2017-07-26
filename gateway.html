@@ -415,10 +415,13 @@
                  :name &quot;foo&quot;
                  :writers #{&quot;alice&quot;}
                  :readers #{[:perm.AAA/friend &quot;alice&quot;]}}) ;; Alice is not a friend of herself
- (read-from-chan s-c2s) =&gt; {:kind :fact
-                          :name &quot;foo&quot;
-                          :writers #{&quot;alice&quot;}
-                          :readers [#{[:perm.AAA/friend &quot;alice&quot;]} #{&quot;alice&quot;}]}</code></pre></div><div><span id="registration-events"></span><h3>6.5 &nbsp;&nbsp; Registration Events</h3></div><div><p>Valid <code>:reg</code>istration events should pass from client to server.</p></div><div class="code"><pre><code class="clojure">(async/&gt;!! c-c2s {:kind :reg
+ (let [ev (read-from-chan s-c2s)]
+ ev =&gt; {:kind :fact
+        :name &quot;foo&quot;
+        :writers #{&quot;alice&quot;}
+        :readers [#{[:perm.AAA/friend &quot;alice&quot;]} #{&quot;alice&quot;}]}
+ (:readers ev) =&gt; vector? ;; Midje doesn't check this by itself...
+ )</code></pre></div><div><span id="registration-events"></span><h3>6.5 &nbsp;&nbsp; Registration Events</h3></div><div><p>Valid <code>:reg</code>istration events should pass from client to server.</p></div><div class="code"><pre><code class="clojure">(async/&gt;!! c-c2s {:kind :reg
                  :name &quot;foo&quot;
                  :key &quot;bar&quot;})
  (let [[ev chan] (async/alts!! [s-c2s

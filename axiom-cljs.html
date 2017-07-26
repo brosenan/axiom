@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">axiom-cljs.core</a>
-                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#ws-url"><h4>2 &nbsp; ws-url</h4></a></li><li><a class="chapter" data-scroll="" href="#update-on-dev-ver"><h4>3 &nbsp; update-on-dev-ver</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>4 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#pubsub"><h5><i>4.1 &nbsp; pubsub</i></h5></a><a class="section" data-scroll="" href="#wrap-atomic-updates"><h5><i>4.2 &nbsp; wrap-atomic-updates</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#ws-url"><h4>2 &nbsp; ws-url</h4></a></li><li><a class="chapter" data-scroll="" href="#update-on-dev-ver"><h4>3 &nbsp; update-on-dev-ver</h4></a></li><li><a class="chapter" data-scroll="" href="#wrap-feed-forward"><h4>4 &nbsp; wrap-feed-forward</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#pubsub"><h5><i>5.1 &nbsp; pubsub</i></h5></a><a class="section" data-scroll="" href="#wrap-atomic-updates"><h5><i>5.2 &nbsp; wrap-atomic-updates</i></h5></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,7 +80,7 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#ws-url"><h4>2 &nbsp; ws-url</h4></a></li><li><a class="chapter" data-scroll="" href="#update-on-dev-ver"><h4>3 &nbsp; update-on-dev-ver</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>4 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#pubsub"><h5><i>4.1 &nbsp; pubsub</i></h5></a><a class="section" data-scroll="" href="#wrap-atomic-updates"><h5><i>4.2 &nbsp; wrap-atomic-updates</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#ws-url"><h4>2 &nbsp; ws-url</h4></a></li><li><a class="chapter" data-scroll="" href="#update-on-dev-ver"><h4>3 &nbsp; update-on-dev-ver</h4></a></li><li><a class="chapter" data-scroll="" href="#wrap-feed-forward"><h4>4 &nbsp; wrap-feed-forward</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#pubsub"><h5><i>5.1 &nbsp; pubsub</i></h5></a><a class="section" data-scroll="" href="#wrap-atomic-updates"><h5><i>5.2 &nbsp; wrap-atomic-updates</i></h5></a></li>
                 </ul>
               </nav>
           </div>
@@ -198,7 +198,108 @@
                   :key (str &quot;not&quot; new-ver)
                   :change 1})
       (is (not= (.get goog.net.cookies &quot;app-version&quot;) new-ver))
-      (is (not= (.get goog.net.cookies &quot;app-version&quot;) (str &quot;not&quot; new-ver))))</code></pre></div><div><span id="under-the-hood"></span><h2><b>4 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="pubsub"></span><h3>4.1 &nbsp;&nbsp; pubsub</h3></div><div><p><code>pubsub</code> is a simple synchronous publish/subscribe mechanism. The <code>pubsub</code> function takes a dispatch function as parameter, and returns a map containing two functions: <code>:sub</code> and <code>:pub</code>.</p></div><div class="code"><pre><code class="clojure">pubsub-1
+      (is (not= (.get goog.net.cookies &quot;app-version&quot;) (str &quot;not&quot; new-ver))))</code></pre></div><div><span id="wrap-feed-forward"></span><h2><b>4 &nbsp;&nbsp; wrap-feed-forward</b></h2></div><div><p>Valid events that are <code>:pub</code>lished by the client later return from the server almost unchanged. <code>:sub</code>scribers will receive these events with a certain delay. Unfortunately, this delay may cause undesired behavior, when updates to the desplay are delayed until the events return from the server-side. To overcome this problem, the <code>wrap-feed-forward</code> middleware propagates events immediately from publishers to subscribers, on the client.</p></div><div><p><code>wrap-feed-forward</code> wraps a connection map. It preserves the connection's properties, such that events <code>:pub</code>lished on the client are forwarded to the server, and events coming from the server are received by <code>:sub</code>scribers on the client.</p></div><div class="code"><pre><code class="clojure">wrap-feed-forward-1
+ (let [ps (ax/pubsub :name)
+     published (atom [])
+     subscribed (atom [])
+     host (-&gt; {:pub (partial swap! published conj)
+               :sub (:sub ps)}
+              ax/wrap-feed-forward)]
+ ;; Events coming from the server
+ ((:sub host) &quot;foo&quot; (partial swap! subscribed conj))
+ ((:pub ps) {:kind :fact
+             :name &quot;foo&quot;
+             :key 1
+             :data [2 3]
+             :ts 1000
+             :change 1
+             :readers #{}
+             :writers #{}})
+ (is (= @subscribed [{:kind :fact
+                      :name &quot;foo&quot;
+                      :key 1
+                      :data [2 3]
+                      :ts 1000
+                      :change 1
+                      :readers #{}
+                      :writers #{}}]))
+ ;; Event published by the client
+ ((:pub host) {:kind :fact
+               :name &quot;bar&quot;
+               :key 1
+               :data [2 3]
+               :ts 1000
+               :change 1
+               :readers #{}
+               :writers #{}})
+ (is (= @published [{:kind :fact
+                     :name &quot;bar&quot;
+                     :key 1
+                     :data [2 3]
+                     :ts 1000
+                     :change 1
+                     :readers #{}
+                     :writers #{}}])))</code></pre></div><div><p>However, for events published by the client, subscribers on the client get immediate response.</p></div><div class="code"><pre><code class="clojure">wrap-feed-forward-2
+ (let [ps (ax/pubsub :name)
+     subscribed (atom [])
+     host (-&gt; {:pub (fn [&amp; _])
+               :sub (:sub ps)}
+              ax/wrap-feed-forward)]
+ ((:sub host) &quot;foo&quot; (partial swap! subscribed conj))
+ ;; Event published by the client
+ ((:pub host) {:kind :fact
+               :name &quot;foo&quot;
+               :key 1
+               :data [2 3]
+               :ts 1000
+               :change 1
+               :readers #{}
+               :writers #{}})
+ ;; is received by the client
+ (is (= @subscribed [{:kind :fact
+                      :name &quot;foo&quot;
+                      :key 1
+                      :data [2 3]
+                      :ts 1000
+                      :change 1
+                      :readers #{}
+                      :writers #{}}])))</code></pre></div><div><p><code>wrap-feed-forward</code> de-duplicates, so that once an event that was forwarded comes back from the server, it is not forwarded again to subscribers.</p></div><div class="code"><pre><code class="clojure">wrap-feed-forward-3
+ (let [ps (ax/pubsub :name)
+     subscribed (atom [])
+     host (-&gt; {:pub (fn [&amp; _])
+               :sub (:sub ps)}
+              ax/wrap-feed-forward)]
+ ((:sub host) &quot;foo&quot; (partial swap! subscribed conj))
+ ;; Event published by the client
+ ((:pub host) {:kind :fact
+               :name &quot;foo&quot;
+               :key 1
+               :data [2 3]
+               :ts 1000
+               :change 1
+               :readers #{}
+               :writers #{}})
+ ;; and received from the server
+ ((:pub ps) {:kind :fact
+             :name &quot;foo&quot;
+             :key 1
+             :data [2 3]
+             :ts 1000
+             :change 1
+             :readers #{}
+             :writers #{}})
+ ;; is received only once by subscribers
+ (is (= (count @subscribed) 1))
+ ;; However, if the event is received again it is not blocked.
+ ((:pub ps) {:kind :fact
+             :name &quot;foo&quot;
+             :key 1
+             :data [2 3]
+             :ts 1000
+             :change 1
+             :readers #{}
+             :writers #{}})
+ (is (= (count @subscribed) 2)))</code></pre></div><div><span id="under-the-hood"></span><h2><b>5 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="pubsub"></span><h3>5.1 &nbsp;&nbsp; pubsub</h3></div><div><p><code>pubsub</code> is a simple synchronous publish/subscribe mechanism. The <code>pubsub</code> function takes a dispatch function as parameter, and returns a map containing two functions: <code>:sub</code> and <code>:pub</code>.</p></div><div class="code"><pre><code class="clojure">pubsub-1
     (let [ps (ax/pubsub (fn [x]))]
       (is (fn? (:pub ps)))
       (is (fn? (:sub ps))))</code></pre></div><div><p>When calling the <code>:pub</code> function with a value, the dispatch function is called with that value.</p></div><div class="code"><pre><code class="clojure">pubsub-2
@@ -212,7 +313,7 @@
       ((:sub ps) &quot;alice&quot; (partial reset! val))
       ((:pub ps) {:name &quot;alice&quot; :age 28})
       ((:pub ps) {:name &quot;bob&quot; :age 31})
-      (is (= @val {:name &quot;alice&quot; :age 28})))</code></pre></div><div><span id="wrap-atomic-updates"></span><h3>4.2 &nbsp;&nbsp; wrap-atomic-updates</h3></div><div><p><code>wrap-atomic-updates</code> is a connection middleware that handles <a href='cloudlog-events.html#atomic-updates'>atomic updates</a>, by treating them as two separate events.</p></div><div><p>For normal events, <code>wrap-atomic-updates</code> does not modify the way <code>:sub</code> works.</p></div><div class="code"><pre><code class="clojure">wrap-atomic-updates-1
+      (is (= @val {:name &quot;alice&quot; :age 28})))</code></pre></div><div><span id="wrap-atomic-updates"></span><h3>5.2 &nbsp;&nbsp; wrap-atomic-updates</h3></div><div><p><code>wrap-atomic-updates</code> is a connection middleware that handles <a href='cloudlog-events.html#atomic-updates'>atomic updates</a>, by treating them as two separate events.</p></div><div><p>For normal events, <code>wrap-atomic-updates</code> does not modify the way <code>:sub</code> works.</p></div><div class="code"><pre><code class="clojure">wrap-atomic-updates-1
     (let [ps (ax/pubsub :name)
           host (-&gt; {:sub (:sub ps)}
                    ax/wrap-atomic-updates)
