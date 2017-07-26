@@ -116,15 +116,37 @@ It depends on `rabbitmq-service` for publishing, and `time` for filling in the `
    (di/startup $)
    (def publish (di/do-with! $ [publish] publish))))
 
+
+"`publish` fills in missing details if they are not provided in the original event."
 (fact
  (publish {:some :event}) => nil
  (provided
   (nippy/freeze {:some :event
-                 :ts 12345
+                 :ts 12345 ;; Returned by `time`.
                  :change 1
                  :writers #{}
                  :readers #{}}) => ..bin..
   (event-routing-key {:some :event}) => ..routing-key..
+  (lb/publish :some-chan facts-exch ..routing-key.. ..bin.. {}) => irrelevant))
+
+"If these fields exist in the event, their original values are retained."
+(fact
+ (publish {:some :event
+           :ts 34567
+           :change -1
+           :writers #{"foo"}
+           :readers #{"bar"}}) => nil
+ (provided
+  (nippy/freeze {:some :event
+                 :ts 34567
+                 :change -1
+                 :writers #{"foo"}
+                 :readers #{"bar"}}) => ..bin..
+  (event-routing-key {:some :event
+                      :ts 34567
+                      :change -1
+                      :writers #{"foo"}
+                      :readers #{"bar"}}) => ..routing-key..
   (lb/publish :some-chan facts-exch ..routing-key.. ..bin.. {}) => irrelevant))
 
 [[:chapter {:title "poll-events: Pull Mode" :tag "poll-events"}]]

@@ -57,10 +57,10 @@
   (-> func class .getDeclaredMethods first .getParameterTypes alength))
 
 (defn publisher [srv info time ev]
-  (let [bin (nippy/freeze (merge ev {:ts (time)
-                                     :change 1
-                                     :writers #{}
-                                     :readers #{}}))
+  (let [bin (nippy/freeze (merge {:ts (time)
+                                  :change 1
+                                  :writers #{}
+                                  :readers #{}} ev))
         rk (event-routing-key ev)]
     (info {:source "rabbit"
            :desc (str "Publishing " ev " on " rk)})
