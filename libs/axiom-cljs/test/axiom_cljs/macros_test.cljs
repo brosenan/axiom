@@ -40,8 +40,9 @@ and return an empty sequence with a meta field `:pending` indicating that the fu
         (is (= res []))
         (is (= (-> res meta :pending) true))
         (is (= @published1 [{:kind :reg
-                              :name "tweetlog/tweeted"
-                              :key "alice"}]))))
+                             :name "tweetlog/tweeted"
+                             :key "alice"
+                             :get-existing true}]))))
 
 "An optional keyword parameter `:store-in` takes an atom and initially `reset!`s is to an empty map."
 (fact defview-4

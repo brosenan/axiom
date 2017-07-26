@@ -71,7 +71,8 @@
                      (do
                        ((:pub ~host) {:kind :reg
                                       :name ~fact-name
-                                      :key ~(-> fact second)})
+                                      :key ~(-> fact second)
+                                      :get-existing true})
                        (ax/merge-meta '() {:pending true})))
                (ax/merge-meta {:add (fn [{:keys [~@(symbols fact)]}]
                                       (let [~'$user (user ~host)]
