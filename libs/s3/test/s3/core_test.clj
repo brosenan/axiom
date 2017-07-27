@@ -72,7 +72,8 @@ An alternative `storage` resource provides just that."
  (let [[store retr] storage]
    (retr "hash-that-does-not-exist") => ..content..
    (provided
-    (http-get "http://some.url/hash-that-does-not-exist") => ..content..)))
+    (http-get "http://some.url/hash-that-does-not-exist") => ..input-stream..
+    (hasher/slurp-bytes ..input-stream..) => ..content..)))
 
 [[:chapter {:title "hasher"}]]
 "The `hasher` resource is a [nippy-multi-hasher](permacode.hasher.html#nippy-multi-hasher) based on the `storage` resource as its storage."

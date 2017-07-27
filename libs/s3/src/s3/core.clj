@@ -40,4 +40,5 @@
                          (with-open [in (io/input-stream local-file)]
                            (hasher/slurp-bytes in))
                          :else
-                         (http-get (str storage-fetch-url "/" key)))))]))
+                         (-> (http-get (str storage-fetch-url "/" key))
+                             hasher/slurp-bytes))))]))
