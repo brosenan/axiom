@@ -80,7 +80,7 @@
                'and 'or 'not
                'map 'filter 'reduce 'reduce-kv 'into 'cat 'mapcat 'eduction 'sequence 'some 'comp
                'map-indexed 'group-by 'distinct
-               'take 'drop 'conj 'take-while 'drop-while 'split-with
+               'take 'drop 'conj 'disj 'take-while 'drop-while 'split-with
                'count 'range 'apply 'concat 'reverse
                'first 'second 'nth 'rest 'next
                'sort 'sort-by 'juxt

@@ -80,36 +80,31 @@ It holds the value `:ok` as long as the WebSocket channel is open, and `:err` on
              (is (= @(:status host) :err))
              (done)))))
 
-"`connection` uses [wrap-atomic-updates](#wrap-atomic-updates) to handle atomic updates."
-(fact connection-3
-  (async done
-         (go
-           (let [the-chan (async/chan 10)
-                 mock-ws-ch (fn [url]
-                              (is (= url "ws://some-url"))
-                              (go
-                                {:ws-channel the-chan}))
-                 host (ax/connection "ws://some-url"
-                                     :ws-ch mock-ws-ch)]
-             (let [test-chan (async/chan 10)]
-               ((:sub host) "foo" #(go (async/>! test-chan %)))
-               (async/>! the-chan {:message {:name "foo" :data ["bar"] :removed ["baz"] :change 1}})
-               (is (= (async/<! test-chan) {:name "foo" :data ["baz"] :change -1}))
-               (is (= (async/<! test-chan) {:name "foo" :data ["bar"] :change 1})))
-             (done)))))
-
 [[:chapter {:title "ws-url"}]]
 "The [connection](#connection) function receives as parameter a WebSocket URL to connect to.
 By default, this will be of the form `ws://<host>/ws`, where `<host>` represents the value of `js/document.location.host`."
 
-"`ws-url` takes a host value and returns a WebSocket URL according to the above pattern."
+"`ws-url` takes a `js/document.location` object and returns a WebSocket URL according to the above pattern."
 (fact ws-url-1
-      (is (= (ax/ws-url "localhost:8080") "ws://localhost:8080/ws")))
+      (is (= (ax/ws-url (js-obj "host" "localhost:8080")) "ws://localhost:8080/ws")))
 
 "In one case, where the host value corresponds to figwheel running on the local host,
 we use `localhost:8080` instead of the original host, to direct WebSockets to Axiom rather than figwheel."
 (fact ws-url-2
-      (is (= (ax/ws-url "localhost:3449") "ws://localhost:8080/ws")))
+      (is (= (ax/ws-url (js-obj "host" "localhost:3449")) "ws://localhost:8080/ws")))
+
+"If a `hash` exists in the location, and if it contains a `?`, 
+everything right of the `?` is appended to the URL as a query string."
+(fact ws-url-3
+      (let [loc (js-obj "host" "localhost:8080"
+                        "hash" "#foo?bar")]
+        (is (= (ax/ws-url loc) "ws://localhost:8080/ws?bar"))))
+
+"If a hash exists, but does not have a query string, no change is made to the URL."
+(fact ws-url-4
+      (let [loc (js-obj "host" "localhost:8080"
+                        "hash" "#foobar")]
+        (is (= (ax/ws-url loc) "ws://localhost:8080/ws"))))
 
 [[:chapter {:title "update-on-dev-ver"}]]
 "When in development, [Figwheel](https://github.com/bhauman/lein-figwheel) can be used to update client-side artifacts as they are being modified, 
@@ -265,7 +260,7 @@ and events coming from the server are received by `:sub`scribers on the client."
                  :data [2 3]
                  :ts 1000
                  :change 1
-                 :readers #{}
+                 :readers #{"foo"}
                  :writers #{}})
    ;; and received from the server
    ((:pub ps) {:kind :fact
@@ -274,7 +269,8 @@ and events coming from the server are received by `:sub`scribers on the client."
                :data [2 3]
                :ts 1000
                :change 1
-               :readers #{}
+               ;; The server may change the readers
+               :readers #{"bar"}
                :writers #{}})
    ;; is received only once by subscribers
    (is (= (count @subscribed) 1))
@@ -285,11 +281,41 @@ and events coming from the server are received by `:sub`scribers on the client."
                :data [2 3]
                :ts 1000
                :change 1
-               :readers #{}
+               :readers #{"bar"}
                :writers #{}})
    (is (= (count @subscribed) 2))))
 
+[[:chapter {:title "wrap-atomic-updates"}]]
+"`wrap-atomic-updates` is a connection middleware that handles [atomic updates](cloudlog-events.html#atomic-updates),
+by treating them as two separate events."
 
+"For normal events, `wrap-atomic-updates` does not modify the way `:sub` works."
+(fact wrap-atomic-updates-1
+      (let [ps (ax/pubsub :name)
+            host (-> {:sub (:sub ps)}
+                     ax/wrap-atomic-updates)
+            published (atom [])]
+        ((:sub host) "foo" (partial swap! published conj))
+        ((:pub ps) {:name "foo" :key "bar" :data [1 2 3] :change 1})
+        (is (= @published [{:name "foo" :key "bar" :data [1 2 3] :change 1}]))))
+
+"However, for atomic updates, the subscribed function is called twice: A first time with a negative `:change` and the `:removed` value in place of `:data`,
+and the a second time with the original value of `:change` and `:removed` removed."
+(fact wrap-atomic-updates-2
+      (let [ps (ax/pubsub :name)
+            host (-> {:sub (:sub ps)}
+                     ax/wrap-atomic-updates)
+            published (atom [])]
+        ((:sub host) "foo" (partial swap! published conj))
+        ((:pub ps) {:name "foo" :key "bar" :data [2 3 4] :removed [1 2 3] :change 1})
+        (is (= @published [{:name "foo" :key "bar" :data [1 2 3] :change -1}
+                           {:name "foo" :key "bar" :data [2 3 4] :change 1}]))))
+
+[[:chapter {:title "default-connection"}]]
+"`default-connection` is a high-level function intended to provide a connection-map using the default settings.
+It uses [ws-url](#ws-url) to create a WebSocket URL based on `js/document.location`,
+it calls [connection](#connection) to create a connection to that URL,
+and uses [wrap-feed-forward](#wrap-feed-forward) and [wrap-atomic-updates](#wrap-atomic-updates) to augment this connection to work well with views and queries."
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "pubsub"}]]
@@ -317,30 +343,3 @@ When the dispatch function returns that dispatch value, the `:sub`scribed functi
         ((:pub ps) {:name "alice" :age 28})
         ((:pub ps) {:name "bob" :age 31})
         (is (= @val {:name "alice" :age 28}))))
-
-
-[[:section {:title "wrap-atomic-updates"}]]
-"`wrap-atomic-updates` is a connection middleware that handles [atomic updates](cloudlog-events.html#atomic-updates),
-by treating them as two separate events."
-
-"For normal events, `wrap-atomic-updates` does not modify the way `:sub` works."
-(fact wrap-atomic-updates-1
-      (let [ps (ax/pubsub :name)
-            host (-> {:sub (:sub ps)}
-                     ax/wrap-atomic-updates)
-            published (atom [])]
-        ((:sub host) "foo" (partial swap! published conj))
-        ((:pub ps) {:name "foo" :key "bar" :data [1 2 3] :change 1})
-        (is (= @published [{:name "foo" :key "bar" :data [1 2 3] :change 1}]))))
-
-"However, for atomic updates, the subscribed function is called twice: A first time with a negative `:change` and the `:removed` value in place of `:data`,
-and the a second time with the original value of `:change` and `:removed` removed."
-(fact wrap-atomic-updates-2
-      (let [ps (ax/pubsub :name)
-            host (-> {:sub (:sub ps)}
-                     ax/wrap-atomic-updates)
-            published (atom [])]
-        ((:sub host) "foo" (partial swap! published conj))
-        ((:pub ps) {:name "foo" :key "bar" :data [2 3 4] :removed [1 2 3] :change 1})
-        (is (= @published [{:name "foo" :key "bar" :data [1 2 3] :change -1}
-                           {:name "foo" :key "bar" :data [2 3 4] :change 1}]))))
