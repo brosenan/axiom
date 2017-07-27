@@ -13,8 +13,9 @@
 [[:chapter {:title "connection"}]]
 "`connection` creates a connection to the host."
 
-"It takes a URL and a an optional keyword parameter `:ws-ch`, 
-which defaults to a [function of the same name in the chord library](https://github.com/jarohen/chord#clojurescript).
+"It takes a URL and a the following optional keyword parameter:
+- `:ws-ch`, which defaults to a [function of the same name in the chord library](https://github.com/jarohen/chord#clojurescript), and
+- `:atom`, which defaults to `clojure.core/atom`, and is used to construct a mutable box to place the user's identity.
 It returns a map containing the following keys:
 1. A `:sub` function for subscribing to events coming from the host.
 2. A `:pub` function for publishing events.

@@ -13,8 +13,9 @@
      :sub (fn [disp f]
             (swap! listeners update disp conj f))}))
 
-(defn connection [url & {:keys [ws-ch]
-                         :or {ws-ch ws-ch}}]
+(defn connection [url & {:keys [ws-ch atom]
+                         :or {ws-ch ws-ch
+                              atom atom}}]
   (let [to-host (async/chan 2)
         ps (pubsub :name)
         identity (atom nil)
@@ -105,10 +106,10 @@
                                    :else
                                    (f ev)))))))))
 
-(defn default-connection []
+(defn default-connection [atom]
   (-> js/document.location
       ws-url
-      connection
+      (connection :atom atom)
       update-on-dev-ver
       wrap-feed-forward
       wrap-atomic-updates))
