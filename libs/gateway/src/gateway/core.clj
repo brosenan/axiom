@@ -22,6 +22,17 @@
         (update m k f)
         :else m))
 
+(defn info-from-param-or-cookie-middleware [key param cookie]
+  (fn [handler]
+    (fn [req]
+      (cond (not (nil? (get-in req [:params param])))
+            (-> (handler (assoc req key (get-in req [:params param])))
+                (assoc-in [:cookies cookie :value] (get-in req [:params param])))
+            (not (nil? (get-in req [:cookies cookie :value])))
+            (handler (assoc req key (get-in req [:cookies cookie :value])))
+            :else
+            (handler req)))))
+
 (defn wrap-websocket-handler [handler]
   (fn [req]
     (if (:websocket? req)
@@ -33,9 +44,7 @@
           (handler (assoc req :ws-channel-pair [chan-from-ws chan-to-ws]))))
       (handler req))))
 
-(defn cookie-version-selector [handler]
-  (fn [req]
-    (handler (assoc req :app-version (get-in req [:cookies "app-version" :value])))))
+(def cookie-version-selector (info-from-param-or-cookie-middleware :app-version "_ver" "app-version"))
 
 (defn uri-partial-event [req]
   (let [{:keys [ns name key]} (:route-params req)]
@@ -77,16 +86,7 @@
 
 (defn module [$]
   (di/provide $ authenticator [use-dummy-authenticator]
-              (fn [handler]
-                (fn[req]
-                  (let [id (or (get-in req [:params "_identity"])
-                               (get-in req [:cookies "user_identity" :value]))]
-                    (cond id
-                          (-> (handler (-> req
-                                           (assoc :identity id)))
-                              (update-in [:cookies] #(assoc % "user_identity" {:value id})))
-                          :else
-                          (handler req))))))
+              (info-from-param-or-cookie-middleware :identity "_identity" "user_identity"))
 
   (di/provide $ version-selector [dummy-version]
               (fn [handler]

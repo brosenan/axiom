@@ -447,10 +447,22 @@ It copies its content to the `:app-version` key in the request."
 (fact
  (let [ver (atom nil)
        handler (fn [req]
-                 (reset! ver (:app-version req)))
+                 (reset! ver (:app-version req))
+                 {:status 200})
        app (cookie-version-selector handler)]
    (app {:cookies {"app-version" {:value "ver123"}}})
    @ver => "ver123"))
+
+"While the name does not so indicate, the `cookie-version-selector` can also take a version value from a parameter `_ver`."
+(fact
+ (let [ver (atom nil)
+       handler (fn [req]
+                 (reset! ver (:app-version req))
+                 {:status 200})
+       app (cookie-version-selector handler)]
+   (app {:params {"_ver" "ver234"}}) => {:status 200
+                                         :cookies {"app-version" {:value "ver234"}}}
+   @ver => "ver234"))
 
 [[:section {:title "Picking a Version based on Domain"}]]
 "But how do we get the initial version value?
@@ -1218,3 +1230,48 @@ and replies to each such event with a similar event, with the `:data` field (a n
 (fact
  (ws/close socket)
  (srv))
+
+[[:section {:title "info-from-param-or-cookie-middleware"}]]
+"The `info-from-param-or-cookie-middleware` function takes the following parameters:
+1. A key to be added to the `req`,
+2. A parameter name (for a URL parameter), and
+3. A name of a cookie.
+It returns a middleware function."
+(fact
+ (let [wrap-foo (info-from-param-or-cookie-middleware :foo "foo-param" "foo-cookie")]
+   (def handler (-> (fn [req]
+                      {:req req
+                       :status 200})
+                    wrap-foo))))
+
+"When none of the cookie nor the param are present in a given request, it passes the request unchanged."
+(fact
+ (handler {:some :req}) => {:req {:some :req}
+                            :status 200}
+ (handler {:cookies {"some" {:value "cookie"}}}) => {:req {:cookies {"some" {:value "cookie"}}}
+                                                     :status 200}
+ (handler {:params {"some" "param"}}) => {:req {:params {"some" "param"}}
+                                          :status 200})
+
+"When the request contains the specified cookie, the cookie's value is returned as the specified key."
+(fact
+ (handler {:cookies {"foo-cookie" {:value "bar"}}}) => {:req {:foo "bar"
+                                                              :cookies {"foo-cookie" {:value "bar"}}}
+                                                        :status 200})
+
+"When the request contains the specified parameter, it is taken for the specified key,
+and a cookie is set with that value."
+(fact
+ (handler {:params {"foo-param" "bar"}}) => {:req {:params {"foo-param" "bar"}
+                                                   :foo "bar"}
+                                             :status 200
+                                             :cookies {"foo-cookie" {:value "bar"}}})
+
+"When both a cookie and a parameter exist in the request (with different values), the *parameter* wins."
+(fact
+ (handler {:cookies {"foo-cookie" {:value "bar"}}
+           :params {"foo-param" "baz"}}) => {:req {:params {"foo-param" "baz"}
+                                                   :cookies {"foo-cookie" {:value "bar"}}
+                                                   :foo "baz"}
+                                             :status 200
+                                             :cookies {"foo-cookie" {:value "baz"}}})
