@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 26 July 2017</h5>
+              <h5>Date: 28 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.2.0</h5></div></div>
           <hr/>
@@ -116,7 +116,8 @@
    (String. bytes) =&gt; &quot;Foo Bar&quot;))</code></pre></div><div><p>If we retreive a key and it does not exist in the local directory, an HTTP GET request is made to a URL made of the <code>storage-fetch-url</code> and the key.</p></div><div class="code"><pre><code class="clojure">(let [[store retr] storage]
  (retr &quot;hash-that-does-not-exist&quot;) =&gt; ..content..
  (provided
-  (http-get &quot;http://some.url/hash-that-does-not-exist&quot;) =&gt; ..content..))</code></pre></div><div><span id="hasher"></span><h2><b>3 &nbsp;&nbsp; hasher</b></h2></div><div><p>The <code>hasher</code> resource is a <a href='permacode.hasher.html#nippy-multi-hasher'>nippy-multi-hasher</a> based on the <code>storage</code> resource as its storage.</p></div><div class="code"><pre><code class="clojure">(let [calls (transient [])
+  (http-get &quot;http://some.url/hash-that-does-not-exist&quot;) =&gt; ..input-stream..
+  (hasher/slurp-bytes ..input-stream..) =&gt; ..content..))</code></pre></div><div><span id="hasher"></span><h2><b>3 &nbsp;&nbsp; hasher</b></h2></div><div><p>The <code>hasher</code> resource is a <a href='permacode.hasher.html#nippy-multi-hasher'>nippy-multi-hasher</a> based on the <code>storage</code> resource as its storage.</p></div><div class="code"><pre><code class="clojure">(let [calls (transient [])
      $ (di/injector {:storage [(fn [k v]
                                  (conj! calls [:store k v]))
                                (fn [k])]})]

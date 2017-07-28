@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 26 July 2017</h5>
+              <h5>Date: 28 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.2.0</h5></div></div>
           <hr/>
@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">axiom-cljs.core</a>
-                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#ws-url"><h4>2 &nbsp; ws-url</h4></a></li><li><a class="chapter" data-scroll="" href="#update-on-dev-ver"><h4>3 &nbsp; update-on-dev-ver</h4></a></li><li><a class="chapter" data-scroll="" href="#wrap-feed-forward"><h4>4 &nbsp; wrap-feed-forward</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#pubsub"><h5><i>5.1 &nbsp; pubsub</i></h5></a><a class="section" data-scroll="" href="#wrap-atomic-updates"><h5><i>5.2 &nbsp; wrap-atomic-updates</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#ws-url"><h4>2 &nbsp; ws-url</h4></a></li><li><a class="chapter" data-scroll="" href="#update-on-dev-ver"><h4>3 &nbsp; update-on-dev-ver</h4></a></li><li><a class="chapter" data-scroll="" href="#wrap-feed-forward"><h4>4 &nbsp; wrap-feed-forward</h4></a></li><li><a class="chapter" data-scroll="" href="#wrap-atomic-updates"><h4>5 &nbsp; wrap-atomic-updates</h4></a></li><li><a class="chapter" data-scroll="" href="#default-connection"><h4>6 &nbsp; default-connection</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>7 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#pubsub"><h5><i>7.1 &nbsp; pubsub</i></h5></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,11 +80,11 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#ws-url"><h4>2 &nbsp; ws-url</h4></a></li><li><a class="chapter" data-scroll="" href="#update-on-dev-ver"><h4>3 &nbsp; update-on-dev-ver</h4></a></li><li><a class="chapter" data-scroll="" href="#wrap-feed-forward"><h4>4 &nbsp; wrap-feed-forward</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>5 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#pubsub"><h5><i>5.1 &nbsp; pubsub</i></h5></a><a class="section" data-scroll="" href="#wrap-atomic-updates"><h5><i>5.2 &nbsp; wrap-atomic-updates</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#connection"><h4>1 &nbsp; connection</h4></a></li><li><a class="chapter" data-scroll="" href="#ws-url"><h4>2 &nbsp; ws-url</h4></a></li><li><a class="chapter" data-scroll="" href="#update-on-dev-ver"><h4>3 &nbsp; update-on-dev-ver</h4></a></li><li><a class="chapter" data-scroll="" href="#wrap-feed-forward"><h4>4 &nbsp; wrap-feed-forward</h4></a></li><li><a class="chapter" data-scroll="" href="#wrap-atomic-updates"><h4>5 &nbsp; wrap-atomic-updates</h4></a></li><li><a class="chapter" data-scroll="" href="#default-connection"><h4>6 &nbsp; default-connection</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>7 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#pubsub"><h5><i>7.1 &nbsp; pubsub</i></h5></a></li>
                 </ul>
               </nav>
           </div>
-          <div class="code"><pre><code class="clojure">(enable-console-print!)</code></pre></div><div><span id="connection"></span><h2><b>1 &nbsp;&nbsp; connection</b></h2></div><div><p><code>connection</code> creates a connection to the host.</p></div><div><p>It takes a URL and a an optional keyword parameter <code>:ws-ch</code>,  which defaults to a <a href='https://github.com/jarohen/chord#clojurescript'>function of the same name in the chord library</a>. It returns a map containing the following keys:</p><ol><li>A <code>:sub</code> function for subscribing to events coming from the host.</li><li>A <code>:pub</code> function for publishing events.</li><li>A <code>:time</code> function which returns the current time in milliseconds.</li><li>A <code>:uuid</code> function which returns some universally-unique identifier.</li><li>An <code>:identity</code> atom, which will contain the user's identity once an <code>:init</code> event is received from the host.</li></ol></div><div class="code"><pre><code class="clojure">connection-1
+          <div class="code"><pre><code class="clojure">(enable-console-print!)</code></pre></div><div><span id="connection"></span><h2><b>1 &nbsp;&nbsp; connection</b></h2></div><div><p><code>connection</code> creates a connection to the host.</p></div><div><p>It takes a URL and a the following optional keyword parameter:</p><ul><li><code>:ws-ch</code>, which defaults to a <a href='https://github.com/jarohen/chord#clojurescript'>function of the same name in the chord library</a>, and</li><li><code>:atom</code>, which defaults to <code>clojure.core/atom</code>, and is used to construct a mutable box to place the user's identity.It returns a map containing the following keys:</li><li>A <code>:sub</code> function for subscribing to events coming from the host.</li><li>A <code>:pub</code> function for publishing events.</li><li>A <code>:time</code> function which returns the current time in milliseconds.</li><li>A <code>:uuid</code> function which returns some universally-unique identifier.</li><li>An <code>:identity</code> atom, which will contain the user's identity once an <code>:init</code> event is received from the host.</li></ul></div><div class="code"><pre><code class="clojure">connection-1
 (async done
        (go
          (let [the-chan (async/chan 10)
@@ -137,24 +137,15 @@
            (async/close! the-chan)
            (async/&lt;! (async/timeout 1))
            (is (= @(:status host) :err))
-           (done))))</code></pre></div><div><p><code>connection</code> uses <a href='#wrap-atomic-updates'>wrap-atomic-updates</a> to handle atomic updates.</p></div><div class="code"><pre><code class="clojure">connection-3
-(async done
-       (go
-         (let [the-chan (async/chan 10)
-               mock-ws-ch (fn [url]
-                            (is (= url &quot;ws://some-url&quot;))
-                            (go
-                              {:ws-channel the-chan}))
-               host (ax/connection &quot;ws://some-url&quot;
-                                   :ws-ch mock-ws-ch)]
-           (let [test-chan (async/chan 10)]
-             ((:sub host) &quot;foo&quot; #(go (async/&gt;! test-chan %)))
-             (async/&gt;! the-chan {:message {:name &quot;foo&quot; :data [&quot;bar&quot;] :removed [&quot;baz&quot;] :change 1}})
-             (is (= (async/&lt;! test-chan) {:name &quot;foo&quot; :data [&quot;baz&quot;] :change -1}))
-             (is (= (async/&lt;! test-chan) {:name &quot;foo&quot; :data [&quot;bar&quot;] :change 1})))
-           (done))))</code></pre></div><div><span id="ws-url"></span><h2><b>2 &nbsp;&nbsp; ws-url</b></h2></div><div><p>The <a href='#connection'>connection</a> function receives as parameter a WebSocket URL to connect to. By default, this will be of the form <code>ws://&lt;host&gt;/ws</code>, where <code>&lt;host&gt;</code> represents the value of <code>js/document.location.host</code>.</p></div><div><p><code>ws-url</code> takes a host value and returns a WebSocket URL according to the above pattern.</p></div><div class="code"><pre><code class="clojure">ws-url-1
-    (is (= (ax/ws-url &quot;localhost:8080&quot;) &quot;ws://localhost:8080/ws&quot;))</code></pre></div><div><p>In one case, where the host value corresponds to figwheel running on the local host, we use <code>localhost:8080</code> instead of the original host, to direct WebSockets to Axiom rather than figwheel.</p></div><div class="code"><pre><code class="clojure">ws-url-2
-    (is (= (ax/ws-url &quot;localhost:3449&quot;) &quot;ws://localhost:8080/ws&quot;))</code></pre></div><div><span id="update-on-dev-ver"></span><h2><b>3 &nbsp;&nbsp; update-on-dev-ver</b></h2></div><div><p>When in development, <a href='https://github.com/bhauman/lein-figwheel'>Figwheel</a> can be used to update client-side artifacts as they are being modified,  without having to reload the page. However, when updating the <a href='cloudlog.html'>Cloudlog</a> logic, we wish to update content of the [views]axiom-cljs.macros.html#defview) and [queries](axiom-cljs.macros.html#defquery), and that cannot be done without refreshing.</p></div><div><p><code>update-on-dev-ver</code> is a middleware function that can be called on a connection map, and returns a valid connection map.</p></div><div class="code"><pre><code class="clojure">update-on-dev-ver-0
+           (done))))</code></pre></div><div><span id="ws-url"></span><h2><b>2 &nbsp;&nbsp; ws-url</b></h2></div><div><p>The <a href='#connection'>connection</a> function receives as parameter a WebSocket URL to connect to. By default, this will be of the form <code>ws://&lt;host&gt;/ws</code>, where <code>&lt;host&gt;</code> represents the value of <code>js/document.location.host</code>.</p></div><div><p><code>ws-url</code> takes a <code>js/document.location</code> object and returns a WebSocket URL according to the above pattern.</p></div><div class="code"><pre><code class="clojure">ws-url-1
+    (is (= (ax/ws-url (js-obj &quot;host&quot; &quot;localhost:8080&quot;)) &quot;ws://localhost:8080/ws&quot;))</code></pre></div><div><p>In one case, where the host value corresponds to figwheel running on the local host, we use <code>localhost:8080</code> instead of the original host, to direct WebSockets to Axiom rather than figwheel.</p></div><div class="code"><pre><code class="clojure">ws-url-2
+    (is (= (ax/ws-url (js-obj &quot;host&quot; &quot;localhost:3449&quot;)) &quot;ws://localhost:8080/ws&quot;))</code></pre></div><div><p>If a <code>hash</code> exists in the location, and if it contains a <code>?</code>,  everything right of the <code>?</code> is appended to the URL as a query string.</p></div><div class="code"><pre><code class="clojure">ws-url-3
+    (let [loc (js-obj &quot;host&quot; &quot;localhost:8080&quot;
+                      &quot;hash&quot; &quot;#foo?bar&quot;)]
+      (is (= (ax/ws-url loc) &quot;ws://localhost:8080/ws?bar&quot;)))</code></pre></div><div><p>If a hash exists, but does not have a query string, no change is made to the URL.</p></div><div class="code"><pre><code class="clojure">ws-url-4
+    (let [loc (js-obj &quot;host&quot; &quot;localhost:8080&quot;
+                      &quot;hash&quot; &quot;#foobar&quot;)]
+      (is (= (ax/ws-url loc) &quot;ws://localhost:8080/ws&quot;)))</code></pre></div><div><span id="update-on-dev-ver"></span><h2><b>3 &nbsp;&nbsp; update-on-dev-ver</b></h2></div><div><p>When in development, <a href='https://github.com/bhauman/lein-figwheel'>Figwheel</a> can be used to update client-side artifacts as they are being modified,  without having to reload the page. However, when updating the <a href='cloudlog.html'>Cloudlog</a> logic, we wish to update content of the [views]axiom-cljs.macros.html#defview) and [queries](axiom-cljs.macros.html#defquery), and that cannot be done without refreshing.</p></div><div><p><code>update-on-dev-ver</code> is a middleware function that can be called on a connection map, and returns a valid connection map.</p></div><div class="code"><pre><code class="clojure">update-on-dev-ver-0
     (let [ps (ax/pubsub :name)
           host (-&gt;  {:sub (:sub ps)
                      :pub (fn [&amp; _])}
@@ -277,7 +268,7 @@
                :data [2 3]
                :ts 1000
                :change 1
-               :readers #{}
+               :readers #{&quot;foo&quot;}
                :writers #{}})
  ;; and received from the server
  ((:pub ps) {:kind :fact
@@ -286,7 +277,8 @@
              :data [2 3]
              :ts 1000
              :change 1
-             :readers #{}
+             ;; The server may change the readers
+             :readers #{&quot;bar&quot;}
              :writers #{}})
  ;; is received only once by subscribers
  (is (= (count @subscribed) 1))
@@ -297,23 +289,9 @@
              :data [2 3]
              :ts 1000
              :change 1
-             :readers #{}
+             :readers #{&quot;bar&quot;}
              :writers #{}})
- (is (= (count @subscribed) 2)))</code></pre></div><div><span id="under-the-hood"></span><h2><b>5 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="pubsub"></span><h3>5.1 &nbsp;&nbsp; pubsub</h3></div><div><p><code>pubsub</code> is a simple synchronous publish/subscribe mechanism. The <code>pubsub</code> function takes a dispatch function as parameter, and returns a map containing two functions: <code>:sub</code> and <code>:pub</code>.</p></div><div class="code"><pre><code class="clojure">pubsub-1
-    (let [ps (ax/pubsub (fn [x]))]
-      (is (fn? (:pub ps)))
-      (is (fn? (:sub ps))))</code></pre></div><div><p>When calling the <code>:pub</code> function with a value, the dispatch function is called with that value.</p></div><div class="code"><pre><code class="clojure">pubsub-2
-    (let [val (atom nil)
-          ps (ax/pubsub (fn [x]
-                          (reset! val x)))]
-      ((:pub ps) [1 2 3])
-      (is (= @val [1 2 3])))</code></pre></div><div><p>The <code>:sub</code> function takes a dispatch value, and a function. When the dispatch function returns that dispatch value, the <code>:sub</code>scribed function is called with the <code>:pub</code>lished value.</p></div><div class="code"><pre><code class="clojure">pubsub-3
-    (let [val (atom nil)
-          ps (ax/pubsub :name)]
-      ((:sub ps) &quot;alice&quot; (partial reset! val))
-      ((:pub ps) {:name &quot;alice&quot; :age 28})
-      ((:pub ps) {:name &quot;bob&quot; :age 31})
-      (is (= @val {:name &quot;alice&quot; :age 28})))</code></pre></div><div><span id="wrap-atomic-updates"></span><h3>5.2 &nbsp;&nbsp; wrap-atomic-updates</h3></div><div><p><code>wrap-atomic-updates</code> is a connection middleware that handles <a href='cloudlog-events.html#atomic-updates'>atomic updates</a>, by treating them as two separate events.</p></div><div><p>For normal events, <code>wrap-atomic-updates</code> does not modify the way <code>:sub</code> works.</p></div><div class="code"><pre><code class="clojure">wrap-atomic-updates-1
+ (is (= (count @subscribed) 2)))</code></pre></div><div><span id="wrap-atomic-updates"></span><h2><b>5 &nbsp;&nbsp; wrap-atomic-updates</b></h2></div><div><p><code>wrap-atomic-updates</code> is a connection middleware that handles <a href='cloudlog-events.html#atomic-updates'>atomic updates</a>, by treating them as two separate events.</p></div><div><p>For normal events, <code>wrap-atomic-updates</code> does not modify the way <code>:sub</code> works.</p></div><div class="code"><pre><code class="clojure">wrap-atomic-updates-1
     (let [ps (ax/pubsub :name)
           host (-&gt; {:sub (:sub ps)}
                    ax/wrap-atomic-updates)
@@ -328,7 +306,21 @@
       ((:sub host) &quot;foo&quot; (partial swap! published conj))
       ((:pub ps) {:name &quot;foo&quot; :key &quot;bar&quot; :data [2 3 4] :removed [1 2 3] :change 1})
       (is (= @published [{:name &quot;foo&quot; :key &quot;bar&quot; :data [1 2 3] :change -1}
-                         {:name &quot;foo&quot; :key &quot;bar&quot; :data [2 3 4] :change 1}])))</code></pre></div>
+                         {:name &quot;foo&quot; :key &quot;bar&quot; :data [2 3 4] :change 1}])))</code></pre></div><div><span id="default-connection"></span><h2><b>6 &nbsp;&nbsp; default-connection</b></h2></div><div><p><code>default-connection</code> is a high-level function intended to provide a connection-map using the default settings. It uses <a href='#ws-url'>ws-url</a> to create a WebSocket URL based on <code>js/document.location</code>, it calls <a href='#connection'>connection</a> to create a connection to that URL, and uses <a href='#wrap-feed-forward'>wrap-feed-forward</a> and <a href='#wrap-atomic-updates'>wrap-atomic-updates</a> to augment this connection to work well with views and queries.</p></div><div><span id="under-the-hood"></span><h2><b>7 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="pubsub"></span><h3>7.1 &nbsp;&nbsp; pubsub</h3></div><div><p><code>pubsub</code> is a simple synchronous publish/subscribe mechanism. The <code>pubsub</code> function takes a dispatch function as parameter, and returns a map containing two functions: <code>:sub</code> and <code>:pub</code>.</p></div><div class="code"><pre><code class="clojure">pubsub-1
+    (let [ps (ax/pubsub (fn [x]))]
+      (is (fn? (:pub ps)))
+      (is (fn? (:sub ps))))</code></pre></div><div><p>When calling the <code>:pub</code> function with a value, the dispatch function is called with that value.</p></div><div class="code"><pre><code class="clojure">pubsub-2
+    (let [val (atom nil)
+          ps (ax/pubsub (fn [x]
+                          (reset! val x)))]
+      ((:pub ps) [1 2 3])
+      (is (= @val [1 2 3])))</code></pre></div><div><p>The <code>:sub</code> function takes a dispatch value, and a function. When the dispatch function returns that dispatch value, the <code>:sub</code>scribed function is called with the <code>:pub</code>lished value.</p></div><div class="code"><pre><code class="clojure">pubsub-3
+    (let [val (atom nil)
+          ps (ax/pubsub :name)]
+      ((:sub ps) &quot;alice&quot; (partial reset! val))
+      ((:pub ps) {:name &quot;alice&quot; :age 28})
+      ((:pub ps) {:name &quot;bob&quot; :age 31})
+      (is (= @val {:name &quot;alice&quot; :age 28})))</code></pre></div>
         </div>
       </div>
     </div>
