@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 28 July 2017</h5>
+              <h5>Date: 29 July 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.2.0</h5></div></div>
           <hr/>
@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">leiningen.axiom</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#deploy"><h4>2 &nbsp; deploy</h4></a></li><li><a class="chapter" data-scroll="" href="#run"><h4>3 &nbsp; run</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#deploy"><h4>2 &nbsp; deploy</h4></a></li><li><a class="chapter" data-scroll="" href="#run"><h4>3 &nbsp; run</h4></a></li><li><a class="chapter" data-scroll="" href="#deps"><h4>4 &nbsp; deps</h4></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,7 +80,7 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#deploy"><h4>2 &nbsp; deploy</h4></a></li><li><a class="chapter" data-scroll="" href="#run"><h4>3 &nbsp; run</h4></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#deploy"><h4>2 &nbsp; deploy</h4></a></li><li><a class="chapter" data-scroll="" href="#run"><h4>3 &nbsp; run</h4></a></li><li><a class="chapter" data-scroll="" href="#deps"><h4>4 &nbsp; deps</h4></a></li>
                 </ul>
               </nav>
           </div>
@@ -108,7 +108,7 @@
  (Thread/sleep 100)
  (let [res @(http/get &quot;http://localhost:33333&quot;)]
    (:status res) =&gt; 200
-   (-&gt; res :body slurp) =&gt; &quot;Hello&quot;))</code></pre></div>
+   (-&gt; res :body slurp) =&gt; &quot;Hello&quot;))</code></pre></div><div><span id="deps"></span><h2><b>4 &nbsp;&nbsp; deps</b></h2></div><div><p><code>.clj</code> files in Axiom apps are requied to be <a href='permacode.validate.html#introduction'>valid permacode source files</a>. This means, among other things, that they <a href='permacode.validate.html#validate-ns'>cannot <code>:require</code> any namespaces</a>, except for a small white-list of pure ones. The way to </p></div>
         </div>
       </div>
     </div>
