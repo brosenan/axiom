@@ -92,16 +92,17 @@ and then aggregating the results."
 "`simulate-with` is useful for testing a single rule. However, sometimes we are interested in testing the integration
 of several rules together.
 `simulate-rules-with` is given a collection of rules (and possibly definitions that are not rules and are ignored),
-and a set of facts.  It extends this set of facts with derived facts that are produced by applying the rules."
+and a collection of facts.  
+It extends this set of facts with derived facts that are produced by applying the rules."
 
 "For example, consider the `trending` rule defined (here)[#derived-facts].
 This rule aggregates the timelines of certain *influencers* into a single *trending* timeline."
 
 (fact
  (let [derived (simulate-rules-with [timeline trending]
-                                    [:test/influencer "alice"]
-                                    [:test/follows "alice" "bob"]
-                                    [:test/tweeted "bob" "hello"])]
+                                    [[:test/influencer "alice"]
+                                     [:test/follows "alice" "bob"]
+                                     [:test/tweeted "bob" "hello"]])]
    (derived [:cloudlog.core_test/trending 1]) => #{["hello"]}))
 
 
@@ -109,17 +110,17 @@ This rule aggregates the timelines of certain *influencers* into a single *trend
 does not matter."
 (fact
  (let [derived (simulate-rules-with [trending timeline]
-                                    [:test/influencer "alice"]
-                                    [:test/follows "alice" "bob"]
-                                    [:test/tweeted "bob" "hello"])]
+                                    [[:test/influencer "alice"]
+                                     [:test/follows "alice" "bob"]
+                                     [:test/tweeted "bob" "hello"]])]
    (derived [:cloudlog.core_test/trending 1]) => #{["hello"]}))
 
 "The second argument (writer group identifier) has the same meaning as in `simulate-with`."
 (fact
  (let [derived (simulate-rules-with [trending timeline]
-                                    [:test/influencer "alice"]
-                                    [:test/follows "alice" "bob"]
-                                    [:test/tweeted "bob" "hello"])]
+                                    [[:test/influencer "alice"]
+                                     [:test/follows "alice" "bob"]
+                                     [:test/tweeted "bob" "hello"]])]
    (-> (derived [:cloudlog.core_test/trending 1])
        first
        meta
@@ -128,8 +129,8 @@ does not matter."
 "The rule collection can include elements that are not rules, which are ignored."
 (fact
  (let [derived (simulate-rules-with [1 "foo" timeline inc]
-                                    [:test/follows "alice" "bob"]
-                                    [:test/tweeted "bob" "hello"])]
+                                    [[:test/follows "alice" "bob"]
+                                     [:test/tweeted "bob" "hello"]])]
    (derived [:cloudlog.core_test/timeline 2]) => #{["alice" "hello"]}))
 
 [[:section {:title "Under the Hood"}]]
@@ -167,26 +168,26 @@ These are returned by the `rule-cont` function."
 [[:chapter {:title "run-query: Applies a Clause on the Facts" :tag "run-query"}]]
 "Eventually, users query the state of the application through [clauses](#defclause).
 `run-query` takes a collection of rule functions, a query, its output arity, 
-a writer identity (intended to be the identity of the application),
 a reader set (the identity of whom is making the query),
-and any number of facts.  It returs a set of tuples returned from this query."
+and a collection of facts. 
+It returs a set of tuples returned from this query."
 (fact
  (let [rules (map (fn [[k v]] @v) (ns-publics 'cloudlog.core_test))]
    (run-query rules
-              (f [:test/multi-keyword-search ["rant" "politics"]]) 1 "cloudlog.core_test" #{}
-              (f [:test/doc 100 "This is a song about love."])
-              (f [:test/doc 200 "This is a rant about politics."])
-              (f [:test/doc 200 "This is a rant about love."])
-              (f [:test/doc 300 "This is a doc about nothing."]))
+              (f [:test/multi-keyword-search ["rant" "politics"]]) 1 #{}
+              [(f [:test/doc 100 "This is a song about love."])
+               (f [:test/doc 200 "This is a rant about politics."])
+               (f [:test/doc 200 "This is a rant about love."])
+               (f [:test/doc 300 "This is a doc about nothing."])])
    => #{["This is a rant about politics."]}))
 
 "The query result will not include elements the user performing the query is not allowed to see."
 (fact
  (let [rules (map (fn [[k v]] @v) (ns-publics 'cloudlog.core_test))]
    (run-query rules
-              (f [:test/multi-keyword-search ["this" "sentence"]]) 1 "cloudlog.core_test" #{:me}
-              (f [:test/doc 100 "This is a sentence"] :readers interset/universe)
-              (f [:test/doc 200 "This is another sentence"] :readers #{:someone-else}))
+              (f [:test/multi-keyword-search ["this" "sentence"]]) 1 #{:me}
+              [(f [:test/doc 100 "This is a sentence"] :readers interset/universe)
+               (f [:test/doc 200 "This is another sentence"] :readers #{:someone-else})])
    => #{["This is a sentence"]}))
 
 "`run-query` aggregates the results coming from different clauses of the same prediate.
@@ -194,5 +195,5 @@ For example, the following holds with the above definitions of `foo-1` and `foo-
 
 (fact
  (run-query [foo-1 foo-2]
-            (f [:test/foo 2]) 1 :test #{})
+            (f [:test/foo 2]) 1 #{} [])
  => #{[3] [4]})

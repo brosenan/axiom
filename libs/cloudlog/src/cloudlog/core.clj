@@ -203,7 +203,7 @@
         ; else
         (recur (rest rules) (merge-with set/union facts {(rule-target-fact (first rules)) (simulate* (first rules) facts)}))))
  
- (defn simulate-rules-with [rules & facts]
+ (defn simulate-rules-with [rules facts]
    (simulate-rules-with* (sort-rules rules) (with* facts)))
 
  (defn f [f & others]
@@ -218,11 +218,11 @@
  (defn preserve-meta [func]
    (fn [t] (with-meta (func t) (meta t))))
  
- (defn run-query [rules query arity writer readers & facts]
+ (defn run-query [rules query arity readers facts]
    (let [query-head (first query)
          query-body (rest query)
          key [(append-to-keyword query-head "?") (inc (count (rest query)))]
-         facts (apply simulate-rules-with rules (vec (concat [(first key) :unique-id] query-body)) facts)]
+         facts (simulate-rules-with rules (cons (vec (concat [(first key) :unique-id] query-body)) facts))]
      (->> [(append-to-keyword query-head "!") (inc arity)]
           facts
           (map (preserve-meta rest))
