@@ -76,7 +76,7 @@
   env)
 
 (def core-white-list
-  (set/union #{'+ '- '* '/ '= '== 'not= 'inc 'dec
+  (set/union #{'+ '- '* '/ '= '== 'not= 'inc 'dec 'quot 'mod 'rem
                'and 'or 'not
                'map 'filter 'reduce 'reduce-kv 'into 'cat 'mapcat 'eduction 'sequence 'some 'comp
                'map-indexed 'group-by 'distinct

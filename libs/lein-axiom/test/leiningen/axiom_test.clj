@@ -123,17 +123,19 @@ in the project's *first source-path*, if they don't already exist."
 "Given a hash-code, a [hasher](permacode.hasher.html#introduction) and a source path,
 `create-perm-file` creates a `.clj` source file with the underlying content.
 The file will be placed under the `perm` directory because the namespace is named `perm.*` (where `*` is the given hash-code).
+Its `ns` header will be updated to include the `perm.*` name.
 It returns whether a new file needed to be created."
 (fact
  (let [hasher [(fn [code content]
                  (throw (Exception. "This should not be called")))
                (fn [hashcode]
-                 '[(ns perm.FOO)
+                 '[(ns original.name
+                     (:require [something]))
                    (foo 123)
                    (bar 234)])]
        source-dir (io/file "/tmp" (str "testsrc-" (rand-int 100000)))]
    (create-perm-file "FOO" hasher source-dir) => true
    (-> (io/file source-dir "perm") .exists) => true
-   (-> (io/file source-dir "perm" "FOO.clj") slurp) => "(ns perm.FOO)(foo 123)(bar 234)"
+   (-> (io/file source-dir "perm" "FOO.clj") slurp) => "(ns perm.FOO (:require [something]))(foo 123)(bar 234)"
    (create-perm-file "FOO" hasher source-dir) => false ;; This file already exists
    ))

@@ -3,6 +3,7 @@
             [storm.core :refer :all]
             [cloudlog.core :as clg]
             [permacode.core :as perm]
+            [permacode.validate :as permval]
             [org.apache.storm
              [clojure :as s]
              [config :as scfg]
@@ -360,7 +361,8 @@ It defines `rule-topology` based on these resources:
  (let [config {:storm-cluster {:run (fn [name top]
                                       (swap! running-topologies assoc name top))
                                :kill (fn [name]
-                                       (swap! running-topologies dissoc name))}}
+                                       (swap! running-topologies dissoc name))}
+               :hasher :some-hasher}
        $ (di/injector config)]
    (def config config)
    (module $ config)
@@ -389,18 +391,25 @@ It defines `rule-topology` based on these resources:
 and then assigns it to the `storm-cluster`.
 The topology name is converted to avoid names not allowed by Storm."
 (fact
- (rule-topology {:kind :fact
-                 :name "axiom/rule-ready"
-                 :key 0
-                 :data ['perm.ABCD1234/timeline]
-                 :ts 1000
-                 :change 1
-                 :writers #{}
-                 :readers #{}}) => nil
+ (with-redefs-fn {#'topology (fn [rule cfg]
+                               (when-not (= rule 'perm.ABCD1234/timeline)
+                                 (throw (Exception. "Bad rule value given")))
+                               (when-not (= cfg config)
+                                 (throw (Exception. "Bad config value")))
+                               (when-not (= permval/*hasher* :some-hasher)
+                                 (throw (Exception. "Hasher not bound when calling topology")))
+                               :the-topology)}
+   #(rule-topology {:kind :fact
+                    :name "axiom/rule-ready"
+                    :key 0
+                    :data ['perm.ABCD1234/timeline]
+                    :ts 1000
+                    :change 1
+                    :writers #{}
+                    :readers #{}})) => nil
  (provided
-  (topology 'perm.ABCD1234/timeline config) => ..topology..
   (convert-topology-name "perm.ABCD1234/timeline") => "some-name")
- (@running-topologies "some-name") => ..topology..)
+ (@running-topologies "some-name") => :the-topology)
 
 "When an `axiom/rule-ready` event with a *negative* `:change` arrives,
 we kill the associated topology."

@@ -1,5 +1,6 @@
 (ns storm.core
   (:require [permacode.core :as perm]
+            [permacode.validate :as permval]
             [cloudlog.core :as clg]
             [cloudlog-events.core :as ev]
             [org.apache.storm
@@ -163,12 +164,13 @@
       (str/replace #"[\\/:]" "_")))
 
 (defn module [$ config]
-  (di/provide $ rule-topology [storm-cluster]
+  (di/provide $ rule-topology [storm-cluster hasher]
               (fn [ev]
                 (let [rule (-> ev :data first)
                       topo-name (convert-topology-name (str rule))]
                   (when (> (:change ev) 0)
-                    (let [topology (topology rule config)]
+                    (let [topology (binding [permval/*hasher* hasher]
+                                     (topology rule config))]
                       ((:run storm-cluster) topo-name topology)
                       nil))
                   (when (< (:change ev) 0)

@@ -55,8 +55,10 @@
             (println (str file))
             (-> permdir .mkdirs)
             (with-open [file (io/writer file)]
-              (doseq [expr content]
-                (.write file (pr-str expr))))
+              (let [[[_ns name & clauses] & exprs] content]
+                (.write file (pr-str (concat ['ns (symbol (str "perm." hashcode))] clauses)))
+                (doseq [expr exprs]
+                  (.write file (pr-str expr)))))
             true))))
 
 (defn deps
