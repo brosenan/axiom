@@ -146,16 +146,17 @@
                                 (:require [clojure.string :as str]
                                           [perm.FOO :as foo])
                                 (:require [perm.BAR]
-                                          [perm.BAZ :as baz])))</code></pre></div><div><span id="create-perm-file"></span><h3>5.3 &nbsp;&nbsp; create-perm-file</h3></div><div><p>Given a hash-code, a <a href='permacode.hasher.html#introduction'>hasher</a> and a source path, <code>create-perm-file</code> creates a <code>.clj</code> source file with the underlying content. The file will be placed under the <code>perm</code> directory because the namespace is named <code>perm.&#42;</code> (where <code>&#42;</code> is the given hash-code). It returns whether a new file needed to be created.</p></div><div class="code"><pre><code class="clojure">(let [hasher [(fn [code content]
+                                          [perm.BAZ :as baz])))</code></pre></div><div><span id="create-perm-file"></span><h3>5.3 &nbsp;&nbsp; create-perm-file</h3></div><div><p>Given a hash-code, a <a href='permacode.hasher.html#introduction'>hasher</a> and a source path, <code>create-perm-file</code> creates a <code>.clj</code> source file with the underlying content. The file will be placed under the <code>perm</code> directory because the namespace is named <code>perm.&#42;</code> (where <code>&#42;</code> is the given hash-code). Its <code>ns</code> header will be updated to include the <code>perm.&#42;</code> name. It returns whether a new file needed to be created.</p></div><div class="code"><pre><code class="clojure">(let [hasher [(fn [code content]
                (throw (Exception. &quot;This should not be called&quot;)))
              (fn [hashcode]
-               '[(ns perm.FOO)
+               '[(ns original.name
+                   (:require [something]))
                  (foo 123)
                  (bar 234)])]
      source-dir (io/file &quot;/tmp&quot; (str &quot;testsrc-&quot; (rand-int 100000)))]
  (create-perm-file &quot;FOO&quot; hasher source-dir) =&gt; true
  (-&gt; (io/file source-dir &quot;perm&quot;) .exists) =&gt; true
- (-&gt; (io/file source-dir &quot;perm&quot; &quot;FOO.clj&quot;) slurp) =&gt; &quot;(ns perm.FOO)(foo 123)(bar 234)&quot;
+ (-&gt; (io/file source-dir &quot;perm&quot; &quot;FOO.clj&quot;) slurp) =&gt; &quot;(ns perm.FOO (:require [something]))(foo 123)(bar 234)&quot;
  (create-perm-file &quot;FOO&quot; hasher source-dir) =&gt; false ;; This file already exists
  )</code></pre></div>
         </div>

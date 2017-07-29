@@ -189,24 +189,24 @@
    [:test/tweeted 2] #{[&quot;bob&quot; &quot;hello&quot;]}}</code></pre></div><div><p><code>with&#42;</code> moves metadata placed on facts over to the tuples the fact is converted to.</p></div><div class="code"><pre><code class="clojure">(let [with-map (with* [(f [:test/baz 1 2 3] :foo &quot;bar&quot;)])]
  (-&gt; (with-map [:test/baz 3]) first meta :foo) =&gt; &quot;bar&quot;)</code></pre></div><div><span id="simulate"></span><h3><i>4.2.2 &nbsp;&nbsp; simulate*</i></h3></div><div><p>This map is then given as a parameter to <code>simulate&#42;</code>, along with the rule function to be simulated.</p></div><div><p>A simple rule is simulated by applying tuples from the set corresponding to the rule's source-fact, and then aggregating the results.</p></div><div class="code"><pre><code class="clojure">(simulate* foo-yx {[:test/foo 2] #{[1 2] [3 4]}}) =&gt; #{[2 1] [4 3]}</code></pre></div><div><p>In rules with joins, the continuations are followed.</p></div><div class="code"><pre><code class="clojure">(simulate* timeline (with* [[:test/follows &quot;alice&quot; &quot;bob&quot;]
                            [:test/tweeted &quot;bob&quot; &quot;hello&quot;]]))
- =&gt; #{[&quot;alice&quot; &quot;hello&quot;]}</code></pre></div><div><span id="simulate-rules-with"></span><h2><b>5 &nbsp;&nbsp; simulate-rules-with: Perform a simulation Based on a Complete Namespace</b></h2></div><div><p><code>simulate-with</code> is useful for testing a single rule. However, sometimes we are interested in testing the integration of several rules together. <code>simulate-rules-with</code> is given a collection of rules (and possibly definitions that are not rules and are ignored), and a set of facts.  It extends this set of facts with derived facts that are produced by applying the rules.</p></div><div><p>For example, consider the <code>trending</code> rule defined (here)[#derived-facts]. This rule aggregates the timelines of certain <em>influencers</em> into a single <em>trending</em> timeline.</p></div><div class="code"><pre><code class="clojure">(let [derived (simulate-rules-with [timeline trending]
-                                  [:test/influencer &quot;alice&quot;]
-                                  [:test/follows &quot;alice&quot; &quot;bob&quot;]
-                                  [:test/tweeted &quot;bob&quot; &quot;hello&quot;])]
+ =&gt; #{[&quot;alice&quot; &quot;hello&quot;]}</code></pre></div><div><span id="simulate-rules-with"></span><h2><b>5 &nbsp;&nbsp; simulate-rules-with: Perform a simulation Based on a Complete Namespace</b></h2></div><div><p><code>simulate-with</code> is useful for testing a single rule. However, sometimes we are interested in testing the integration of several rules together. <code>simulate-rules-with</code> is given a collection of rules (and possibly definitions that are not rules and are ignored), and a collection of facts.<br /> It extends this set of facts with derived facts that are produced by applying the rules.</p></div><div><p>For example, consider the <code>trending</code> rule defined (here)[#derived-facts]. This rule aggregates the timelines of certain <em>influencers</em> into a single <em>trending</em> timeline.</p></div><div class="code"><pre><code class="clojure">(let [derived (simulate-rules-with [timeline trending]
+                                  [[:test/influencer &quot;alice&quot;]
+                                   [:test/follows &quot;alice&quot; &quot;bob&quot;]
+                                   [:test/tweeted &quot;bob&quot; &quot;hello&quot;]])]
  (derived [:cloudlog.core_test/trending 1]) =&gt; #{[&quot;hello&quot;]})</code></pre></div><div><p>We topologically-sort the rules so the order in which they appear in the call to <code>simulate-rules-with</code> does not matter.</p></div><div class="code"><pre><code class="clojure">(let [derived (simulate-rules-with [trending timeline]
-                                  [:test/influencer &quot;alice&quot;]
-                                  [:test/follows &quot;alice&quot; &quot;bob&quot;]
-                                  [:test/tweeted &quot;bob&quot; &quot;hello&quot;])]
+                                  [[:test/influencer &quot;alice&quot;]
+                                   [:test/follows &quot;alice&quot; &quot;bob&quot;]
+                                   [:test/tweeted &quot;bob&quot; &quot;hello&quot;]])]
  (derived [:cloudlog.core_test/trending 1]) =&gt; #{[&quot;hello&quot;]})</code></pre></div><div><p>The second argument (writer group identifier) has the same meaning as in <code>simulate-with</code>.</p></div><div class="code"><pre><code class="clojure">(let [derived (simulate-rules-with [trending timeline]
-                                  [:test/influencer &quot;alice&quot;]
-                                  [:test/follows &quot;alice&quot; &quot;bob&quot;]
-                                  [:test/tweeted &quot;bob&quot; &quot;hello&quot;])]
+                                  [[:test/influencer &quot;alice&quot;]
+                                   [:test/follows &quot;alice&quot; &quot;bob&quot;]
+                                   [:test/tweeted &quot;bob&quot; &quot;hello&quot;]])]
  (-&gt; (derived [:cloudlog.core_test/trending 1])
      first
      meta
      :writers) =&gt; #{&quot;cloudlog.core_test&quot;})</code></pre></div><div><p>The rule collection can include elements that are not rules, which are ignored.</p></div><div class="code"><pre><code class="clojure">(let [derived (simulate-rules-with [1 &quot;foo&quot; timeline inc]
-                                  [:test/follows &quot;alice&quot; &quot;bob&quot;]
-                                  [:test/tweeted &quot;bob&quot; &quot;hello&quot;])]
+                                  [[:test/follows &quot;alice&quot; &quot;bob&quot;]
+                                   [:test/tweeted &quot;bob&quot; &quot;hello&quot;]])]
  (derived [:cloudlog.core_test/timeline 2]) =&gt; #{[&quot;alice&quot; &quot;hello&quot;]})</code></pre></div><div><span id="under-the-hood-0"></span><h3>5.1 &nbsp;&nbsp; Under the Hood</h3></div><div><p>The key to what <code>simulate-rules-with</code> is doing is sorting the given rule functions topologically using <a href='cloudlog.graph.html#toposort'>graph/toposort</a>. This is done in the <code>sort-rules</code> function, which takes a collection of rules and sorts them by dependencies.</p></div><div class="code"><pre><code class="clojure">(sort-rules [trending timeline]) =&gt; [timeline trending]</code></pre></div><div><p>Sorting should be arbitrary in the case where two rules (or clauses) have the same target fact, as in the case of clauses sharing a predicate, as follows:</p></div><div class="code"><pre><code class="clojure">(defclause foo-1
   [:test/foo a -&gt; b]
   (let [b (inc a)]))
@@ -214,20 +214,20 @@
 (defclause foo-2
   [:test/foo a -&gt; b]
   (let [b (* a 2)]))</code></pre></div><div class="code"><pre><code class="clojure">(set (sort-rules [foo-1 foo-2])) =&gt; #{foo-1 foo-2}</code></pre></div><div><p>Many of the operations here are based on iterating on the continuations of a rule function. These are returned by the <code>rule-cont</code> function.</p></div><div><p>Typically, we are not going to use these functions directly, but rather <code>map</code> them to their meta properties:</p></div><div class="code"><pre><code class="clojure">(let [conts (rule-cont timeline)]
- (map #(-&gt; % meta :source-fact) conts) =&gt; [[:test/follows 2] [:test/tweeted 2]])</code></pre></div><div><p>The function <code>rule-target-fact</code> returns the target fact of a rule.</p></div><div class="code"><pre><code class="clojure">(rule-target-fact timeline) =&gt; [:cloudlog.core_test/timeline 2]</code></pre></div><div><span id="run-query"></span><h2><b>6 &nbsp;&nbsp; run-query: Applies a Clause on the Facts</b></h2></div><div><p>Eventually, users query the state of the application through <a href='#defclause'>clauses</a>. <code>run-query</code> takes a collection of rule functions, a query, its output arity,  a writer identity (intended to be the identity of the application), a reader set (the identity of whom is making the query), and any number of facts.  It returs a set of tuples returned from this query.</p></div><div class="code"><pre><code class="clojure">(let [rules (map (fn [[k v]] @v) (ns-publics 'cloudlog.core_test))]
+ (map #(-&gt; % meta :source-fact) conts) =&gt; [[:test/follows 2] [:test/tweeted 2]])</code></pre></div><div><p>The function <code>rule-target-fact</code> returns the target fact of a rule.</p></div><div class="code"><pre><code class="clojure">(rule-target-fact timeline) =&gt; [:cloudlog.core_test/timeline 2]</code></pre></div><div><span id="run-query"></span><h2><b>6 &nbsp;&nbsp; run-query: Applies a Clause on the Facts</b></h2></div><div><p>Eventually, users query the state of the application through <a href='#defclause'>clauses</a>. <code>run-query</code> takes a collection of rule functions, a query, its output arity,  a reader set (the identity of whom is making the query), and a collection of facts.  It returs a set of tuples returned from this query.</p></div><div class="code"><pre><code class="clojure">(let [rules (map (fn [[k v]] @v) (ns-publics 'cloudlog.core_test))]
  (run-query rules
-            (f [:test/multi-keyword-search [&quot;rant&quot; &quot;politics&quot;]]) 1 &quot;cloudlog.core_test&quot; #{}
-            (f [:test/doc 100 &quot;This is a song about love.&quot;])
-            (f [:test/doc 200 &quot;This is a rant about politics.&quot;])
-            (f [:test/doc 200 &quot;This is a rant about love.&quot;])
-            (f [:test/doc 300 &quot;This is a doc about nothing.&quot;]))
+            (f [:test/multi-keyword-search [&quot;rant&quot; &quot;politics&quot;]]) 1 #{}
+            [(f [:test/doc 100 &quot;This is a song about love.&quot;])
+             (f [:test/doc 200 &quot;This is a rant about politics.&quot;])
+             (f [:test/doc 200 &quot;This is a rant about love.&quot;])
+             (f [:test/doc 300 &quot;This is a doc about nothing.&quot;])])
  =&gt; #{[&quot;This is a rant about politics.&quot;]})</code></pre></div><div><p>The query result will not include elements the user performing the query is not allowed to see.</p></div><div class="code"><pre><code class="clojure">(let [rules (map (fn [[k v]] @v) (ns-publics 'cloudlog.core_test))]
  (run-query rules
-            (f [:test/multi-keyword-search [&quot;this&quot; &quot;sentence&quot;]]) 1 &quot;cloudlog.core_test&quot; #{:me}
-            (f [:test/doc 100 &quot;This is a sentence&quot;] :readers interset/universe)
-            (f [:test/doc 200 &quot;This is another sentence&quot;] :readers #{:someone-else}))
+            (f [:test/multi-keyword-search [&quot;this&quot; &quot;sentence&quot;]]) 1 #{:me}
+            [(f [:test/doc 100 &quot;This is a sentence&quot;] :readers interset/universe)
+             (f [:test/doc 200 &quot;This is another sentence&quot;] :readers #{:someone-else})])
  =&gt; #{[&quot;This is a sentence&quot;]})</code></pre></div><div><p><code>run-query</code> aggregates the results coming from different clauses of the same prediate. For example, the following holds with the above definitions of <code>foo-1</code> and <code>foo-2</code>:</p></div><div class="code"><pre><code class="clojure">(run-query [foo-1 foo-2]
-          (f [:test/foo 2]) 1 :test #{})
+          (f [:test/foo 2]) 1 #{} [])
  =&gt; #{[3] [4]}</code></pre></div><div><span id="fact-table-get-a-fully-qualified-name-for-a-fact"></span><h2><b>7 &nbsp;&nbsp; fact-table: Get a Fully-Qualified Name for a Fact</b></h2></div><div><p>In an implementation of a Cloudlog engine it is necessary, given a <code>:source-fact</code> meta of a rule, to know which real-world resources (tables, queues etc) are associated with this fact.  Doing so consistently is important to get different references to the same fact to work against the same resources.</p><p>The function <code>fact-table</code> takes a <code>&#91;name arity&#93;</code> pair that is given as the <code>:source-fact</code> of a rule (or a continuation) and returns a string representing this fact.</p><p>For raw facts (represented by Clojure keywords, e.g., <code>:test/follows</code>), the returned string is simply the  fully qualified name of the keyword:</p></div><div class="code"><pre><code class="clojure">(-&gt; timeline meta :source-fact fact-table) =&gt; &quot;test/follows&quot;</code></pre></div><div><p>For a derived fact, represented as a name of a rule, the returned string is the  fully qualified name of the rule.</p></div><div class="code"><pre><code class="clojure">(-&gt; trending meta :continuation
    meta :source-fact fact-table) =&gt; &quot;cloudlog.core_test/timeline&quot;</code></pre></div>
         </div>

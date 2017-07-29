@@ -305,7 +305,8 @@
  (let [config {:storm-cluster {:run (fn [name top]
                                     (swap! running-topologies assoc name top))
                              :kill (fn [name]
-                                     (swap! running-topologies dissoc name))}}
+                                     (swap! running-topologies dissoc name))}
+             :hasher :some-hasher}
      $ (di/injector config)]
  (def config config)
  (module $ config)
@@ -323,18 +324,25 @@
  (di/startup $)
  ((persistent! decl) &quot;storm.core/rule-topology&quot;) =&gt; {:kind :fact
                                                      :name &quot;axiom/rule-ready&quot;}
- ((persistent! assign) &quot;storm.core/rule-topology&quot;) =&gt; :the-rule-topology-func)</code></pre></div><div><p>When an <code>axiom/rule-ready</code> event with a positive <code>:change</code> (introduction of a rule) arrives,  <code>rule-topology</code> calls <a href='#topology'>topology</a> to create a topology for the rule,  and then assigns it to the <code>storm-cluster</code>. The topology name is converted to avoid names not allowed by Storm.</p></div><div class="code"><pre><code class="clojure">(rule-topology {:kind :fact
-               :name &quot;axiom/rule-ready&quot;
-               :key 0
-               :data ['perm.ABCD1234/timeline]
-               :ts 1000
-               :change 1
-               :writers #{}
-               :readers #{}}) =&gt; nil
+ ((persistent! assign) &quot;storm.core/rule-topology&quot;) =&gt; :the-rule-topology-func)</code></pre></div><div><p>When an <code>axiom/rule-ready</code> event with a positive <code>:change</code> (introduction of a rule) arrives,  <code>rule-topology</code> calls <a href='#topology'>topology</a> to create a topology for the rule,  and then assigns it to the <code>storm-cluster</code>. The topology name is converted to avoid names not allowed by Storm.</p></div><div class="code"><pre><code class="clojure">(with-redefs-fn {#'topology (fn [rule cfg]
+                             (when-not (= rule 'perm.ABCD1234/timeline)
+                               (throw (Exception. &quot;Bad rule value given&quot;)))
+                             (when-not (= cfg config)
+                               (throw (Exception. &quot;Bad config value&quot;)))
+                             (when-not (= permval/*hasher* :some-hasher)
+                               (throw (Exception. &quot;Hasher not bound when calling topology&quot;)))
+                             :the-topology)}
+ #(rule-topology {:kind :fact
+                  :name &quot;axiom/rule-ready&quot;
+                  :key 0
+                  :data ['perm.ABCD1234/timeline]
+                  :ts 1000
+                  :change 1
+                  :writers #{}
+                  :readers #{}})) =&gt; nil
  (provided
-(topology 'perm.ABCD1234/timeline config) =&gt; ..topology..
 (convert-topology-name &quot;perm.ABCD1234/timeline&quot;) =&gt; &quot;some-name&quot;)
- (@running-topologies &quot;some-name&quot;) =&gt; ..topology..</code></pre></div><div><p>When an <code>axiom/rule-ready</code> event with a <em>negative</em> <code>:change</code> arrives, we kill the associated topology.</p></div><div class="code"><pre><code class="clojure">(rule-topology {:kind :fact
+ (@running-topologies &quot;some-name&quot;) =&gt; :the-topology</code></pre></div><div><p>When an <code>axiom/rule-ready</code> event with a <em>negative</em> <code>:change</code> arrives, we kill the associated topology.</p></div><div class="code"><pre><code class="clojure">(rule-topology {:kind :fact
                :name &quot;axiom/rule-ready&quot;
                :key 0
                :data ['perm.ABCD1234/timeline]
