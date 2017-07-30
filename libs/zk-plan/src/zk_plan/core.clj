@@ -176,6 +176,7 @@
               (let [alive (atom true)
                     {:keys [worker]} zk-plan
                     threads (map (fn [_] (Thread. (fn []
+                                                    @(:started? @$)
                                                     (loop []
                                                       (when @alive
                                                         (try

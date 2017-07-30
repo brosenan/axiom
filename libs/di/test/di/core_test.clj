@@ -33,14 +33,17 @@ By convention, injectors are bound to the variable `$`.
 The injector is an atom holding a map.
 It has the following fields:
 1. `:resources`: A map containing the currently initialized resources.
-1. `:rule`: An atom holding a sequence of rules contributed by modules.
-2. `:shutdown`: An atom holding a sequence of shutdown operations to be executed."
+2. `:rule`: An atom holding a sequence of rules contributed by modules.
+3. `:shutdown`: An atom holding a sequence of shutdown operations to be executed.
+4. `:started?`: A promise that gets delivered once injector is started."
 (fact
  (let [$ (injector)]
    @$ => map?
    (:resources @$) => map?
    (:rules @$) => sequential?
-   (:shutdown @$) => []))
+   (:shutdown @$) => []
+   (:started? @$) =not=> nil?
+   (:started? @$) =not=> realized?))
 
 "An optional argument provides a map with initial resource values."
 (fact
@@ -136,6 +139,13 @@ a resource name, and therefore does not set the `:resource` meta field in the fu
             (throw (Exception. "This should not be called")))
    (startup $)
    (-> @$ :resources :to-skip) => 8))
+
+"After calling `startup`, the injector's `:started?` field becomes realized."
+(fact
+ (let [$ (injector)]
+   (:started? @$) =not=> realized?
+   (startup $)
+   (:started? @$) => realized?))
 
 [[:chapter {:title "shutdown"}]]
 "When [provide](#provide)ing a resource, it is possible to also provide a `:shutdown` function.

@@ -51,7 +51,8 @@
    (atom
     {:resources initial
      :rules default-rules
-     :shutdown []}))
+     :shutdown []
+     :started? (promise)}))
   ([]
    (injector {})))
 
@@ -116,6 +117,7 @@
                         (recur (rest funcs) (assoc resources res val) shutdown-seq)))
                     :else
                     (recur (rest funcs) resources shutdown-seq)))))
+    (deliver (:started? @$) nil)
     nil))
 
 (defn shutdown [$]
