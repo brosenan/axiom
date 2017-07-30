@@ -305,6 +305,7 @@ and then we need to initiate a topology by publishing an `axiom/rule-ready` even
 
 "`clause-migrator` is a microservice that registers to `axiom/perms-exist` events.
 It depends on `publish` (e.g., [this](rabbit-microservices.html#publish) for publishing the `axiom/perms-exist` events,
+`hasher`, to retrieve the clause's definition,
 and on `declare-service` and `assign-service` for registering itself.
 `declare-service` is also used for declaring the input queues for the clause's topology."
 (fact
@@ -314,6 +315,7 @@ and on `declare-service` and `assign-service` for registering itself.
        assign (transient {})
        $ (di/injector
           {:publish (partial swap! published conj)
+           :hasher [:hash :unhash]
            :declare-service (fn [key part]
                               (swap! declared-queues assoc key part))
            :assign-service (fn [key func]
@@ -326,15 +328,22 @@ and on `declare-service` and `assign-service` for registering itself.
 
 "In response to an `axiom/perms-exist` event with a positive `:change` value, `clause-migrator` look up all clauses in the new perms."
 (fact
- (clause-migrator {:kind :fact
-                   :name "axiom/perms-exist"
-                   :key "ABCD1234"
-                   :data [#{'perm.ABC1234 'perm.DEF5678}]
-                   :writers #{:some-writers}
-                   :change 1}) => nil
- (provided
-  (extract-version-clauses 'perm.ABC1234) => [multi-keyword-search]
-  (extract-version-clauses 'perm.DEF5678) => []))
+ (with-redefs-fn {#'extract-version-clauses
+                  (fn [perm]
+                    (when-not (= permval/*hasher* [:hash :unhash])
+                      (throw (Exception. "Hasher not set in call to extract-version-clauses")))
+                    (cond (= perm 'perm.ABC1234)
+                          [multi-keyword-search]
+                          (= perm 'perm.DEF5678)
+                          []
+                          :else
+                          (throw (Exception. "Unexpected perm value"))))}
+   #(clause-migrator {:kind :fact
+                      :name "axiom/perms-exist"
+                      :key "ABCD1234"
+                      :data [#{'perm.ABC1234 'perm.DEF5678}]
+                      :writers #{:some-writers}
+                      :change 1})) => nil)
 
 "Then it declares a queue associated with the facts that feed each link of each clause:"
 (fact

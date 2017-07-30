@@ -18,7 +18,7 @@
                  (deploy-dir ver "." publish)
                  (println (str "Deployed a new version: " ver)))
     (di/shutdown $)
-    (println "Add &_ver=" ver " to your URL")))
+    (println (str "Add &_ver=" ver) " to your URL")))
 
 (defn run
   "Run an Axiom instance"

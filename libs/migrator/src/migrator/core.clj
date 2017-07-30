@@ -232,13 +232,14 @@
                                   (sh "rm" "-rf" dir))
                                 nil)))
 
-  (di/do-with $ [publish declare-service assign-service]
+  (di/do-with $ [publish declare-service assign-service hasher]
               (declare-service "migrator.core/clause-migrator" {:kind :fact
                                                                 :name "axiom/perms-exist"})
               (assign-service "migrator.core/clause-migrator"
                               (fn [{:keys [data]}]
                                 (let [[perms] data
-                                      clauses (mapcat extract-version-clauses perms)]
+                                      clauses (binding [permval/*hasher* hasher]
+                                                (mapcat extract-version-clauses perms))]
                                   (doseq [clause clauses]
                                     (loop [link clause
                                            n 0]
