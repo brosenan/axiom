@@ -352,7 +352,9 @@ and on `declare-service` and `assign-service` for registering itself.
    (when link
      (@declared-queues (str "fact-for-rule/migrator.core-test/multi-keyword-search!" n))
      => {:kind :fact
-         :name (-> link meta :source-fact first str)}
+         :name (["test/multi-keyword-search?"
+                 "migrator.core-test/index-docs"
+                 "test/doc"] n)}
      (recur (-> link meta :continuation) (inc n)))))
 
 "Finally, it publishes an `axiom/rule-ready` event for each clause."

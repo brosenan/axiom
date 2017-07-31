@@ -62,7 +62,7 @@ as monoliths."
 2. Conditions, according to *values* that appear in the map."
 
 "The function `conds-and-bindings` takes the entries of the map produced by 
-traverse and a predicate that determines if a sub-tree is a value or a variable
+`traverse` and a predicate that determines if a sub-tree is a value or a variable
 and returns a list of conditions and a list of bindings."
 
 (fact

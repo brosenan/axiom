@@ -8,7 +8,8 @@
             [storm.core :as storm]
             [zk-plan.core]
             [clojure.core.async :as async]
-            [clojure.edn :as edn])
+            [clojure.edn :as edn]
+            [clojure.java.io :as io])
   (:gen-class))
 
 (defn injector [config]
@@ -18,7 +19,13 @@
                  'rabbit-microservices.core/module
                  's3.core/module
                  'zk-plan.core/module]
-        config (assoc config :modules modules)
+        config (-> config
+                   (assoc :modules modules)
+                   ;; Log to stdout + file
+                   (assoc :println (fn [& args]
+                                     (apply println args)
+                                     (with-open [w (io/writer "axiom.log" :append true)]
+                                       (.write w (str (apply str args) "\n"))))))
         $ (di/injector config)]
     (doseq [module modules]
       ((eval module) $))

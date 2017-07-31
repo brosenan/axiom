@@ -45,20 +45,27 @@
                                                                        readers interset/universe
                                                                        rule-writers #{(-> rulefunc meta :ns str)}}}]
   (let [single-event-emitter (fn [event]
-                               (for [data (rulefunc (with-meta (vec (cons (:key event) (:data event)))
-                                                      {:writers (:writers event)
-                                                       :readers (:readers event)}))]
-                                 (merge
-                                  (merge event (if (-> rulefunc meta :target-fact)
-                                                 {:name (-> rulefunc meta :target-fact cloudlog/fact-table)}
+                               (let [tuple (-> (vec (cons (:key event) (:data event)))
+                                               (with-meta {:writers (:writers event)
+                                                           :readers (:readers event)}))
+                                     outputs (try
+                                               (rulefunc tuple)
+                                               (catch Exception e
+                                                 (.printStackTrace e)
+                                                 (prn [:on-tuple tuple])
+                                                 []))]
+                                 (for [data outputs]
+                                   (merge
+                                    (merge event (if (-> rulefunc meta :target-fact)
+                                                   {:name (-> rulefunc meta :target-fact cloudlog/fact-table)}
                                         ; else
-                                                 {:kind :rule
-                                                  :name (str (cloudlog/fact-table [rulefunc]) "!" link)}))
-                                  {:key (first data)
-                                   :data (rest data)
-                                   :writers rule-writers
-                                   :change (* (:change event) mult)
-                                   :readers (interset/intersection (:readers event) readers)})))]
+                                                   {:kind :rule
+                                                    :name (str (cloudlog/fact-table [rulefunc]) "!" link)}))
+                                    {:key (first data)
+                                     :data (rest data)
+                                     :writers rule-writers
+                                     :change (* (:change event) mult)
+                                     :readers (interset/intersection (:readers event) readers)}))))]
     (fn [event]
       (let [input-events (split-atomic-update event)]
         (join-atomic-updates (mapcat single-event-emitter input-events))))))

@@ -94,7 +94,7 @@
 (defn register-events-to-queue* [rabbitmq-service info queue reg]
   (let [rk (event-routing-key reg)]
     (info {:source "rabbit"
-           :desc (str "Binding queue " key " to routing key " rk)})
+           :desc (str "Binding queue " queue " to routing key " rk)})
     (lq/bind (:chan rabbitmq-service) queue facts-exch {:routing-key rk})
     nil))
 

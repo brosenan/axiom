@@ -3,16 +3,15 @@
             [axiom-clj.core :as axiom]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [permacode.publish :as publish]))
+            [permacode.publish :as publish]
+            [clojure.pprint :as ppr]))
 
 
 (defn deploy
   "Deploy the contents of the project to the configured Axiom instance"
   [project]
   (let [ver (str "dev-" (rand-int 10000000))
-        $ (axiom/injector (-> (:axiom-config project)
-                              (dissoc :http-config)
-                              (dissoc :migrator-config)))]
+        $ (axiom/injector (-> (:axiom-deploy-config project)))]
     (di/startup $)
     (di/do-with! $ [deploy-dir publish println]
                  (deploy-dir ver "." publish)
@@ -23,7 +22,8 @@
 (defn run
   "Run an Axiom instance"
   [project]
-  (let [$ (axiom/injector (:axiom-config project))]
+  (let [$ (axiom/injector (merge (:axiom-deploy-config project)
+                                 (:axiom-run-config project)))]
     (di/startup $)
     (prn (-> @$ :resources keys sort))
     (while true
@@ -64,7 +64,7 @@
 (defn deps
   "Recursively add permacode dependencies to this project"
   [project & args]
-  (let [$ (axiom/injector (:axiom-config project))
+  (let [$ (axiom/injector (:axiom-deploy-config project))
         src-dir (io/file (first (:source-paths project)))]
     (di/startup $)
     (di/do-with! $ [hasher]
@@ -74,12 +74,25 @@
                                 (create-perm-file dep hasher src-dir))))))
   nil)
 
+(defn pprint
+  "Prints the contents of the given permacode module"
+  [project hashcode]
+  (let [$ (axiom/injector (:axiom-deploy-config project))]
+    (di/startup $)
+    (di/do-with! $ [hasher]
+                 (let [[hash unhash] hasher
+                       content (unhash hashcode)]
+                   (di/shutdown $)
+                   (ppr/pprint content))))
+  nil)
+
 (defn axiom
   "Automating common Axiom tasks"
-  {:subtasks [#'deploy #'run #'deps]}
+  {:subtasks [#'deploy #'run #'deps #'pprint]}
   [project subtask & args]
   (let [task ({"deploy" deploy
                "run" run
-               "deps" deps} subtask)]
+               "deps" deps
+               "pprint" pprint} subtask)]
     (apply task project args)))
 

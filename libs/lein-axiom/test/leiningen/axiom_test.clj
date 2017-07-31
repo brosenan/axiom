@@ -3,20 +3,23 @@
             [leiningen.axiom :refer :all]
             [org.httpkit.client :as http]
             [clojure.java.io :as io]
-            [permacode.publish :as publish]))
+            [permacode.publish :as publish]
+            [clojure.pprint :as ppr]))
 
 [[:chapter {:title "Introduction"}]]
 "`lein-axiom` is a [leiningen](https://leiningen.org) plugin for automating Axiom-related tasks.
 It provides the sub-tasks [deploy](#deploy) and [run](#run)."
 (fact
  (-> #'axiom meta :doc) => "Automating common Axiom tasks"
- (-> #'axiom meta :subtasks) => [#'deploy #'run #'deps]
+ (-> #'axiom meta :subtasks) => [#'deploy #'run #'deps #'pprint]
  (-> #'deploy meta :doc) => "Deploy the contents of the project to the configured Axiom instance"
  (-> #'run meta :doc) => "Run an Axiom instance"
- (-> #'deps meta :doc) => "Recursively add permacode dependencies to this project")
+ (-> #'deps meta :doc) => "Recursively add permacode dependencies to this project"
+ (-> #'pprint meta :doc) => "Prints the contents of the given permacode module")
 
-"The `lein-axiom` plugin requires an `:axiom-config` key to be present in the project.
-This configuration is used to initialize a [DI](di.html) [injector](di.html#injector) so that Axiom's components are available to the plugin."
+"The `lein-axiom` plugin requires the keys `:axiom-deploy-config` and `:axiom-run-config` to be present and contain configuration maps.
+These configuration maps are used to initialize [DI](di.html) [injectors](di.html#injector) so that Axiom's components are available to the plugin.
+`:axiom-run-config` is used by [lein axiom run](#run), while `:axiom-deploy-config` is used by all other tasks."
 
 [[:chapter {:title "deploy"}]]
 "`lein axiom deploy` stores the contents of the project using a [hasher](permacode.hasher.html#introduction),
@@ -25,12 +28,13 @@ This event is then handled by Axiom's [migrator](migrator.html) to deploy the co
 (fact
  (let [published (atom [])
        output (atom "")
-       project {:axiom-config {:publish (partial swap! published conj)
-                               :deploy-dir (fn [ver dir publish]
-                                             (publish {:ver ver
-                                                       :dir dir}))
-                               :uuid (constantly "ABCDEFG")
-                               :println (partial swap! output str)}}]
+       project {:axiom-deploy-config
+                {:publish (partial swap! published conj)
+                 :deploy-dir (fn [ver dir publish]
+                               (publish {:ver ver
+                                         :dir dir}))
+                 :uuid (constantly "ABCDEFG")
+                 :println (partial swap! output str)}}]
    (axiom project "deploy") => nil
    (provided
     (rand-int 10000000) => 5555)
@@ -39,12 +43,15 @@ This event is then handled by Axiom's [migrator](migrator.html) to deploy the co
    @output => "Deployed a new version: dev-5555"))
 
 [[:chapter {:title "run"}]]
-"`lein axiom run` starts an instance of Axiom based on the `:axiom-config`.
+"`lein axiom run` starts an instance of Axiom based on *a merge of `:axiom-deploy-config` and `:axiom-run-config`*, with pereference to the latter.
 It will remain running until interrupted (Ctrl+C) by the user."
 (fact
- (let [project {:axiom-config {:ring-handler (fn [req] {:status 200
-                                                        :body "Hello"})
-                               :http-config {:port 33333}}}
+ (let [project {:axiom-run-config {:http-config {:port 33333}}
+                :axiom-deploy-config
+                {:ring-handler (fn [req] {:status 200
+                                          :body "Hello"})
+                 :http-config {:port 44444} ;; This will be overridden by :axiom-run-config
+                 }}
        fut (future
              (axiom project "run"))]
    (Thread/sleep 100)
@@ -62,10 +69,10 @@ However, for the purpose of running this code in the development environment we 
 
 "Running `lein axiom deps` will [look-up all `.clj` files in the project's `:source-paths`](#all-source-files),
 and for each such file will [extract the dependent `perm.*` namespaces](#required-perms).
-Then, it will use the hasher configured in `:axiom-config` to extract these dependencies and [write them to `.clj` files](#create-perm-file)
+Then, it will use the hasher configured in `:axiom-deploy-config` to extract these dependencies and [write them to `.clj` files](#create-perm-file)
 in the project's *first source-path*, if they don't already exist."
 (fact
- (let [project {:axiom-config {:hasher [..hash.. ..unhash..]}
+ (let [project {:axiom-deploy-config {:hasher [..hash.. ..unhash..]}
                 :source-paths ["/path/to/proj/src1" "/path/to/proj/src2"]}]
    (axiom project "deps") => nil
    (provided
@@ -79,7 +86,7 @@ in the project's *first source-path*, if they don't already exist."
 
 "If new `perm.*` namespaces are introduced, `lein axiom deps` works iteratively to fetch their dependencies."
 (fact
- (let [project {:axiom-config {:hasher [..hash.. ..unhash..]}
+ (let [project {:axiom-deploy-config {:hasher [..hash.. ..unhash..]}
                 :source-paths ["/path/to/proj/src1"]}]
    (axiom project "deps") => nil
    (provided
@@ -92,6 +99,19 @@ in the project's *first source-path*, if they don't already exist."
     (create-perm-file "BAR" [..hash.. ..unhash..] ..src-dir..) =streams=> [true false]
     (create-perm-file "BAZ" [..hash.. ..unhash..] ..src-dir..) => false
     (create-perm-file "QUUX" [..hash.. ..unhash..] ..src-dir..) => false)))
+
+[[:chapter {:title "pprint"}]]
+"`lein axiom pprint` pretty-prints the content of a permacode module, associated with the given hashcode.
+It uses the `hasher` specified in the project's `:axiom-deploy-config` to fetch the module."
+(fact
+ (let [project {:axiom-deploy-config {:hasher [(fn [])
+                                               (fn [hashcode]
+                                                 (when-not (= hashcode "THEHASHCODE")
+                                                   (throw (Exception. "Bad hashcode")))
+                                                 {:some :content})]}}]
+   (axiom project "pprint" "THEHASHCODE") => nil
+   (provided
+    (ppr/pprint {:some :content}) => irrelevant)))
 
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "all-source-files"}]]

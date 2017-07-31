@@ -246,7 +246,7 @@
                                       (when link
                                         (declare-service (str "fact-for-rule/" (-> clause meta :ns str) "/" (-> clause meta :name) "!" n)
                                                          {:kind :fact
-                                                          :name (-> link meta :source-fact first str)})
+                                                          :name (-> link meta :source-fact first str (subs 1))})
                                         (recur (-> link meta :continuation) (inc n))))
                                     (publish {:kind :fact
                                               :name "axiom/rule-ready"
