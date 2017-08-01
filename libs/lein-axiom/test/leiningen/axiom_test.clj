@@ -27,20 +27,17 @@ publishes an `axiom/perm-versions` event.
 This event is then handled by Axiom's [migrator](migrator.html) to deploy the code, and by Axiom's [gateway](gateway.html) to [serve static files](gateway.html#static-handler)."
 (fact
  (let [published (atom [])
-       output (atom "")
        project {:axiom-deploy-config
                 {:publish (partial swap! published conj)
                  :deploy-dir (fn [ver dir publish]
                                (publish {:ver ver
                                          :dir dir}))
-                 :uuid (constantly "ABCDEFG")
-                 :println (partial swap! output str)}}]
+                 :uuid (constantly "ABCDEFG")}}]
    (axiom project "deploy") => nil
    (provided
     (rand-int 10000000) => 5555)
    @published => [{:ver "dev-5555"
-                   :dir "."}]
-   @output => "Deployed a new version: dev-5555"))
+                   :dir "."}]))
 
 [[:chapter {:title "run"}]]
 "`lein axiom run` starts an instance of Axiom based on *a merge of `:axiom-deploy-config` and `:axiom-run-config`*, with pereference to the latter.
