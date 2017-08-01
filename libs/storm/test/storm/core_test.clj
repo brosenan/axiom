@@ -93,11 +93,13 @@ The `initial-link-bolt` will in this case create a tuple for which the `:key` is
                                                                     config))})
          result (st/complete-topology cluster topology
                                       :mock-sources
-                                      {"f0" [[:fact "test/follows" "alice" ["bob"]
+                                      {"f0" [[:fact "test/follows" "alice" ["bob"] ["charlie"]
                                               1000 1 #{} #{}]]})]
      (set (st/read-tuples result "l0"))
-     => #{[:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
-           1000 1 #{"storm.core-test"} #{}]})))
+     => #{[:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"] nil
+           1000 1 #{"storm.core-test"} #{}]
+          [:rule "storm.core-test/timeline!0" "charlie" ["alice" "charlie"] nil
+           1000 -1 #{"storm.core-test"} #{}]})))
 
 [[:chapter {:title "link-bolt"}]]
 "The `link-bolt` implements a single (non-initial) link in a rule.
@@ -166,17 +168,17 @@ and the `f1` spout providing tweets."
          result (st/complete-topology
                  cluster topology
                  :mock-sources
-                 {"l0" [[:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
+                 {"l0" [[:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"] nil
                          1000 1 #{"storm.core-test"} #{}]]
-                  "f1" [[:fact "test/tweeted" "foo" ["hello, world"]
+                  "f1" [[:fact "test/tweeted" "foo" ["hello, world"] ["hola, mundo"]
                          1001 1 #{} #{}]]})]
      (->> (st/read-tuples result "l1")
-          (map (fn [[kind name user [tweet] ts change writers readers]]
-                 [user tweet ts]))
-          set) => #{["alice" "bob's first tweet" 1003]
-                    ["alice" "bob's second tweet" 1004]
-                    ["charlie" "hello, world" 1001]
-                    ["dave" "hello, world" 1001]})))
+          (map (fn [[kind name user [tweet] removed ts change writers readers]]
+                 [user tweet removed ts]))
+          set) => #{["alice" "bob's first tweet" nil 1003]
+                    ["alice" "bob's second tweet" nil 1004]
+                    ["charlie" "hello, world" ["hola, mundo"] 1001]
+                    ["dave" "hello, world" ["hola, mundo"] 1001]})))
 
 [[:chapter {:title "store-bolt"}]]
 "The `store-bolt` uses a `database-event-storage-chan` (e.g., [the one for DynamoDB](dynamo.html#database-event-storage-chan))
@@ -217,9 +219,9 @@ be stored in the sequence mocking the database once the topology completes."
          result (st/complete-topology
                  cluster topology
                  :mock-sources
-                 {"src" [[:fact "test/tweeted" "foo" ["hello, world"]
+                 {"src" [[:fact "test/tweeted" "foo" ["hello, world"] nil
                           1001 1 #{} #{}]
-                         [:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
+                         [:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"] nil
                           1000 1 #{"storm.core-test"} #{}]]})]))
  (set @stored-events) => #{{:kind :fact :name "test/tweeted"
                             :key "foo" :data ["hello, world"]
@@ -261,9 +263,9 @@ be stored in the sequence mocking the database once the topology completes."
          result (st/complete-topology
                  cluster topology
                  :mock-sources
-                 {"src" [[:fact "test/tweeted" "foo" ["hello, world"]
+                 {"src" [[:fact "test/tweeted" "foo" ["hello, world"] nil
                           1001 1 #{} #{}]
-                         [:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"]
+                         [:rule "storm.core-test/timeline!0" "bob" ["alice" "bob"] nil
                           1000 1 #{"storm.core-test"} #{}]]})]))
  (set @published-events) => #{{:kind :fact :name "test/tweeted"
                                :key "foo" :data ["hello, world"]

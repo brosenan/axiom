@@ -11,7 +11,7 @@
             [clojure.string :as str]))
 
 (def event-fields
-  ["kind" "name" "key" "data" "ts" "change" "writers" "readers"])
+  ["kind" "name" "key" "data" "removed" "ts" "change" "writers" "readers"])
 
 (defn task-config [config name]
   (merge (->> (config name)
@@ -58,6 +58,7 @@
 
 (defn keyword-keys [event]
   (->> event
+       (filter (fn [[k v]] (not (nil? v))))
        (map (fn [[k v]] [(keyword k) v]))
        (into {})))
 
