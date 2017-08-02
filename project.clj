@@ -42,6 +42,10 @@
                     {:input "libs/cloudlog/test/cloudlog/graph_test.clj"
                      :title "cloudlog.graph"
                      :subtitle "Graph Utilities"}
+                    "cloudlog.unify"
+                    {:input "libs/cloudlog/test/cloudlog/unify_test.clj"
+                     :title "cloudlog.unify"
+                     :subtitle "Unification Macro"}
                     "cloudlog-events"
                     {:input "libs/cloudlog-events/test/cloudlog_events/core_test.clj"
                      :title "cloudlog-events.core"
