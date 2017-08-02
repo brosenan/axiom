@@ -3,12 +3,15 @@
             [permacode.validate :as permval]
             [cloudlog.core :as clg]
             [cloudlog-events.core :as ev]
+            [cloudlog-events.cache :as cache]
             [org.apache.storm
              [clojure :as s]
              [config :as scfg]]
             [di.core :as di]
             [clojure.core.async :as async]
             [clojure.string :as str]))
+
+(def time-window-retention-ms (* 1000 30))
 
 (def event-fields
   ["kind" "name" "key" "data" "removed" "ts" "change" "writers" "readers"])
@@ -88,8 +91,9 @@
         rulefunc (di/do-with! $ [hasher]
                               (binding [permacode.validate/*hasher* hasher]
                                 (perm/eval-symbol rulesym)))]
-    (di/do-with! $ [database-chan]
-                 (let [matcher (ev/matcher rulefunc link database-chan)]
+    (di/do-with! $ [database-chan time]
+                 (let [cached-matcher (cache/wrap-time-window ev/matcher time time-window-retention-ms)
+                       matcher (cached-matcher rulefunc link database-chan)]
                    (s/bolt
                     (execute [tuple]
                              (let [{:as event} tuple
