@@ -37,7 +37,7 @@
     <span>&nbsp;</span>
     <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
     <span>&nbsp;</span>
-    <a class="sidebar-nav-item" href="axiom-clj.html">axiom-clj.core</a><a class="sidebar-nav-item" href="axiom-cljs.html">axiom-cljs.core</a><a class="sidebar-nav-item" href="axiom-cljs.macros.html">axiom-cljs.macros</a><a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="di.html">di.core</a><a class="sidebar-nav-item" href="docs.html"></a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="gateway.html">gateway.core</a><a class="sidebar-nav-item" href="lein-axiom.html">leiningen.axiom</a><a class="sidebar-nav-item" href="migrator.html">migrator.core</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="s3.html">s3.core</a><a class="sidebar-nav-item active" href="storm.html">storm.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
+    <a class="sidebar-nav-item" href="axiom-clj.html">axiom-clj.core</a><a class="sidebar-nav-item" href="axiom-cljs.html">axiom-cljs.core</a><a class="sidebar-nav-item" href="axiom-cljs.macros.html">axiom-cljs.macros</a><a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="cloudlog.unify.html">cloudlog.unify</a><a class="sidebar-nav-item" href="di.html">di.core</a><a class="sidebar-nav-item" href="docs.html"></a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="gateway.html">gateway.core</a><a class="sidebar-nav-item" href="lein-axiom.html">leiningen.axiom</a><a class="sidebar-nav-item" href="migrator.html">migrator.core</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="s3.html">s3.core</a><a class="sidebar-nav-item active" href="storm.html">storm.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
     <span class="sidebar-nav-item">&nbsp;</span>
     <span class="sidebar-nav-item">&nbsp;</span>
   </nav>
@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 29 July 2017</h5>
+              <h5>Date: 02 August 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.2.0</h5></div></div>
           <hr/>
@@ -124,11 +124,13 @@
                                                                   config))})
        result (st/complete-topology cluster topology
                                     :mock-sources
-                                    {&quot;f0&quot; [[:fact &quot;test/follows&quot; &quot;alice&quot; [&quot;bob&quot;]
+                                    {&quot;f0&quot; [[:fact &quot;test/follows&quot; &quot;alice&quot; [&quot;bob&quot;] [&quot;charlie&quot;]
                                             1000 1 #{} #{}]]})]
    (set (st/read-tuples result &quot;l0&quot;))
-   =&gt; #{[:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;]
-         1000 1 #{&quot;storm.core-test&quot;} #{}]}))</code></pre></div><div><span id="link-bolt"></span><h2><b>4 &nbsp;&nbsp; link-bolt</b></h2></div><div><p>The <code>link-bolt</code> implements a single (non-initial) link in a rule. It can receive both <code>:fact</code> and <code>:rule</code> events, coming from fact spouts and previous link bolts, respectively.</p></div><div><p>When an event comes, <code>link-bolt</code> feeds it to a <a href='cloudlog-events.html#matcher'>matcher</a> which looks up any  matching rules or facts in the database. The matcher then applies the rule to the fact (regardless of which one of those came from the input and which one came from the database), and emits the results of this application.</p></div><div><p>To demonstrate this, we will mock the database using a function that when asked for a rule it returns tuples stating that both <code>charlie</code> and <code>dave</code> follow the user in question (regardless of the user), and when asked for a fact it provides two tweets made by the requested author We provide this mock in a module function we will provide in the bolt's config map. The interface we provide is the one required by the <a href='cloudlog-events.html#matcher'>matcher</a>,  and is similar to the one provided for <a href='dynamo.html#database-chan'>DynamoDB</a>.</p></div><div class="code"><pre><code class="clojure">:integ
+   =&gt; #{[:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;] nil
+         1000 1 #{&quot;storm.core-test&quot;} #{}]
+        [:rule &quot;storm.core-test/timeline!0&quot; &quot;charlie&quot; [&quot;alice&quot; &quot;charlie&quot;] nil
+         1000 -1 #{&quot;storm.core-test&quot;} #{}]}))</code></pre></div><div><span id="link-bolt"></span><h2><b>4 &nbsp;&nbsp; link-bolt</b></h2></div><div><p>The <code>link-bolt</code> implements a single (non-initial) link in a rule. It can receive both <code>:fact</code> and <code>:rule</code> events, coming from fact spouts and previous link bolts, respectively.</p></div><div><p>When an event comes, <code>link-bolt</code> feeds it to a <a href='cloudlog-events.html#matcher'>matcher</a> which looks up any  matching rules or facts in the database. The matcher then applies the rule to the fact (regardless of which one of those came from the input and which one came from the database), and emits the results of this application.</p></div><div><p>To demonstrate this, we will mock the database using a function that when asked for a rule it returns tuples stating that both <code>charlie</code> and <code>dave</code> follow the user in question (regardless of the user), and when asked for a fact it provides two tweets made by the requested author We provide this mock in a module function we will provide in the bolt's config map. The interface we provide is the one required by the <a href='cloudlog-events.html#matcher'>matcher</a>,  and is similar to the one provided for <a href='dynamo.html#database-chan'>DynamoDB</a>.</p></div><div class="code"><pre><code class="clojure">:integ
  (defn mock-db-module [$]
  (di/provide $ database-chan [foo]
              (let [database-chan (async/chan)]
@@ -173,17 +175,17 @@
        result (st/complete-topology
                cluster topology
                :mock-sources
-               {&quot;l0&quot; [[:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;]
+               {&quot;l0&quot; [[:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;] nil
                        1000 1 #{&quot;storm.core-test&quot;} #{}]]
-                &quot;f1&quot; [[:fact &quot;test/tweeted&quot; &quot;foo&quot; [&quot;hello, world&quot;]
+                &quot;f1&quot; [[:fact &quot;test/tweeted&quot; &quot;foo&quot; [&quot;hello, world&quot;] [&quot;hola, mundo&quot;]
                        1001 1 #{} #{}]]})]
    (-&gt;&gt; (st/read-tuples result &quot;l1&quot;)
-        (map (fn [[kind name user [tweet] ts change writers readers]]
-               [user tweet ts]))
-        set) =&gt; #{[&quot;alice&quot; &quot;bob's first tweet&quot; 1003]
-                  [&quot;alice&quot; &quot;bob's second tweet&quot; 1004]
-                  [&quot;charlie&quot; &quot;hello, world&quot; 1001]
-                  [&quot;dave&quot; &quot;hello, world&quot; 1001]}))</code></pre></div><div><span id="store-bolt"></span><h2><b>5 &nbsp;&nbsp; store-bolt</b></h2></div><div><p>The <code>store-bolt</code> uses a <code>database-event-storage-chan</code> (e.g., <a href='dynamo.html#database-event-storage-chan'>the one for DynamoDB</a>) to store each event it receives to a database.</p></div><div><p>To demonstrate how it works we will mock a database that stores all the received events into into an <code>atom</code>.</p></div><div class="code"><pre><code class="clojure">:integ
+        (map (fn [[kind name user [tweet] removed ts change writers readers]]
+               [user tweet removed ts]))
+        set) =&gt; #{[&quot;alice&quot; &quot;bob's first tweet&quot; nil 1003]
+                  [&quot;alice&quot; &quot;bob's second tweet&quot; nil 1004]
+                  [&quot;charlie&quot; &quot;hello, world&quot; [&quot;hola, mundo&quot;] 1001]
+                  [&quot;dave&quot; &quot;hello, world&quot; [&quot;hola, mundo&quot;] 1001]}))</code></pre></div><div><span id="store-bolt"></span><h2><b>5 &nbsp;&nbsp; store-bolt</b></h2></div><div><p>The <code>store-bolt</code> uses a <code>database-event-storage-chan</code> (e.g., <a href='dynamo.html#database-event-storage-chan'>the one for DynamoDB</a>) to store each event it receives to a database.</p></div><div><p>To demonstrate how it works we will mock a database that stores all the received events into into an <code>atom</code>.</p></div><div class="code"><pre><code class="clojure">:integ
  (def stored-events (atom []))</code></pre></div><div><p>We mock a module function to provide our mock <code>database-event-storage-chan</code>. It takes tuples <code>&#91;event ack&#93;</code>, where <code>event</code> is an event (map) to be stored  and <code>ack</code> is a channel to be closed once the event is stored.</p></div><div class="code"><pre><code class="clojure">:integ
  (defn mock-db-storage-module [$]
  (di/provide $ database-event-storage-chan [foo]
@@ -205,9 +207,9 @@
        result (st/complete-topology
                cluster topology
                :mock-sources
-               {&quot;src&quot; [[:fact &quot;test/tweeted&quot; &quot;foo&quot; [&quot;hello, world&quot;]
+               {&quot;src&quot; [[:fact &quot;test/tweeted&quot; &quot;foo&quot; [&quot;hello, world&quot;] nil
                         1001 1 #{} #{}]
-                       [:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;]
+                       [:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;] nil
                         1000 1 #{&quot;storm.core-test&quot;} #{}]]})]))
  (set @stored-events) =&gt; #{{:kind :fact :name &quot;test/tweeted&quot;
                           :key &quot;foo&quot; :data [&quot;hello, world&quot;]
@@ -232,9 +234,9 @@
        result (st/complete-topology
                cluster topology
                :mock-sources
-               {&quot;src&quot; [[:fact &quot;test/tweeted&quot; &quot;foo&quot; [&quot;hello, world&quot;]
+               {&quot;src&quot; [[:fact &quot;test/tweeted&quot; &quot;foo&quot; [&quot;hello, world&quot;] nil
                         1001 1 #{} #{}]
-                       [:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;]
+                       [:rule &quot;storm.core-test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;] nil
                         1000 1 #{&quot;storm.core-test&quot;} #{}]]})]))
  (set @published-events) =&gt; #{{:kind :fact :name &quot;test/tweeted&quot;
                              :key &quot;foo&quot; :data [&quot;hello, world&quot;]

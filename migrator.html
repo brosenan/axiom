@@ -37,7 +37,7 @@
     <span>&nbsp;</span>
     <a class="sidebar-nav-item header" href="index.html"><img src="img/logo-white.png"/></a>
     <span>&nbsp;</span>
-    <a class="sidebar-nav-item" href="axiom-clj.html">axiom-clj.core</a><a class="sidebar-nav-item" href="axiom-cljs.html">axiom-cljs.core</a><a class="sidebar-nav-item" href="axiom-cljs.macros.html">axiom-cljs.macros</a><a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="di.html">di.core</a><a class="sidebar-nav-item" href="docs.html"></a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="gateway.html">gateway.core</a><a class="sidebar-nav-item" href="lein-axiom.html">leiningen.axiom</a><a class="sidebar-nav-item active" href="migrator.html">migrator.core</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="s3.html">s3.core</a><a class="sidebar-nav-item" href="storm.html">storm.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
+    <a class="sidebar-nav-item" href="axiom-clj.html">axiom-clj.core</a><a class="sidebar-nav-item" href="axiom-cljs.html">axiom-cljs.core</a><a class="sidebar-nav-item" href="axiom-cljs.macros.html">axiom-cljs.macros</a><a class="sidebar-nav-item" href="cloudlog.html">cloudlog.core</a><a class="sidebar-nav-item" href="cloudlog-events.html">cloudlog-events.core</a><a class="sidebar-nav-item" href="cloudlog.graph.html">cloudlog.graph</a><a class="sidebar-nav-item" href="cloudlog.interset.html">cloudlog.interset</a><a class="sidebar-nav-item" href="cloudlog.unify.html">cloudlog.unify</a><a class="sidebar-nav-item" href="di.html">di.core</a><a class="sidebar-nav-item" href="docs.html"></a><a class="sidebar-nav-item" href="dynamo.html">dynamo.core</a><a class="sidebar-nav-item" href="gateway.html">gateway.core</a><a class="sidebar-nav-item" href="lein-axiom.html">leiningen.axiom</a><a class="sidebar-nav-item active" href="migrator.html">migrator.core</a><a class="sidebar-nav-item" href="permacode.html">permacode.core</a><a class="sidebar-nav-item" href="permacode.hasher.html">permacode.hasher</a><a class="sidebar-nav-item" href="permacode.publish.html">permacode.publish</a><a class="sidebar-nav-item" href="permacode.symbols.html">permacode.symbols</a><a class="sidebar-nav-item" href="permacode.validate.html">permacode.validate</a><a class="sidebar-nav-item" href="rabbit-microservices.html">rabbit-microservices.core</a><a class="sidebar-nav-item" href="s3.html">s3.core</a><a class="sidebar-nav-item" href="storm.html">storm.core</a><a class="sidebar-nav-item" href="zk-plan.html">zk-plan.core</a>
     <span class="sidebar-nav-item">&nbsp;</span>
     <span class="sidebar-nav-item">&nbsp;</span>
   </nav>
@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 29 July 2017</h5>
+              <h5>Date: 02 August 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.2.0</h5></div></div>
           <hr/>
@@ -252,12 +252,13 @@
    [:add-task :plan-node `(link-migrator 'migrator.core-test/trending 1 2 3) [14]] ;; =&gt; 17
    [:add-task :plan-node `(migration-end-notifier 'migrator.core-test/trending
                                                   #{:some-writers}) [15 16 17]] ;; =&gt; 18
-   [:mark-as-ready :plan-node]]</code></pre></div><div><span id="clause-migrator"></span><h2><b>5 &nbsp;&nbsp; clause-migrator</b></h2></div><div><p>Clauses, unlike rules, do not require migration. When a new clause is introduced we need to declare its input queues (for the query and all contributing facts), and then we need to initiate a topology by publishing an <code>axiom/rule-ready</code> event.</p></div><div><p><code>clause-migrator</code> is a microservice that registers to <code>axiom/perms-exist</code> events. It depends on <code>publish</code> (e.g., <a href='rabbit-microservices.html#publish'>this</a> for publishing the <code>axiom/perms-exist</code> events, and on <code>declare-service</code> and <code>assign-service</code> for registering itself. <code>declare-service</code> is also used for declaring the input queues for the clause's topology.</p></div><div class="code"><pre><code class="clojure">(def declared-queues (atom {}))
+   [:mark-as-ready :plan-node]]</code></pre></div><div><span id="clause-migrator"></span><h2><b>5 &nbsp;&nbsp; clause-migrator</b></h2></div><div><p>Clauses, unlike rules, do not require migration. When a new clause is introduced we need to declare its input queues (for the query and all contributing facts), and then we need to initiate a topology by publishing an <code>axiom/rule-ready</code> event.</p></div><div><p><code>clause-migrator</code> is a microservice that registers to <code>axiom/perms-exist</code> events. It depends on <code>publish</code> (e.g., <a href='rabbit-microservices.html#publish'>this</a> for publishing the <code>axiom/perms-exist</code> events, <code>hasher</code>, to retrieve the clause's definition, and on <code>declare-service</code> and <code>assign-service</code> for registering itself. <code>declare-service</code> is also used for declaring the input queues for the clause's topology.</p></div><div class="code"><pre><code class="clojure">(def declared-queues (atom {}))
  (def published (atom []))
  (let [decl (atom {})
      assign (transient {})
      $ (di/injector
         {:publish (partial swap! published conj)
+         :hasher [:hash :unhash]
          :declare-service (fn [key part]
                             (swap! declared-queues assoc key part))
          :assign-service (fn [key func]
@@ -266,20 +267,29 @@
  (di/startup $)
  (@declared-queues &quot;migrator.core/clause-migrator&quot;) =&gt; {:kind :fact
                                                         :name &quot;axiom/perms-exist&quot;}
- (def clause-migrator ((persistent! assign) &quot;migrator.core/clause-migrator&quot;)))</code></pre></div><div><p>In response to an <code>axiom/perms-exist</code> event with a positive <code>:change</code> value, <code>clause-migrator</code> look up all clauses in the new perms.</p></div><div class="code"><pre><code class="clojure">(clause-migrator {:kind :fact
-                 :name &quot;axiom/perms-exist&quot;
-                 :key &quot;ABCD1234&quot;
-                 :data [#{'perm.ABC1234 'perm.DEF5678}]
-                 :writers #{:some-writers}
-                 :change 1}) =&gt; nil
- (provided
-(extract-version-clauses 'perm.ABC1234) =&gt; [multi-keyword-search]
-(extract-version-clauses 'perm.DEF5678) =&gt; [])</code></pre></div><div><p>Then it declares a queue associated with the facts that feed each link of each clause:</p></div><div class="code"><pre><code class="clojure">(loop [link multi-keyword-search
+ (def clause-migrator ((persistent! assign) &quot;migrator.core/clause-migrator&quot;)))</code></pre></div><div><p>In response to an <code>axiom/perms-exist</code> event with a positive <code>:change</code> value, <code>clause-migrator</code> look up all clauses in the new perms.</p></div><div class="code"><pre><code class="clojure">(with-redefs-fn {#'extract-version-clauses
+                (fn [perm]
+                  (when-not (= permval/*hasher* [:hash :unhash])
+                    (throw (Exception. &quot;Hasher not set in call to extract-version-clauses&quot;)))
+                  (cond (= perm 'perm.ABC1234)
+                        [multi-keyword-search]
+                        (= perm 'perm.DEF5678)
+                        []
+                        :else
+                        (throw (Exception. &quot;Unexpected perm value&quot;))))}
+ #(clause-migrator {:kind :fact
+                    :name &quot;axiom/perms-exist&quot;
+                    :key &quot;ABCD1234&quot;
+                    :data [#{'perm.ABC1234 'perm.DEF5678}]
+                    :writers #{:some-writers}
+                    :change 1})) =&gt; nil</code></pre></div><div><p>Then it declares a queue associated with the facts that feed each link of each clause:</p></div><div class="code"><pre><code class="clojure">(loop [link multi-keyword-search
       n 0]
  (when link
    (@declared-queues (str &quot;fact-for-rule/migrator.core-test/multi-keyword-search!&quot; n))
    =&gt; {:kind :fact
-       :name (-&gt; link meta :source-fact first str)}
+       :name ([&quot;test/multi-keyword-search?&quot;
+               &quot;migrator.core-test/index-docs&quot;
+               &quot;test/doc&quot;] n)}
    (recur (-&gt; link meta :continuation) (inc n))))</code></pre></div><div><p>Finally, it publishes an <code>axiom/rule-ready</code> event for each clause.</p></div><div class="code"><pre><code class="clojure">@published =&gt; [{:kind :fact
                :name &quot;axiom/rule-ready&quot;
                :key 0
