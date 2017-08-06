@@ -42,14 +42,13 @@ as well as credentials for accessing S3.  See [clj-aws-s3 documentation](https:/
                    (hasher/slurp-bytes ..inp2..) => content)))))
 
 
-[[:section "Local Storage with S3 Fallback"]]
+[[:section {:title "Local Storage with S3 Fallback"}]]
 "Developers working in their own environments often want their solution local, without the need to provide credentials.
 An alternative `storage` resource provides just that."
 
 "If the resources `storage-local-path` and `storage-fetch-url` exist, a `storage` resource is provided."
 (fact
  (def path (str "/tmp/store" (rand-int 1000000)))
- (-> (io/file path) .mkdirs)
  (let [$ (di/injector {:storage-local-path path
                        :storage-fetch-url "http://some.url"})]
    (module $)

@@ -31,6 +31,7 @@
 
   (di/provide $ storage [storage-local-path
                          storage-fetch-url]
+              (-> (io/file storage-local-path) .mkdirs)
               [(fn [key value]
                  (with-open [out (io/output-stream (io/file storage-local-path key))]
                    (.write out value)))
