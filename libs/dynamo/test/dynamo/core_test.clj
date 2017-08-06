@@ -73,8 +73,8 @@ and the request channel.  Once called, it will perform the following:
  (database-retriever chan-req) => true
  (provided
   (far/query :some-config :foo.bar {:key [:eq "123"]})
-  => [{:key "123" :ts 1000 :event ..bin1..}
-      {:key "123" :ts 1001 :event ..bin2..}]
+  => [{:key "123" :ts 1000N :event ..bin1..}
+      {:key "123" :ts 1001N :event ..bin2..}]
   (nippy/thaw ..bin1..) => {:data [1 2 3]}
   (nippy/thaw ..bin2..) => {:data [2 3 4]}))
 
@@ -87,22 +87,26 @@ and the request channel.  Once called, it will perform the following:
 - The `:ts` field is taken from the item, and
 - The rest of the fields are taken from the de-serialized `:event` field in the item."
 (fact
-                                        ; First event
- (async/alts!! [chan-res
-                (async/timeout 100)]) => [{:kind :fact
-                                           :name "foo/bar"
-                                           :key 123
-                                           :ts 1000
-                                           :data [1 2 3]}
-                                          chan-res]
-                                        ; Second event
- (async/alts!! [chan-res
-                (async/timeout 100)]) => [{:kind :fact
-                                           :name "foo/bar"
-                                           :key 123
-                                           :ts 1001
-                                           :data [2 3 4]}
-                                          chan-res])
+ ;; First event
+ (let [[ev1 ch] (async/alts!! [chan-res
+                             (async/timeout 100)])]
+   ch => chan-res
+   ev1 => {:kind :fact
+           :name "foo/bar"
+           :key 123
+           :ts 1000
+           :data [1 2 3]})
+ ;; Second event
+ (let [[ev2 ch] (async/alts!! [chan-res
+                               (async/timeout 100)])]
+   ch => chan-res
+   ev2 => {:kind :fact
+           :name "foo/bar"
+           :key 123
+           :ts 1001
+           :data [2 3 4]}
+   ;; Specifically, the type of the :ts field is kept long (and not BigInt, as DynamoDB maintains it)
+   (class (:ts ev2)) => Long))
 
 "Eventually `database-retriever` closes the response channel."
 (fact

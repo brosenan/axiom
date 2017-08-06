@@ -25,7 +25,7 @@
             (let [items (far/query config kw {:key [:eq (pr-str (:key  ev))]})]
               (doseq [item items]
                 (let [event (-> (nippy/thaw (:event item))
-                                (merge {:ts (:ts item)})
+                                (merge {:ts (.longValue (:ts item))})
                                 (merge ev))]
                   (async/>!! res-chan event))))
             (async/close! res-chan)
