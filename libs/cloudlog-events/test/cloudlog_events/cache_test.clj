@@ -83,7 +83,8 @@ For the `:rule` event we do not expect any response, because the database is emp
      res => #{(event :fact "cloudlog-events.core_test/timeline" "alice" ["hello"])
               (event :fact "cloudlog-events.core_test/timeline" "eve" ["hello"])})))
 
-"The result is de-dupped, so that we do not get duplicate output events in the (highly probablye) case when events we get from the cache also exist in the database."
+"The result is de-dupped, so that we do not get duplicate output events in the (highly probablye) case when events we get from the cache also exist in the database.
+Note that the de-dupping is actually performed in [accumulate-db-chan](cloudlog-events.html#accumulate-db-chan)."
 (fact
  (let [db-chan (async/chan 10)]
    (async/go-loop []
@@ -100,7 +101,8 @@ For the `:rule` event we do not expect any response, because the database is emp
      (let [res-chan (async/chan 2)]
        (timeline-cached-matcher (event :fact "test/tweeted" "bob" ["hello"]) res-chan)
        (let [[res ch] (async/alts!! [(async/reduce conj [] res-chan) (async/timeout 1000)])]
-         (count res) => 1)))))
+         (count res) => 1
+         (:change (first res)) => 1)))))
 
 [[:section {:title "Under the Hood"}]]
 "The time-window cache is a tuple containing:

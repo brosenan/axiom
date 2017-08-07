@@ -369,9 +369,9 @@ of the two.  We don't care as long as we get what we need from the other side of
 "For each such event the matcher will emit the events obtained by multiplying the fact and the rules."
 (fact
  (async/alts!! [res-chan
-                (async/timeout 1000)]) => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["hello"]) res-chan]
+                (async/timeout 1000)]) => [(event :fact "cloudlog-events.core_test/timeline" "eve" ["hello"]) res-chan]
  (async/alts!! [res-chan
-                (async/timeout 1000)]) => [(event :fact "cloudlog-events.core_test/timeline" "eve" ["hello"]) res-chan])
+                (async/timeout 1000)]) => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["hello"]) res-chan])
 
 "Finally, the channel needs to be closed."
 (fact
@@ -404,9 +404,9 @@ of the two.  We don't care as long as we get what we need from the other side of
 "The results are emitted on the `res-chan`:"
 (fact
  (async/alts!! [res-chan
-                (async/timeout 1000)]) => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["hello"]) res-chan]
- (async/alts!! [res-chan
                 (async/timeout 1000)]) => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["world"]) res-chan]
+ (async/alts!! [res-chan
+                (async/timeout 1000)]) => [(event :fact "cloudlog-events.core_test/timeline" "alice" ["hello"]) res-chan]
  (async/alts!! [res-chan
                 (async/timeout 1000)]) => [nil res-chan])
 

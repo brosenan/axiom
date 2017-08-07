@@ -122,7 +122,10 @@
         (let [my-resp-chan (async/chan)
               [req resp-chan] (async/<! my-chan)]
           (async/>! db-chan [req my-resp-chan])
-          (let [accum (->> (async/reduce accumulate (accumulate) my-resp-chan)
+          (let [accum (->> (async/reduce conj #{} my-resp-chan) ;; De-dup before accumulating
+                           async/<!
+                           async/to-chan
+                           (async/reduce accumulate (accumulate))
                            (mapchan accumulated-events)
                            async/<!
                            async/to-chan)]
