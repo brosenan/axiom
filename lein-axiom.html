@@ -71,7 +71,7 @@
               <nav data-gumshoe-header>
                 <ul data-gumshoe>
                   <a data-scroll class="top" href="#page-top">leiningen.axiom</a>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#deploy"><h4>2 &nbsp; deploy</h4></a></li><li><a class="chapter" data-scroll="" href="#run"><h4>3 &nbsp; run</h4></a></li><li><a class="chapter" data-scroll="" href="#deps"><h4>4 &nbsp; deps</h4></a></li><li><a class="chapter" data-scroll="" href="#pprint"><h4>5 &nbsp; pprint</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>6 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#all-source-files"><h5><i>6.1 &nbsp; all-source-files</i></h5></a><a class="section" data-scroll="" href="#required-perms"><h5><i>6.2 &nbsp; required-perms</i></h5></a><a class="section" data-scroll="" href="#create-perm-file"><h5><i>6.3 &nbsp; create-perm-file</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#deploy"><h4>2 &nbsp; deploy</h4></a></li><li><a class="chapter" data-scroll="" href="#run"><h4>3 &nbsp; run</h4></a></li><li><a class="chapter" data-scroll="" href="#deps"><h4>4 &nbsp; deps</h4></a></li><li><a class="chapter" data-scroll="" href="#pprint"><h4>5 &nbsp; pprint</h4></a></li><li><a class="chapter" data-scroll="" href="#inspect"><h4>6 &nbsp; inspect</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>7 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#all-source-files"><h5><i>7.1 &nbsp; all-source-files</i></h5></a><a class="section" data-scroll="" href="#required-perms"><h5><i>7.2 &nbsp; required-perms</i></h5></a><a class="section" data-scroll="" href="#create-perm-file"><h5><i>7.3 &nbsp; create-perm-file</i></h5></a></li>
                 </ul>
               </nav>
             </div>
@@ -80,16 +80,17 @@
           <div class="toc">
               <nav>
                 <ul>
-                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#deploy"><h4>2 &nbsp; deploy</h4></a></li><li><a class="chapter" data-scroll="" href="#run"><h4>3 &nbsp; run</h4></a></li><li><a class="chapter" data-scroll="" href="#deps"><h4>4 &nbsp; deps</h4></a></li><li><a class="chapter" data-scroll="" href="#pprint"><h4>5 &nbsp; pprint</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>6 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#all-source-files"><h5><i>6.1 &nbsp; all-source-files</i></h5></a><a class="section" data-scroll="" href="#required-perms"><h5><i>6.2 &nbsp; required-perms</i></h5></a><a class="section" data-scroll="" href="#create-perm-file"><h5><i>6.3 &nbsp; create-perm-file</i></h5></a></li>
+                  <li><a class="chapter" data-scroll="" href="#introduction"><h4>1 &nbsp; Introduction</h4></a></li><li><a class="chapter" data-scroll="" href="#deploy"><h4>2 &nbsp; deploy</h4></a></li><li><a class="chapter" data-scroll="" href="#run"><h4>3 &nbsp; run</h4></a></li><li><a class="chapter" data-scroll="" href="#deps"><h4>4 &nbsp; deps</h4></a></li><li><a class="chapter" data-scroll="" href="#pprint"><h4>5 &nbsp; pprint</h4></a></li><li><a class="chapter" data-scroll="" href="#inspect"><h4>6 &nbsp; inspect</h4></a></li><li><a class="chapter" data-scroll="" href="#under-the-hood"><h4>7 &nbsp; Under the Hood</h4></a><a class="section" data-scroll="" href="#all-source-files"><h5><i>7.1 &nbsp; all-source-files</i></h5></a><a class="section" data-scroll="" href="#required-perms"><h5><i>7.2 &nbsp; required-perms</i></h5></a><a class="section" data-scroll="" href="#create-perm-file"><h5><i>7.3 &nbsp; create-perm-file</i></h5></a></li>
                 </ul>
               </nav>
           </div>
           <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>lein-axiom</code> is a <a href='https://leiningen.org'>leiningen</a> plugin for automating Axiom-related tasks. It provides the sub-tasks <a href='#deploy'>deploy</a> and <a href='#run'>run</a>.</p></div><div class="code"><pre><code class="clojure">(-&gt; #'axiom meta :doc) =&gt; &quot;Automating common Axiom tasks&quot;
- (-&gt; #'axiom meta :subtasks) =&gt; [#'deploy #'run #'deps #'pprint]
+ (-&gt; #'axiom meta :subtasks) =&gt; [#'deploy #'run #'deps #'pprint #'inspect]
  (-&gt; #'deploy meta :doc) =&gt; &quot;Deploy the contents of the project to the configured Axiom instance&quot;
  (-&gt; #'run meta :doc) =&gt; &quot;Run an Axiom instance&quot;
  (-&gt; #'deps meta :doc) =&gt; &quot;Recursively add permacode dependencies to this project&quot;
- (-&gt; #'pprint meta :doc) =&gt; &quot;Prints the contents of the given permacode module&quot;</code></pre></div><div><p>The <code>lein-axiom</code> plugin requires the keys <code>:axiom-deploy-config</code> and <code>:axiom-run-config</code> to be present and contain configuration maps. These configuration maps are used to initialize <a href='di.html'>DI</a> <a href='di.html#injector'>injectors</a> so that Axiom's components are available to the plugin. <code>:axiom-run-config</code> is used by <a href='#run'>lein axiom run</a>, while <code>:axiom-deploy-config</code> is used by all other tasks.</p></div><div><span id="deploy"></span><h2><b>2 &nbsp;&nbsp; deploy</b></h2></div><div><p><code>lein axiom deploy</code> stores the contents of the project using a <a href='permacode.hasher.html#introduction'>hasher</a>, publishes an <code>axiom/perm-versions</code> event. This event is then handled by Axiom's <a href='migrator.html'>migrator</a> to deploy the code, and by Axiom's <a href='gateway.html'>gateway</a> to <a href='gateway.html#static-handler'>serve static files</a>.</p></div><div class="code"><pre><code class="clojure">(let [published (atom [])
+ (-&gt; #'pprint meta :doc) =&gt; &quot;Prints the contents of the given permacode module&quot;
+ (-&gt; #'inspect meta :doc) =&gt; &quot;Performs a database query based on the given partial event&quot;</code></pre></div><div><p>The <code>lein-axiom</code> plugin requires the keys <code>:axiom-deploy-config</code> and <code>:axiom-run-config</code> to be present and contain configuration maps. These configuration maps are used to initialize <a href='di.html'>DI</a> <a href='di.html#injector'>injectors</a> so that Axiom's components are available to the plugin. <code>:axiom-run-config</code> is used by <a href='#run'>lein axiom run</a>, while <code>:axiom-deploy-config</code> is used by all other tasks.</p></div><div><span id="deploy"></span><h2><b>2 &nbsp;&nbsp; deploy</b></h2></div><div><p><code>lein axiom deploy</code> stores the contents of the project using a <a href='permacode.hasher.html#introduction'>hasher</a>, publishes an <code>axiom/perm-versions</code> event. This event is then handled by Axiom's <a href='migrator.html'>migrator</a> to deploy the code, and by Axiom's <a href='gateway.html'>gateway</a> to <a href='gateway.html#static-handler'>serve static files</a>.</p></div><div class="code"><pre><code class="clojure">(let [published (atom [])
      project {:axiom-deploy-config
               {:publish (partial swap! published conj)
                :deploy-dir (fn [ver dir publish]
@@ -140,7 +141,27 @@
                                                {:some :content})]}}]
  (axiom project &quot;pprint&quot; &quot;THEHASHCODE&quot;) =&gt; nil
  (provided
-  (ppr/pprint {:some :content}) =&gt; irrelevant))</code></pre></div><div><span id="under-the-hood"></span><h2><b>6 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="all-source-files"></span><h3>6.1 &nbsp;&nbsp; all-source-files</h3></div><div><p>Given a <code>project</code>, <code>all-source-files</code> returns all the <code>&#42;.clj</code> files located under all <code>:source-paths</code> in the <code>project</code>.</p></div><div class="code"><pre><code class="clojure">(all-source-files {:source-paths [&quot;/path/to/proj/src1&quot;
+  (ppr/pprint {:some :content}) =&gt; irrelevant))</code></pre></div><div><span id="inspect"></span><h2><b>6 &nbsp;&nbsp; inspect</b></h2></div><div><p><code>lein axiom inspect</code> prints the events stored in the database, <a href='dynamo.html#database-chan'>matching a partial event</a>. It takes one parameter which is a map represented in EDN format. This map should include the fields <code>:kind</code> (<code>:fact</code> or <code>:rule</code>), <code>:name</code> and <code>:key</code>. It prints out the matching events in EDN format.</p></div><div class="code"><pre><code class="clojure">(let [db-chan (async/chan 10)
+     project {:axiom-deploy-config {:database-chan db-chan}}
+     future (async/thread
+              (axiom project &quot;inspect&quot; &quot;{:kind :fact :name &#92;&quot;foo/bar&#92;&quot; :key 123}&quot;))]
+ (let [[[q repl-ch] ch] (async/alts!! [db-chan (async/timeout 1000)])
+       ev1 {:kind :fact
+            :name &quot;foo/bar&quot;
+            :key 123
+            :data [1 2 3]}
+       ev2 {:kind :fact
+            :name &quot;foo/bar&quot;
+            :key 123
+            :data [2 3 4]}]
+   ch =&gt; db-chan
+   q =&gt; {:kind :fact :name &quot;foo/bar&quot; :key 123}
+   (async/&gt;!! repl-ch ev1)
+   (async/&gt;!! repl-ch ev2)
+   (async/close! repl-ch)
+   (async/&lt;!! future) =&gt; nil
+   ;; @output =&gt; (str &quot;&#92;n&quot; (pr-str ev1) &quot;&#92;n&quot; (pr-str ev2))
+   ))</code></pre></div><div><span id="under-the-hood"></span><h2><b>7 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="all-source-files"></span><h3>7.1 &nbsp;&nbsp; all-source-files</h3></div><div><p>Given a <code>project</code>, <code>all-source-files</code> returns all the <code>&#42;.clj</code> files located under all <code>:source-paths</code> in the <code>project</code>.</p></div><div class="code"><pre><code class="clojure">(all-source-files {:source-paths [&quot;/path/to/proj/src1&quot;
                                  &quot;/path/to/proj/src2&quot;]}) =&gt; [(io/file &quot;/path/to/proj/src1/foo.clj&quot;)
                                                              (io/file &quot;/path/to/proj/src2/bar.clj&quot;)
                                                              (io/file &quot;/path/to/proj/src2/baz.clj&quot;)]
@@ -149,13 +170,13 @@
                                               (io/file &quot;/path/to/proj/src1/x.cljs&quot;)
                                               (io/file &quot;/path/to/proj/src1/index.html&quot;)]
 (file-seq (io/file &quot;/path/to/proj/src2&quot;)) =&gt; [(io/file &quot;/path/to/proj/src2/bar.clj&quot;)
-                                              (io/file &quot;/path/to/proj/src2/baz.clj&quot;)])</code></pre></div><div><span id="required-perms"></span><h3>6.2 &nbsp;&nbsp; required-perms</h3></div><div><p>Given a file, <code>required-perms</code> returns all the permacode hash-codes required by that source file.</p></div><div class="code"><pre><code class="clojure">(required-perms ..file..) =&gt; [&quot;FOO&quot; &quot;BAR&quot; &quot;BAZ&quot;]
+                                              (io/file &quot;/path/to/proj/src2/baz.clj&quot;)])</code></pre></div><div><span id="required-perms"></span><h3>7.2 &nbsp;&nbsp; required-perms</h3></div><div><p>Given a file, <code>required-perms</code> returns all the permacode hash-codes required by that source file.</p></div><div class="code"><pre><code class="clojure">(required-perms ..file..) =&gt; [&quot;FOO&quot; &quot;BAR&quot; &quot;BAZ&quot;]
  (provided
 (publish/get-ns ..file..) =&gt; '(ns some.ns
                                 (:require [clojure.string :as str]
                                           [perm.FOO :as foo])
                                 (:require [perm.BAR]
-                                          [perm.BAZ :as baz])))</code></pre></div><div><span id="create-perm-file"></span><h3>6.3 &nbsp;&nbsp; create-perm-file</h3></div><div><p>Given a hash-code, a <a href='permacode.hasher.html#introduction'>hasher</a> and a source path, <code>create-perm-file</code> creates a <code>.clj</code> source file with the underlying content. The file will be placed under the <code>perm</code> directory because the namespace is named <code>perm.&#42;</code> (where <code>&#42;</code> is the given hash-code). Its <code>ns</code> header will be updated to include the <code>perm.&#42;</code> name. It returns whether a new file needed to be created.</p></div><div class="code"><pre><code class="clojure">(let [hasher [(fn [code content]
+                                          [perm.BAZ :as baz])))</code></pre></div><div><span id="create-perm-file"></span><h3>7.3 &nbsp;&nbsp; create-perm-file</h3></div><div><p>Given a hash-code, a <a href='permacode.hasher.html#introduction'>hasher</a> and a source path, <code>create-perm-file</code> creates a <code>.clj</code> source file with the underlying content. The file will be placed under the <code>perm</code> directory because the namespace is named <code>perm.&#42;</code> (where <code>&#42;</code> is the given hash-code). Its <code>ns</code> header will be updated to include the <code>perm.&#42;</code> name. It returns whether a new file needed to be created.</p></div><div class="code"><pre><code class="clojure">(let [hasher [(fn [code content]
                (throw (Exception. &quot;This should not be called&quot;)))
              (fn [hashcode]
                '[(ns original.name
