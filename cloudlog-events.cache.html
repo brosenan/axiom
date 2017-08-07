@@ -62,9 +62,9 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 02 August 2017</h5>
+              <h5>Date: 07 August 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
-              <h5>Version: 0.2.2</h5></div></div>
+              <h5>Version: 0.2.3</h5></div></div>
           <hr/>
           <div class="outline">
             <div class="toc">
@@ -117,7 +117,7 @@
  (timeline-cached-matcher (event :fact &quot;test/tweeted&quot; &quot;bob&quot; [&quot;hello&quot;]) res-chan)
  (let [[res ch] (async/alts!! [(async/reduce conj #{} res-chan) (async/timeout 1000)])]
    res =&gt; #{(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;alice&quot; [&quot;hello&quot;])
-            (event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;eve&quot; [&quot;hello&quot;])}))</code></pre></div><div><p>The result is de-dupped, so that we do not get duplicate output events in the (highly probablye) case when events we get from the cache also exist in the database.</p></div><div class="code"><pre><code class="clojure">(let [db-chan (async/chan 10)]
+            (event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;eve&quot; [&quot;hello&quot;])}))</code></pre></div><div><p>The result is de-dupped, so that we do not get duplicate output events in the (highly probablye) case when events we get from the cache also exist in the database. Note that the de-dupping is actually performed in <a href='cloudlog-events.html#accumulate-db-chan'>accumulate-db-chan</a>.</p></div><div class="code"><pre><code class="clojure">(let [db-chan (async/chan 10)]
  (async/go-loop []
    (let [[q ch] (async/&lt;! db-chan)]
      (when (= (:kind q) :rule)
@@ -132,7 +132,8 @@
    (let [res-chan (async/chan 2)]
      (timeline-cached-matcher (event :fact &quot;test/tweeted&quot; &quot;bob&quot; [&quot;hello&quot;]) res-chan)
      (let [[res ch] (async/alts!! [(async/reduce conj [] res-chan) (async/timeout 1000)])]
-       (count res) =&gt; 1))))</code></pre></div><div><span id="under-the-hood"></span><h3>1.1 &nbsp;&nbsp; Under the Hood</h3></div><div><p>The time-window cache is a tuple containing:</p><ol><li>a map between event pairs of a <code>:name</code> and a <code>:key</code> to sets of complete events sharing a <code>:name</code> and a <code>:key</code>, and</li><li>a double-list containing the events in the order of their arrival along with the time of their arrival.</li><li>the retention period (in the time-units used for timestamps).  This figure is given as parameterThe <code>time-window-cache</code> function creates this data structure.</li></ol></div><div class="code"><pre><code class="clojure">(time-window-cache 30) =&gt; [{} [] 30]</code></pre></div><div><p>The function <code>tw-update</code> receives a time-window, and adds the given event to it. The event is stored alongside the timestamp that is passed to <code>tw-update</code> as its third argument.</p></div><div class="code"><pre><code class="clojure">(let [ev1 {:name &quot;foo&quot; :key &quot;bar&quot; :data [1 2 3]}]
+       (count res) =&gt; 1
+       (:change (first res)) =&gt; 1))))</code></pre></div><div><span id="under-the-hood"></span><h3>1.1 &nbsp;&nbsp; Under the Hood</h3></div><div><p>The time-window cache is a tuple containing:</p><ol><li>a map between event pairs of a <code>:name</code> and a <code>:key</code> to sets of complete events sharing a <code>:name</code> and a <code>:key</code>, and</li><li>a double-list containing the events in the order of their arrival along with the time of their arrival.</li><li>the retention period (in the time-units used for timestamps).  This figure is given as parameterThe <code>time-window-cache</code> function creates this data structure.</li></ol></div><div class="code"><pre><code class="clojure">(time-window-cache 30) =&gt; [{} [] 30]</code></pre></div><div><p>The function <code>tw-update</code> receives a time-window, and adds the given event to it. The event is stored alongside the timestamp that is passed to <code>tw-update</code> as its third argument.</p></div><div class="code"><pre><code class="clojure">(let [ev1 {:name &quot;foo&quot; :key &quot;bar&quot; :data [1 2 3]}]
  (tw-update (time-window-cache 30) ev1 1000)
  =&gt; [{[&quot;foo&quot; &quot;bar&quot;] #{ev1}} [[ev1 1000]] 30])</code></pre></div><div><p><code>tw-update</code> also prunes events older than the retention period. For example, if we have 3 events coming at times <code>1000</code>, <code>1020</code> and <code>1040</code> to a cache with a retention period of <code>30</code>, after the third update we should only have the last two events in the cache.</p></div><div class="code"><pre><code class="clojure">(let [ev1 {:name &quot;foo&quot; :key &quot;bar&quot; :data [1 2 3]}
      ev2 {:name &quot;foo&quot; :key &quot;bar&quot; :data [2 3 4]}

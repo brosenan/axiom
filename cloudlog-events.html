@@ -62,9 +62,9 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 02 August 2017</h5>
+              <h5>Date: 07 August 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
-              <h5>Version: 0.2.2</h5></div></div>
+              <h5>Version: 0.2.3</h5></div></div>
           <hr/>
           <div class="outline">
             <div class="toc">
@@ -188,9 +188,9 @@
  (async/&gt;!! reply-chan (event :rule &quot;cloudlog-events.core_test/timeline!0&quot; &quot;bob&quot; [&quot;fred&quot; &quot;bob&quot;]))
  (async/&gt;!! reply-chan (event :rule &quot;cloudlog-events.core_test/timeline!0&quot; &quot;bob&quot; [&quot;fred&quot; &quot;bob&quot;] :change -1))
  (async/close! reply-chan)</code></pre></div><div><p>For each such event the matcher will emit the events obtained by multiplying the fact and the rules.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [res-chan
-              (async/timeout 1000)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;alice&quot; [&quot;hello&quot;]) res-chan]
+              (async/timeout 1000)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;eve&quot; [&quot;hello&quot;]) res-chan]
  (async/alts!! [res-chan
-              (async/timeout 1000)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;eve&quot; [&quot;hello&quot;]) res-chan]</code></pre></div><div><p>Finally, the channel needs to be closed.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [res-chan
+              (async/timeout 1000)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;alice&quot; [&quot;hello&quot;]) res-chan]</code></pre></div><div><p>Finally, the channel needs to be closed.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [res-chan
               (async/timeout 1000)]) =&gt; [nil res-chan]</code></pre></div><div><span id="matching-facts-for-rules"></span><h3>4.2 &nbsp;&nbsp; Matching Facts for Rules</h3></div><div><p>A matcher function can accept either a fact event or a rule event.</p></div><div class="code"><pre><code class="clojure">(def res-chan (async/chan 1000))
 (timeline-matcher (event :rule &quot;cloudlog-events.core_test/timeline!0&quot; &quot;bob&quot; [&quot;alice&quot; &quot;bob&quot;]) res-chan)</code></pre></div><div><p>For a rule, the matcher will query the database for matching facts.</p></div><div class="code"><pre><code class="clojure">(def db-request
   (async/alts!! [db-chan
@@ -200,9 +200,9 @@
  (def reply-chan (-&gt; db-request first second))</code></pre></div><div><p>Now the database replies fact events.</p></div><div class="code"><pre><code class="clojure">(async/&gt;!! reply-chan (event :fact &quot;test/tweeted&quot; &quot;bob&quot; [&quot;hello&quot;]))
  (async/&gt;!! reply-chan (event :fact &quot;test/tweeted&quot; &quot;bob&quot; [&quot;world&quot;]))
  (async/close! reply-chan)</code></pre></div><div><p>The results are emitted on the <code>res-chan</code>:</p></div><div class="code"><pre><code class="clojure">(async/alts!! [res-chan
-              (async/timeout 1000)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;alice&quot; [&quot;hello&quot;]) res-chan]
- (async/alts!! [res-chan
               (async/timeout 1000)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;alice&quot; [&quot;world&quot;]) res-chan]
+ (async/alts!! [res-chan
+              (async/timeout 1000)]) =&gt; [(event :fact &quot;cloudlog-events.core_test/timeline&quot; &quot;alice&quot; [&quot;hello&quot;]) res-chan]
  (async/alts!! [res-chan
               (async/timeout 1000)]) =&gt; [nil res-chan]</code></pre></div><div><span id="accumulating-events"></span><h2><b>5 &nbsp;&nbsp; Accumulating Events</b></h2></div><div><p><a href='#emitter'>emitters</a> <a href='#multiplier'>multipliers</a> and <a href='#matcher'>matchers</a> treat each event individually. This approach is consistent with the practice of <a href='https://martinfowler.com/eaaDev/EventSourcing.html'>Event Sourcing</a>. However, sometimes we wish to see the complete picture and accumulate events. The following functions support event accumulation.</p></div><div><span id="accumulate"></span><h3>5.1 &nbsp;&nbsp; accumulate</h3></div><div><p><code>accumulate</code> is a <em>reducing function</em> that accumulates events into a map for which the keys are the events themselves, excluding their <code>:change</code> and <code>:ts</code> fields, and the values are tuples, containing the sums of the <code>:change</code> and the maximum <code>:ts</code> for each entry.</p></div><div><p>With arity 0, <code>accumulate</code> returns and empty map.</p></div><div class="code"><pre><code class="clojure">(accumulate) =&gt; {}</code></pre></div><div><p>With arity 2, it will take a map and an event, and if the event is not already a key in the map, it will be added so that the <code>:change</code> and <code>:ts</code> fields move from the key to the value.</p></div><div class="code"><pre><code class="clojure">(accumulate {} (event :fact &quot;foo/bar&quot; &quot;k1&quot; [1 2] :ts 1000))
  =&gt; {(-&gt; (event :fact &quot;foo/bar&quot; &quot;k1&quot; [1 2])

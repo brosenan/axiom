@@ -62,9 +62,9 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 02 August 2017</h5>
+              <h5>Date: 07 August 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
-              <h5>Version: 0.2.2</h5></div></div>
+              <h5>Version: 0.2.3</h5></div></div>
           <hr/>
           <div class="outline">
             <div class="toc">
@@ -111,25 +111,29 @@
                     chan-res])</code></pre></div><div><p>We call <code>database-retriever</code> with a client options map (see <a href='https://github.com/ptaoussanis/faraday'>faraday's documentation</a>), and the request channel.  Once called, it will perform the following:</p><ol><li>Call <code>faraday</code>'s <code>query</code> method, to get a collection of items (maps).</li><li>Call <code>nippy/thaw</code> to deserialize the body of each event.</li></ol></div><div class="code"><pre><code class="clojure">(database-retriever chan-req) =&gt; true
  (provided
 (far/query :some-config :foo.bar {:key [:eq &quot;123&quot;]})
-=&gt; [{:key &quot;123&quot; :ts 1000 :event ..bin1..}
-    {:key &quot;123&quot; :ts 1001 :event ..bin2..}]
+=&gt; [{:key &quot;123&quot; :ts 1000N :event ..bin1..}
+    {:key &quot;123&quot; :ts 1001N :event ..bin2..}]
 (nippy/thaw ..bin1..) =&gt; {:data [1 2 3]}
-(nippy/thaw ..bin2..) =&gt; {:data [2 3 4]})</code></pre></div><div><p>It also ensured that the table exists by calling (our mock) <code>database-ensure-table</code>.</p></div><div class="code"><pre><code class="clojure">@table-ensured =&gt; :foo.bar</code></pre></div><div><p>The events are reconstructed from the items:</p><ul><li>The <code>:kind</code>, <code>:name</code> and <code>:key</code> fields are taken from the request.</li><li>The <code>:ts</code> field is taken from the item, and</li><li>The rest of the fields are taken from the de-serialized <code>:event</code> field in the item.</li></ul></div><div class="code"><pre><code class="clojure">; First event
- (async/alts!! [chan-res
-              (async/timeout 100)]) =&gt; [{:kind :fact
-                                         :name &quot;foo/bar&quot;
-                                         :key 123
-                                         :ts 1000
-                                         :data [1 2 3]}
-                                        chan-res]
-                                      ; Second event
- (async/alts!! [chan-res
-              (async/timeout 100)]) =&gt; [{:kind :fact
-                                         :name &quot;foo/bar&quot;
-                                         :key 123
-                                         :ts 1001
-                                         :data [2 3 4]}
-                                        chan-res]</code></pre></div><div><p>Eventually <code>database-retriever</code> closes the response channel.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [chan-res
+(nippy/thaw ..bin2..) =&gt; {:data [2 3 4]})</code></pre></div><div><p>It also ensured that the table exists by calling (our mock) <code>database-ensure-table</code>.</p></div><div class="code"><pre><code class="clojure">@table-ensured =&gt; :foo.bar</code></pre></div><div><p>The events are reconstructed from the items:</p><ul><li>The <code>:kind</code>, <code>:name</code> and <code>:key</code> fields are taken from the request.</li><li>The <code>:ts</code> field is taken from the item, and</li><li>The rest of the fields are taken from the de-serialized <code>:event</code> field in the item.</li></ul></div><div class="code"><pre><code class="clojure">;; First event
+ (let [[ev1 ch] (async/alts!! [chan-res
+                           (async/timeout 100)])]
+ ch =&gt; chan-res
+ ev1 =&gt; {:kind :fact
+         :name &quot;foo/bar&quot;
+         :key 123
+         :ts 1000
+         :data [1 2 3]})
+ ;; Second event
+ (let [[ev2 ch] (async/alts!! [chan-res
+                             (async/timeout 100)])]
+ ch =&gt; chan-res
+ ev2 =&gt; {:kind :fact
+         :name &quot;foo/bar&quot;
+         :key 123
+         :ts 1001
+         :data [2 3 4]}
+ ;; Specifically, the type of the :ts field is kept long (and not BigInt, as DynamoDB maintains it)
+ (class (:ts ev2)) =&gt; Long)</code></pre></div><div><p>Eventually <code>database-retriever</code> closes the response channel.</p></div><div class="code"><pre><code class="clojure">(async/alts!! [chan-res
               (async/timeout 100)]) =&gt; [nil chan-res]</code></pre></div><div><p>If the request channel is closed, <code>database-retriever</code> exits, returning <code>false</code>.</p></div><div class="code"><pre><code class="clojure">(async/close! chan-req)
  (database-retriever chan-req) =&gt; false</code></pre></div><div><span id="database-event-storage"></span><h2><b>3 &nbsp;&nbsp; database-event-storage: A Function for Storing Events</b></h2></div><div><p><code>database-event-storage</code> is a function for storing events in the database.</p></div><div><p>It is a DI resource that depends on the following resources:</p><ol><li><code>dynamodb-config</code>: The DynamoDB credentials and coordinates, and</li><li><a href='#database-ensure-table'>database-ensure-table</a>: a function that makes sure the given table exists.</li></ol></div><div class="code"><pre><code class="clojure">(def table-ensured (atom nil))
  (let [$ (di/injector {:dynamodb-config :config
