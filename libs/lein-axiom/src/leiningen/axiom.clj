@@ -4,7 +4,9 @@
             [clojure.java.io :as io]
             [clojure.string :as str]
             [permacode.publish :as publish]
-            [clojure.pprint :as ppr]))
+            [clojure.pprint :as ppr]
+            [clojure.core.async :as async]
+            [clojure.edn :as edn]))
 
 
 (defn deploy
@@ -86,13 +88,29 @@
                    (ppr/pprint content))))
   nil)
 
+(defn inspect
+  "Performs a database query based on the given partial event"
+  [project query]
+  (let [$ (axiom/injector (:axiom-deploy-config project))]
+    (di/startup $)
+    (di/do-with! $ [database-chan println]
+                 (let [repl-ch (async/chan 2)]
+                   (async/>!! database-chan [(edn/read-string query) repl-ch])
+                   (loop []
+                     (let [ev (async/<!! repl-ch)]
+                       (when-not (nil? ev)
+                         (println (pr-str ev))
+                         (recur)))))
+                 nil)))
+
 (defn axiom
   "Automating common Axiom tasks"
-  {:subtasks [#'deploy #'run #'deps #'pprint]}
+  {:subtasks [#'deploy #'run #'deps #'pprint #'inspect]}
   [project subtask & args]
   (let [task ({"deploy" deploy
                "run" run
                "deps" deps
-               "pprint" pprint} subtask)]
+               "pprint" pprint
+               "inspect" inspect} subtask)]
     (apply task project args)))
 

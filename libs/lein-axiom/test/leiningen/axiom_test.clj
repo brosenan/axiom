@@ -4,18 +4,20 @@
             [org.httpkit.client :as http]
             [clojure.java.io :as io]
             [permacode.publish :as publish]
-            [clojure.pprint :as ppr]))
+            [clojure.pprint :as ppr]
+            [clojure.core.async :as async]))
 
 [[:chapter {:title "Introduction"}]]
 "`lein-axiom` is a [leiningen](https://leiningen.org) plugin for automating Axiom-related tasks.
 It provides the sub-tasks [deploy](#deploy) and [run](#run)."
 (fact
  (-> #'axiom meta :doc) => "Automating common Axiom tasks"
- (-> #'axiom meta :subtasks) => [#'deploy #'run #'deps #'pprint]
+ (-> #'axiom meta :subtasks) => [#'deploy #'run #'deps #'pprint #'inspect]
  (-> #'deploy meta :doc) => "Deploy the contents of the project to the configured Axiom instance"
  (-> #'run meta :doc) => "Run an Axiom instance"
  (-> #'deps meta :doc) => "Recursively add permacode dependencies to this project"
- (-> #'pprint meta :doc) => "Prints the contents of the given permacode module")
+ (-> #'pprint meta :doc) => "Prints the contents of the given permacode module"
+ (-> #'inspect meta :doc) => "Performs a database query based on the given partial event")
 
 "The `lein-axiom` plugin requires the keys `:axiom-deploy-config` and `:axiom-run-config` to be present and contain configuration maps.
 These configuration maps are used to initialize [DI](di.html) [injectors](di.html#injector) so that Axiom's components are available to the plugin.
@@ -110,6 +112,34 @@ It uses the `hasher` specified in the project's `:axiom-deploy-config` to fetch 
    (provided
     (ppr/pprint {:some :content}) => irrelevant)))
 
+[[:chapter {:title "inspect"}]]
+"`lein axiom inspect` prints the events stored in the database, [matching a partial event](dynamo.html#database-chan).
+It takes one parameter which is a map represented in EDN format.
+This map should include the fields `:kind` (`:fact` or `:rule`), `:name` and `:key`.
+It prints out the matching events in EDN format."
+(fact
+ (let [db-chan (async/chan 10)
+       project {:axiom-deploy-config {:database-chan db-chan}}
+       future (async/thread
+                (axiom project "inspect" "{:kind :fact :name \"foo/bar\" :key 123}"))]
+   (let [[[q repl-ch] ch] (async/alts!! [db-chan (async/timeout 1000)])
+         ev1 {:kind :fact
+              :name "foo/bar"
+              :key 123
+              :data [1 2 3]}
+         ev2 {:kind :fact
+              :name "foo/bar"
+              :key 123
+              :data [2 3 4]}]
+     ch => db-chan
+     q => {:kind :fact :name "foo/bar" :key 123}
+     (async/>!! repl-ch ev1)
+     (async/>!! repl-ch ev2)
+     (async/close! repl-ch)
+     (async/<!! future) => nil
+     ;; @output => (str "\n" (pr-str ev1) "\n" (pr-str ev2))
+     )))
+
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "all-source-files"}]]
 "Given a `project`, `all-source-files` returns all the `*.clj` files located under all `:source-paths` in the `project`."
@@ -156,3 +186,4 @@ It returns whether a new file needed to be created."
    (-> (io/file source-dir "perm" "FOO.clj") slurp) => "(ns perm.FOO (:require [something]))(foo 123)(bar 234)"
    (create-perm-file "FOO" hasher source-dir) => false ;; This file already exists
    ))
+
