@@ -40,10 +40,11 @@
                 :else
                 (cons (first events) (join-atomic-updates (rest events)))))))
 
-(defn emitter [rulefunc & {:keys [link mult readers rule-writers] :or {link 0
-                                                                       mult 1
-                                                                       readers interset/universe
-                                                                       rule-writers #{(-> rulefunc meta :ns str)}}}]
+(defn emitter [rulefunc & {:keys [link mult readers rule-writers mult-ts] :or {link 0
+                                                                               mult 1
+                                                                               readers interset/universe
+                                                                               rule-writers #{(-> rulefunc meta :ns str)}
+                                                                               mult-ts 1}}]
   (let [single-event-emitter (fn [event]
                                (let [tuple (-> (vec (cons (:key event) (:data event)))
                                                (with-meta {:writers (:writers event)
@@ -58,11 +59,12 @@
                                    (merge
                                     (merge event (if (-> rulefunc meta :target-fact)
                                                    {:name (-> rulefunc meta :target-fact cloudlog/fact-table)}
-                                        ; else
+                                                   ;; else
                                                    {:kind :rule
                                                     :name (str (cloudlog/fact-table [rulefunc]) "!" link)}))
                                     {:key (first data)
                                      :data (rest data)
+                                     :ts (mod (* (:ts event) mult-ts) (bit-shift-left 1 48))
                                      :writers rule-writers
                                      :change (* (:change event) mult)
                                      :readers (interset/intersection (:readers event) readers)}))))]
@@ -83,7 +85,8 @@
                                               :link index
                                               :mult (:change rule-ev)
                                               :readers (:readers rule-ev)
-                                              :rule-writers (:writers rule-ev))]
+                                              :rule-writers (:writers rule-ev)
+                                              :mult-ts (:ts rule-ev))]
                               (em fact-ev)))]
     (fn [rule-ev fact-ev]
       (let [rule-evs (split-atomic-update rule-ev)]

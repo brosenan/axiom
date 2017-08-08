@@ -336,7 +336,9 @@ We will use [dependency injection](di.html) to initialize the needed services."
                                               :key ["z"]
                                               :ts 1000
                                               :data ["foo/foo" ["z"] 1000]
-                                              :change 1}
+                                              :change 1
+                                              :readers #{}
+                                              :writers #{}}
                                              res-chan]
    (async/alts!! [res-chan
                   (async/timeout 1000)]) => [{:kind :fact
@@ -344,7 +346,9 @@ We will use [dependency injection](di.html) to initialize the needed services."
                                               :key ["z"]
                                               :ts 2000
                                               :data ["foo/foo" ["z"] 2000]
-                                              :change 1}
+                                              :change 1
+                                              :readers #{}
+                                              :writers #{}}
                                              res-chan]
    (async/alts!! [res-chan
                   (async/timeout 1000)]) => [{:kind :fact
@@ -352,7 +356,9 @@ We will use [dependency injection](di.html) to initialize the needed services."
                                               :key ["z"]
                                               :ts 3000
                                               :data ["foo/foo" ["z"] 3000]
-                                              :change 1}
+                                              :change 1
+                                              :readers #{}
+                                              :writers #{}}
                                              res-chan]
    (async/alts!! [res-chan
                   (async/timeout 1000)]) => [nil

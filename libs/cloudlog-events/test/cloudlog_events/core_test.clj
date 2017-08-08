@@ -31,7 +31,7 @@ on the internal state of a rule. Each event contains the following fields:
           :name name
           :key key
           :data data
-          :ts 1000
+          :ts 1
           :change 1
           :writers #{}
           :readers #{}} ev))
@@ -286,28 +286,34 @@ The advantage of this approach is that they guarantee that everything that needs
 relatively low cost.  The disadvantage is that if we use such a mechanism we need to be able to cope with processing being done more than once.
 We cope with this in two ways:
 1. All computation is declarative, meaning that if you call a rule function twice with the same input you are guaranteed to get the same output.
-2. We use a consistent unique key for each result, so that if we get the same result a second time, the new result gets \"swallowed\" by the old result.
+2. We use a consistent unique key for each result, so that if we get the same result a second time, the new result gets \"swallowed\" by the old result."
 
-The unique ID we use is the timestamp -- `:ts`.  Timestamps are given to *fact events* when they are created.
-Each timestamp in the system, whether it refers to a raw fact, derived fact or rule events, is always originally
-a timestamp given to a raw fact when it was created.  This takes the computation time out of the equation for calculating
-these timestamps."
-
-"An `emitter` function simply moves the `:ts` attribute from its input event to its output."
+"The unique ID we use is the timestamp -- `:ts`.  Timestamps are given to *fact events* when they are created.
+An `emitter` function simply moves the `:ts` attribute from its input event to its output."
 (fact
  (let [em (emitter foo-yx)
        ev (first (em (event :fact ":test/foo" 1 [2] :ts 1234)))]
    (:ts ev) => 1234))
 
-"For a `multiplier`, the question of which `:ts` value to produce is more complicated.
-Each of the input events (the rule and the fact) has a timestamp, so which one should we use?
-Because we want each timestamp to be a real timestamp (from a raw fact event), we need to take
-exactly one of them.  We take the one from the *fact*."
+"For rule events and derived facts we use a consistent manipulation of the timestamps in the original facts being used.
+This makes the `:ts` lose its value as timestamp, but remain consistent and specific, so no matter when a fact and rule met, the `:ts` of their mutual products
+only depends on the combination of their `:ts`."
+
+"A `multiplier` therefore needs to compute a function of the fact and rule `:ts` values.
+This function needs to be specific, so that the chance for a collision,
+(i.e., two fact/rule pairs with different `:ts` values multiplying into rules or derived facts with the same `:ts` values),
+is minimized.
+The `+` operator will not do a good job here, because, for example, the pairs `[1000 2000]` and `[1001 1999]` have the same sum.
+The `*` operator will do a better job, given that all our timestamps are within the same order of magnitude, but the result will be out of that range,
+and as we apply more multipliers the result will grow to be unnecessarily large or overflow (if `bigint` is not used).
+We therefore use a modular multiplication as our operation."
 (fact
- (let [mult (multiplier timeline 1)
-       ev (first (mult (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"] :ts 2345)
-                       (event :fact ":test/tweeted" "bob" ["hello"] :ts 3456)))]
-   (:ts ev) => 3456))
+ (let [ts1 (rand-int 2000000000)
+       ts2 (rand-int 2000000000)
+       mult (multiplier timeline 1)
+       ev (first (mult (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"] :ts ts1)
+                       (event :fact ":test/tweeted" "bob" ["hello"] :ts ts2)))]
+   (:ts ev) => (mod (* ts1 ts2) (bit-shift-left 1 48))))
 
 "Why? because we need to keep the value unique per `:key`.
 Consider the above example.  If we take the rule `:ts` value, the `:ts` for each entry in Alice's timeline

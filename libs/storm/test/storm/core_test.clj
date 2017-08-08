@@ -175,10 +175,10 @@ and the `f1` spout providing tweets."
      (->> (st/read-tuples result "l1")
           (map (fn [[kind name user [tweet] removed ts change writers readers]]
                  [user tweet removed ts]))
-          set) => #{["alice" "bob's first tweet" nil 1003]
-                    ["alice" "bob's second tweet" nil 1004]
-                    ["charlie" "hello, world" ["hola, mundo"] 1001]
-                    ["dave" "hello, world" ["hola, mundo"] 1001]})))
+          set) => #{["alice" "bob's first tweet" nil 1003000]
+                    ["alice" "bob's second tweet" nil 1004000]
+                    ["charlie" "hello, world" ["hola, mundo"] 1002001]
+                    ["dave" "hello, world" ["hola, mundo"] 1003002]})))
 
 [[:chapter {:title "store-bolt"}]]
 "The `store-bolt` uses a `database-event-storage-chan` (e.g., [the one for DynamoDB](dynamo.html#database-event-storage-chan))

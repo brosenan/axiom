@@ -464,7 +464,7 @@ The following service function listens to such events and for the rule `followee
  (def done (async/chan))
  (di/do-with! $ [serve]
    (serve (fn [ev]
-            (when (= (name (:key ev)) "followee-tweets")
+            (when (= (-> ev :data first name) "followee-tweets")
               (async/close! done)))
           {:kind :fact
            :name "axiom/rule-ready"})))
@@ -625,7 +625,8 @@ We mock this function by providing `:test/follows` facts for Alice, who follows 
                      :name name
                      :key "alice"
                      :data [followee]
-                     :change 1}))
+                     :change 1
+                     :ts 1}))
   (async/close! chan))
 
 "To store the resulting tuples it depends on a `database-event-storage-chan` (e.g., [this](dynamo.html#database-event-storage-chan)),
@@ -662,21 +663,24 @@ In our case, these should be one per each fact."
                   :kind :rule
                   :name "migrator.core-test/timeline!0"
                   :readers nil
-                  :writers #{"migrator.core-test"}}
+                  :writers #{"migrator.core-test"}
+                  :ts 1}
  (read-event) => {:change 1
                   :data ["alice" "charlie"]
                   :key "charlie"
                   :kind :rule
                   :name "migrator.core-test/timeline!0"
                   :readers nil
-                  :writers #{"migrator.core-test"}}
+                  :writers #{"migrator.core-test"}
+                  :ts 1}
  (read-event) => {:change 1
                   :data ["alice" "dave"]
                   :key "dave"
                   :kind :rule
                   :name "migrator.core-test/timeline!0"
                   :readers nil
-                  :writers #{"migrator.core-test"}})
+                  :writers #{"migrator.core-test"}
+                  :ts 1})
 
 [[:section {:title "link-migrator"}]]
 "For links other than 0, migration requires applying a [matcher](cloudlog-events.html#matcher).
@@ -704,7 +708,8 @@ We will mock one to produce `:test/tweeted` facts, stating that Bob, Charlie and
                      :name name
                      :key user
                      :data ["hello"]
-                     :change 1}))
+                     :change 1
+                     :ts 1}))
   (async/close! chan))
 
 "We also need to provide a `database-chan` (e.g., [this](dynamo.html#database-chan)), which in our case,
@@ -720,19 +725,21 @@ These events are similar to the ones we got from the [initial-migrator](#initial
          (when-not (= (:name query) "migrator.core-test/timeline!0")
            (throw (Exception. (str "Wrong fact in query: " (:name query)))))
          (async/>!! out-chan {:change 1
-                             :data ["alice" (:key query)]
-                             :key (:key query)
-                             :kind :rule
-                             :name "migrator.core-test/timeline!0"
-                             :readers nil
-                             :writers #{:some-writer}})
+                              :data ["alice" (:key query)]
+                              :key (:key query)
+                              :kind :rule
+                              :name "migrator.core-test/timeline!0"
+                              :readers nil
+                              :writers #{:some-writer}
+                              :ts 1})
          (async/>!! out-chan {:change 1
-                             :data ["eve" (:key query)]
-                             :key (:key query)
-                             :kind :rule
-                             :name "migrator.core-test/timeline!0"
-                             :readers nil
-                             :writers #{:some-writer}})
+                              :data ["eve" (:key query)]
+                              :key (:key query)
+                              :kind :rule
+                              :name "migrator.core-test/timeline!0"
+                              :readers nil
+                              :writers #{:some-writer}
+                              :ts 1})
          (async/close! out-chan)
          (recur))))))
 
@@ -766,46 +773,52 @@ are pushed to the `database-event-storage-chan`."
  ;; For Bob
  (read-event) => {:kind :fact
                   :name "migrator.core-test/timeline"
-                  :key "alice"
-                  :data ["bob" "hello"]
-                  :change 1
-                  :readers nil
-                  :writers #{:some-writer}}
- (read-event) => {:kind :fact
-                  :name "migrator.core-test/timeline"
                   :key "eve"
                   :data ["bob" "hello"]
                   :change 1
                   :readers nil
-                  :writers #{:some-writer}}
+                  :writers #{:some-writer}
+                  :ts 1}
  (read-event) => {:kind :fact
                   :name "migrator.core-test/timeline"
                   :key "alice"
-                  :data ["charlie" "hello"]
+                  :data ["bob" "hello"]
                   :change 1
                   :readers nil
-                  :writers #{:some-writer}}
+                  :writers #{:some-writer}
+                  :ts 1}
  (read-event) => {:kind :fact
                   :name "migrator.core-test/timeline"
                   :key "eve"
                   :data ["charlie" "hello"]
                   :change 1
                   :readers nil
-                  :writers #{:some-writer}}
+                  :writers #{:some-writer}
+                  :ts 1}
  (read-event) => {:kind :fact
                   :name "migrator.core-test/timeline"
                   :key "alice"
-                  :data ["dave" "hello"]
+                  :data ["charlie" "hello"]
                   :change 1
                   :readers nil
-                  :writers #{:some-writer}}
+                  :writers #{:some-writer}
+                  :ts 1}
  (read-event) => {:kind :fact
                   :name "migrator.core-test/timeline"
                   :key "eve"
                   :data ["dave" "hello"]
                   :change 1
                   :readers nil
-                  :writers #{:some-writer}})
+                  :writers #{:some-writer}
+                  :ts 1}
+ (read-event) => {:kind :fact
+                  :name "migrator.core-test/timeline"
+                  :key "alice"
+                  :data ["dave" "hello"]
+                  :change 1
+                  :readers nil
+                  :writers #{:some-writer}
+                  :ts 1})
 
 "For good citizenship, let's close the mock `database-chan` and allow the service we started shut down."
 (fact
