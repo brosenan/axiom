@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 07 August 2017</h5>
+              <h5>Date: 08 August 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.2.3</h5></div></div>
           <hr/>
@@ -250,7 +250,9 @@
                                             :key [&quot;z&quot;]
                                             :ts 1000
                                             :data [&quot;foo/foo&quot; [&quot;z&quot;] 1000]
-                                            :change 1}
+                                            :change 1
+                                            :readers #{}
+                                            :writers #{}}
                                            res-chan]
  (async/alts!! [res-chan
                 (async/timeout 1000)]) =&gt; [{:kind :fact
@@ -258,7 +260,9 @@
                                             :key [&quot;z&quot;]
                                             :ts 2000
                                             :data [&quot;foo/foo&quot; [&quot;z&quot;] 2000]
-                                            :change 1}
+                                            :change 1
+                                            :readers #{}
+                                            :writers #{}}
                                            res-chan]
  (async/alts!! [res-chan
                 (async/timeout 1000)]) =&gt; [{:kind :fact
@@ -266,7 +270,9 @@
                                             :key [&quot;z&quot;]
                                             :ts 3000
                                             :data [&quot;foo/foo&quot; [&quot;z&quot;] 3000]
-                                            :change 1}
+                                            :change 1
+                                            :readers #{}
+                                            :writers #{}}
                                            res-chan]
  (async/alts!! [res-chan
                 (async/timeout 1000)]) =&gt; [nil

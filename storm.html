@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 07 August 2017</h5>
+              <h5>Date: 08 August 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.2.3</h5></div></div>
           <hr/>
@@ -182,10 +182,10 @@
    (-&gt;&gt; (st/read-tuples result &quot;l1&quot;)
         (map (fn [[kind name user [tweet] removed ts change writers readers]]
                [user tweet removed ts]))
-        set) =&gt; #{[&quot;alice&quot; &quot;bob's first tweet&quot; nil 1003]
-                  [&quot;alice&quot; &quot;bob's second tweet&quot; nil 1004]
-                  [&quot;charlie&quot; &quot;hello, world&quot; [&quot;hola, mundo&quot;] 1001]
-                  [&quot;dave&quot; &quot;hello, world&quot; [&quot;hola, mundo&quot;] 1001]}))</code></pre></div><div><span id="store-bolt"></span><h2><b>5 &nbsp;&nbsp; store-bolt</b></h2></div><div><p>The <code>store-bolt</code> uses a <code>database-event-storage-chan</code> (e.g., <a href='dynamo.html#database-event-storage-chan'>the one for DynamoDB</a>) to store each event it receives to a database.</p></div><div><p>To demonstrate how it works we will mock a database that stores all the received events into into an <code>atom</code>.</p></div><div class="code"><pre><code class="clojure">:integ
+        set) =&gt; #{[&quot;alice&quot; &quot;bob's first tweet&quot; nil 1003000]
+                  [&quot;alice&quot; &quot;bob's second tweet&quot; nil 1004000]
+                  [&quot;charlie&quot; &quot;hello, world&quot; [&quot;hola, mundo&quot;] 1002001]
+                  [&quot;dave&quot; &quot;hello, world&quot; [&quot;hola, mundo&quot;] 1003002]}))</code></pre></div><div><span id="store-bolt"></span><h2><b>5 &nbsp;&nbsp; store-bolt</b></h2></div><div><p>The <code>store-bolt</code> uses a <code>database-event-storage-chan</code> (e.g., <a href='dynamo.html#database-event-storage-chan'>the one for DynamoDB</a>) to store each event it receives to a database.</p></div><div><p>To demonstrate how it works we will mock a database that stores all the received events into into an <code>atom</code>.</p></div><div class="code"><pre><code class="clojure">:integ
  (def stored-events (atom []))</code></pre></div><div><p>We mock a module function to provide our mock <code>database-event-storage-chan</code>. It takes tuples <code>&#91;event ack&#93;</code>, where <code>event</code> is an event (map) to be stored  and <code>ack</code> is a channel to be closed once the event is stored.</p></div><div class="code"><pre><code class="clojure">:integ
  (defn mock-db-storage-module [$]
  (di/provide $ database-event-storage-chan [foo]
