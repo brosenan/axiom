@@ -308,11 +308,11 @@ The `*` operator will do a better job, given that all our timestamps are within 
 and as we apply more multipliers the result will grow to be unnecessarily large or overflow (if `bigint` is not used).
 We therefore use a modular multiplication as our operation."
 (fact
- (let [ts1 (rand-int 2000000000)
-       ts2 (rand-int 2000000000)
+ (let [ts1 (* (bigint (rand-int 2000000000)) 1234)
+       ts2 (* (bigint (rand-int 2000000000)) 1234)
        mult (multiplier timeline 1)
-       ev (first (mult (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"] :ts ts1)
-                       (event :fact ":test/tweeted" "bob" ["hello"] :ts ts2)))]
+       ev (first (mult (event :rule "cloudlog-events.core_test/timeline!0" "bob" ["alice" "bob"] :ts (long ts1))
+                       (event :fact ":test/tweeted" "bob" ["hello"] :ts (long ts2))))]
    (:ts ev) => (mod (* ts1 ts2) (bit-shift-left 1 48))))
 
 "Why? because we need to keep the value unique per `:key`.

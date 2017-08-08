@@ -64,7 +64,7 @@
                                                     :name (str (cloudlog/fact-table [rulefunc]) "!" link)}))
                                     {:key (first data)
                                      :data (rest data)
-                                     :ts (mod (* (:ts event) mult-ts) (bit-shift-left 1 48))
+                                     :ts (mod (* (bigint (:ts event)) mult-ts) (bit-shift-left 1 48))
                                      :writers rule-writers
                                      :change (* (:change event) mult)
                                      :readers (interset/intersection (:readers event) readers)}))))]
