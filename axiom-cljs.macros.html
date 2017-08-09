@@ -181,12 +181,10 @@
                                :data [&quot;world&quot;]
                                :readers #{}
                                :writers #{&quot;alice&quot;}}] -1)
-    (is (= (count (my-tweets2 &quot;alice&quot;)) 0))</code></pre></div><div><span id="event-emitting-functions"></span><h3>1.1 &nbsp;&nbsp; Event-Emitting Functions</h3></div><div><p>A view provides functions that allow users to emit event for creating, updating and deleting facts.</p></div><div><p>For <em>creating facts</em>, a sequence returned by a view function has an <code>:add</code> meta-field. This is a function that takes a value map as input, and emits a corresponding event with the following keys:</p><ol><li><code>:kind</code> is always <code>:fact</code>.</li><li><code>:name</code> is the first element in the fact pattern, converted to string.</li><li><code>:key</code> and <code>:data</code> are derived from the value map.</li><li><code>:ts</code> consults the host's <code>:time</code> function.</li><li><code>:change</code> is always 1.</li><li><code>:writers</code> defaults to the set representing the user.</li><li><code>:readers</code> defaults to the universal set.</li></ol></div><div class="code"><pre><code class="clojure">defview-ev-1a
-    (let [add (-&gt; (my-tweets2 &quot;alice&quot;)
-                  meta :add)]
+    (is (= (count (my-tweets2 &quot;alice&quot;)) 0))</code></pre></div><div><span id="event-emitting-functions"></span><h3>1.1 &nbsp;&nbsp; Event-Emitting Functions</h3></div><div><p>A view provides functions that allow users to emit event for creating, updating and deleting facts.</p></div><div><p>For <em>creating facts</em>, a sequence returned by a view function has an <code>:add</code> meta-field. This is a function that takes a value map as input, and emits a corresponding event with the following keys:</p><ol><li><code>:kind</code> is always <code>:fact</code>.</li><li><code>:name</code> is the first element in the fact pattern, converted to string.</li><li><code>:key</code> and <code>:data</code> are derived from the value map.</li><li><code>:ts</code> consults the host's <code>:time</code> function.</li><li><code>:change</code> is always 1.</li><li><code>:writers</code> defaults to the set representing the user.</li><li><code>:readers</code> defaults to the universal set.Parameters already given to the view function (e.g., <code>:user &quot;alice&quot;</code> in the following example) should be omitted.</li></ol></div><div class="code"><pre><code class="clojure">defview-ev-1a
+    (let [{:keys [add]} (meta (my-tweets2 &quot;alice&quot;))]
       (is (fn? add))
-      (add {:user &quot;alice&quot;
-            :tweet &quot;Hola!&quot;})
+      (add {:tweet &quot;Hola!&quot;})
       (is (= @published2
              [{:kind :fact
                 :name &quot;tweetlog/tweeted&quot;
