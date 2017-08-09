@@ -50,10 +50,10 @@
                     {:input "libs/cloudlog-events/test/cloudlog_events/core_test.clj"
                      :title "cloudlog-events.core"
                      :subtitle "Event Processing"}
-                    "cloudlog-events.cache"
-                    {:input "libs/cloudlog-events/test/cloudlog_events/cache_test.clj"
-                     :title "cloudlog-events.cache"
-                     :subtitle "Event Caches"}
+                    "cloudlog-events.testing"
+                    {:input "libs/cloudlog-events/test/cloudlog_events/testing_test.clj"
+                     :title "cloudlog-events.testing"
+                     :subtitle "Test Utilities"}
                     "zk-plan"
                     {:input "libs/zk-plan/test/zk_plan/core_test.clj"
                      :title "zk-plan.core"
