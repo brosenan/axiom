@@ -1,4 +1,5 @@
-(ns axiom-cljs.macros)
+(ns axiom-cljs.macros
+  (:require [clojure.set :as set]))
 
 
 (defn ^:private symbols [form]
@@ -73,7 +74,7 @@
                                       :key ~(-> fact second)
                                       :get-existing true})
                        (ax/merge-meta '() {:pending true})))
-               (ax/merge-meta {:add (fn [{:keys [~@(symbols fact)]}]
+               (ax/merge-meta {:add (fn [{:keys [~@(set/difference (symbols fact) (symbols args))]}]
                                       (let [~'$user (user ~host)]
                                         ((:pub ~host)
                                          {:kind :fact

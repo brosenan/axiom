@@ -162,13 +162,12 @@ This is a function that takes a value map as input, and emits a corresponding ev
 4. `:ts` consults the host's `:time` function.
 5. `:change` is always 1.
 6. `:writers` defaults to the set representing the user.
-7. `:readers` defaults to the universal set."
+7. `:readers` defaults to the universal set.
+Parameters already given to the view function (e.g., `:user \"alice\"` in the following example) should be omitted."
 (fact defview-ev-1a
-      (let [add (-> (my-tweets2 "alice")
-                    meta :add)]
+      (let [{:keys [add]} (meta (my-tweets2 "alice"))]
         (is (fn? add))
-        (add {:user "alice"
-              :tweet "Hola!"})
+        (add {:tweet "Hola!"})
         (is (= @published2
                [{:kind :fact
                   :name "tweetlog/tweeted"
