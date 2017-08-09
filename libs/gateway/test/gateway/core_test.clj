@@ -743,6 +743,23 @@ and in case the `:readers` does not include the user, the `:readers` set is modi
           :readers [#{[:perm.AAA/friend "alice"]} #{"alice"}]}
    (:readers ev) => vector? ;; Midje doesn't check this by itself...
    ))
+
+"This operation is only performed on `:fact` events.
+`:reg` events are left alone."
+(fact
+ (defn read-from-chan [ch]
+   (let [[item read-ch] (async/alts!! [ch (async/timeout 1000)])]
+     (when-not (= read-ch ch)
+       (throw (Exception. "Timed out trying to read from channel")))
+     item))
+ (async/>!! c-c2s {:kind :reg
+                   :name "foo"
+                   :key 123})
+ (let [ev (read-from-chan s-c2s)]
+   ev => {:kind :reg
+          :name "foo"
+          :key 123}))
+
 [[:section {:title "Registration Events"}]]
 "Valid `:reg`istration events should pass from client to server."
 (fact

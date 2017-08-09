@@ -84,6 +84,18 @@
           [trans] data]
       trans)))
 
+;; For debugging
+(defn event-tracer [[c-c2s c-s2c] stage]
+  (let [s-c2s (async/chan 2 (map #(do
+                                    (prn [:c2s stage %])
+                                    %)))
+        s-s2c (async/chan 2 (map #(do
+                                    (prn [:s2c stage %])
+                                    %)))]
+    (async/pipe c-c2s s-c2s)
+    (async/pipe s-s2c c-s2c)
+    [s-c2s s-s2c]))
+
 (defn module [$]
   (di/provide $ authenticator [use-dummy-authenticator]
               (info-from-param-or-cookie-middleware :identity "_identity" "user_identity"))
@@ -162,11 +174,13 @@
                                                        (= (:kind %) :reg)
                                                        (contains? % :name)
                                                        (contains? % :key))))
-                                            (map #(update % :readers (fn [x]
-                                                                       (cond (user-in-set? x)
-                                                                             x
-                                                                             :else
-                                                                             (vec (interset/union x #{identity}))))))))
+                                            (map #(cond (= (:kind %) :fact)
+                                                        (update % :readers (fn [x]
+                                                                             (cond (user-in-set? x)
+                                                                                   x
+                                                                                   :else
+                                                                                   (vec (interset/union x #{identity})))))
+                                                        :else %))))
                       s-s2c (async/chan 10 (filter #(and
                                                      (or
                                                       (user-in-set? (:writers %))
