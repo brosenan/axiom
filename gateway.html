@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 08 August 2017</h5>
+              <h5>Date: 09 August 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.2.3</h5></div></div>
           <hr/>
@@ -429,7 +429,18 @@
         :writers #{&quot;alice&quot;}
         :readers [#{[:perm.AAA/friend &quot;alice&quot;]} #{&quot;alice&quot;}]}
  (:readers ev) =&gt; vector? ;; Midje doesn't check this by itself...
- )</code></pre></div><div><span id="registration-events"></span><h3>6.5 &nbsp;&nbsp; Registration Events</h3></div><div><p>Valid <code>:reg</code>istration events should pass from client to server.</p></div><div class="code"><pre><code class="clojure">(async/&gt;!! c-c2s {:kind :reg
+ )</code></pre></div><div><p>This operation is only performed on <code>:fact</code> events. <code>:reg</code> events are left alone.</p></div><div class="code"><pre><code class="clojure">(defn read-from-chan [ch]
+ (let [[item read-ch] (async/alts!! [ch (async/timeout 1000)])]
+   (when-not (= read-ch ch)
+     (throw (Exception. &quot;Timed out trying to read from channel&quot;)))
+   item))
+ (async/&gt;!! c-c2s {:kind :reg
+                 :name &quot;foo&quot;
+                 :key 123})
+ (let [ev (read-from-chan s-c2s)]
+ ev =&gt; {:kind :reg
+        :name &quot;foo&quot;
+        :key 123})</code></pre></div><div><span id="registration-events"></span><h3>6.5 &nbsp;&nbsp; Registration Events</h3></div><div><p>Valid <code>:reg</code>istration events should pass from client to server.</p></div><div class="code"><pre><code class="clojure">(async/&gt;!! c-c2s {:kind :reg
                  :name &quot;foo&quot;
                  :key &quot;bar&quot;})
  (let [[ev chan] (async/alts!! [s-c2s
