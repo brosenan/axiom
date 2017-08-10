@@ -67,9 +67,15 @@
                     (map to-event)
                     index-events)]
     (cond (empty? rules)
-          (->> (index index-key)
-               (map :data)
-               set)
+          (let [result (->> (index index-key)
+                            (map :data)
+                            set)]
+            (cond (empty? result)
+                  {:keys (set (keys index))
+                   :rules (->> (all-rules)
+                               (map #(keyword (-> % meta :ns str) (-> % meta :name)))
+                               set)}
+                  :else result))
           :else
           (recur (rest rules) (process-rule (first rules) index)))))
 

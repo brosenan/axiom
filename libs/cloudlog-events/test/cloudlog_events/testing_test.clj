@@ -1,7 +1,8 @@
 (ns cloudlog-events.testing-test
   (:use [midje.sweet]
         [cloudlog-events.testing])
-  [:require [cloudlog.core :as clg]])
+  (:require [cloudlog.core :as clg]
+            [clojure.set :as set]))
 
 [[:chapter {:title "Introduction"}]]
 "Unit testing is an important aspect of any software, and good tools for testing are important for creating good tests.
@@ -54,6 +55,29 @@ and returns a set of `:data` tuples that together with the rule name and the key
               [:tweetlog/tweeted "alice" "hello, world" 100 #{"alice"}]
               [:tweetlog/tweeted "bob" "hola, mundo" 200 #{"bob"}]]]
    (apply-rules facts [:cloudlog-events.testing-test/followee-tweets ["charlie" 0]]) => #{["alice" "hello, world" 100]}))
+
+"If no result is available, `apply-rules` returns a map with the following fields to help debugging the problem:
+- `:keys`: A set of all the keys that exist in the index, and
+- `:rules`: A set of all the names of the rules that were applied."
+
+"For example, if in the above example we misspell the name of the rule and write, e.g., `followees-tweets` instead of `followee-tweets`,
+we get a map telling us what names are valid so we can adjust the test (in this case) or the rule if the mistake was done there."
+(fact
+ (let [facts [[:tweetlog/follows "charlie" "alice" #{"charlie"}]
+              [:tweetlog/follows "eve" "bob" #{"eve"}]
+              [:tweetlog/tweeted "alice" "hello, world" 100 #{"alice"}]
+              [:tweetlog/tweeted "bob" "hola, mundo" 200 #{"bob"}]]]
+   (let [result (apply-rules facts [:cloudlog-events.testing-test/followees-tweets ["charlie" 0]])]
+     (:keys result) => #{[:tweetlog/follows "charlie"]
+                         [:tweetlog/follows "eve"]
+                         [:tweetlog/tweeted "alice"]
+                         [:tweetlog/tweeted "bob"]
+                         [:cloudlog-events.testing-test/followee-tweets ["charlie" 0]]
+                         [:cloudlog-events.testing-test/followee-tweets ["eve" 0]]
+                         [:cloudlog-events.testing-test/follower "alice"]
+                         [:cloudlog-events.testing-test/follower "bob"]}
+     (set/subset? #{:cloudlog-events.testing-test/followee-tweets :cloudlog-events.testing-test/follower} (:rules result))
+     => true)))
 
 [[:chapter {:title "query"}]]
 "`query` uses [apply-rules](#apply-rules) to perform a query.
