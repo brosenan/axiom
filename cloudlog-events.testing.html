@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 09 August 2017</h5>
+              <h5>Date: 10 August 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.2.3</h5></div></div>
           <hr/>
@@ -108,7 +108,21 @@
             [:tweetlog/follows &quot;eve&quot; &quot;bob&quot; #{&quot;eve&quot;}]
             [:tweetlog/tweeted &quot;alice&quot; &quot;hello, world&quot; 100 #{&quot;alice&quot;}]
             [:tweetlog/tweeted &quot;bob&quot; &quot;hola, mundo&quot; 200 #{&quot;bob&quot;}]]]
- (apply-rules facts [:cloudlog-events.testing-test/followee-tweets [&quot;charlie&quot; 0]]) =&gt; #{[&quot;alice&quot; &quot;hello, world&quot; 100]})</code></pre></div><div><span id="query"></span><h2><b>3 &nbsp;&nbsp; query</b></h2></div><div><p><code>query</code> uses <a href='#apply-rules'>apply-rules</a> to perform a query. Queries exercise <a href='cloudlog.html#defclause'>clauses</a> by providing them an input tuple, expecting output tuples in return.</p></div><div><p>The <code>query</code> function takes a collection of facts and a query vector that consists of the name of the predicate (the keyword mentioned in the clause) and all its input arguments, and returns a set of the results as tuples corresponding to the output arguments.</p></div><div class="code"><pre><code class="clojure">(let [facts [[:tweetlog/follows &quot;charlie&quot; &quot;alice&quot; #{&quot;charlie&quot;}]
+ (apply-rules facts [:cloudlog-events.testing-test/followee-tweets [&quot;charlie&quot; 0]]) =&gt; #{[&quot;alice&quot; &quot;hello, world&quot; 100]})</code></pre></div><div><p>If no result is available, <code>apply-rules</code> returns a map with the following fields to help debugging the problem:</p><ul><li><code>:keys</code>: A set of all the keys that exist in the index, and</li><li><code>:rules</code>: A set of all the names of the rules that were applied.</li></ul></div><div><p>For example, if in the above example we misspell the name of the rule and write, e.g., <code>followees-tweets</code> instead of <code>followee-tweets</code>, we get a map telling us what names are valid so we can adjust the test (in this case) or the rule if the mistake was done there.</p></div><div class="code"><pre><code class="clojure">(let [facts [[:tweetlog/follows &quot;charlie&quot; &quot;alice&quot; #{&quot;charlie&quot;}]
+            [:tweetlog/follows &quot;eve&quot; &quot;bob&quot; #{&quot;eve&quot;}]
+            [:tweetlog/tweeted &quot;alice&quot; &quot;hello, world&quot; 100 #{&quot;alice&quot;}]
+            [:tweetlog/tweeted &quot;bob&quot; &quot;hola, mundo&quot; 200 #{&quot;bob&quot;}]]]
+ (let [result (apply-rules facts [:cloudlog-events.testing-test/followees-tweets [&quot;charlie&quot; 0]])]
+   (:keys result) =&gt; #{[:tweetlog/follows &quot;charlie&quot;]
+                       [:tweetlog/follows &quot;eve&quot;]
+                       [:tweetlog/tweeted &quot;alice&quot;]
+                       [:tweetlog/tweeted &quot;bob&quot;]
+                       [:cloudlog-events.testing-test/followee-tweets [&quot;charlie&quot; 0]]
+                       [:cloudlog-events.testing-test/followee-tweets [&quot;eve&quot; 0]]
+                       [:cloudlog-events.testing-test/follower &quot;alice&quot;]
+                       [:cloudlog-events.testing-test/follower &quot;bob&quot;]}
+   (set/subset? #{:cloudlog-events.testing-test/followee-tweets :cloudlog-events.testing-test/follower} (:rules result))
+   =&gt; true))</code></pre></div><div><span id="query"></span><h2><b>3 &nbsp;&nbsp; query</b></h2></div><div><p><code>query</code> uses <a href='#apply-rules'>apply-rules</a> to perform a query. Queries exercise <a href='cloudlog.html#defclause'>clauses</a> by providing them an input tuple, expecting output tuples in return.</p></div><div><p>The <code>query</code> function takes a collection of facts and a query vector that consists of the name of the predicate (the keyword mentioned in the clause) and all its input arguments, and returns a set of the results as tuples corresponding to the output arguments.</p></div><div class="code"><pre><code class="clojure">(let [facts [[:tweetlog/follows &quot;charlie&quot; &quot;alice&quot; #{&quot;charlie&quot;}]
             [:tweetlog/follows &quot;eve&quot; &quot;bob&quot; #{&quot;eve&quot;}]
             [:tweetlog/tweeted &quot;alice&quot; &quot;hello, world&quot; 100 #{&quot;alice&quot;}]
             [:tweetlog/tweeted &quot;bob&quot; &quot;hola, mundo&quot; 200 #{&quot;bob&quot;}]]]
