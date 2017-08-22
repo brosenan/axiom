@@ -12,15 +12,15 @@
        set
        clg/sort-rules))
 
-(defn to-event [[kw key & args]]
+(defn to-event [[name key data writers readers]]
   {:kind :fact
-   :name (str (namespace kw) "/" (name kw))
+   :name name
    :key key
-   :data (take (dec (count args)) args)
+   :data data
    :ts 1
    :change 1
-   :writers (last args)
-   :readers #{}})
+   :writers writers
+   :readers readers})
 
 (defn merge-indexes
   ([] {})
@@ -79,9 +79,35 @@
           :else
           (recur (rest rules) (process-rule (first rules) index)))))
 
-(defn query [facts [pred & args]]
+(def ^:dynamic *scenario* nil)
+(def ^:dynamic *user* nil)
+
+(defmacro scenario [& body]
+  `(binding [*scenario* (atom [])] ~@body))
+
+(defmacro as [user & body]
+  `(binding [*user* ~user] ~@body))
+
+(defn emit
+  ([fact]
+   (when (nil? *user*)
+     (throw (Exception. "emit can only be called from within an `as` block")))
+   (emit fact #{*user*}))
+  ([fact writers]
+   (emit fact writers #{}))
+  ([[name-kw key & data] writers readers]
+   (when (nil? *scenario*)
+     (throw (Exception. "emit can only be called from within a scenario")))
+   (swap! *scenario* conj [(str (symbol (namespace name-kw) (name name-kw))) key data writers readers])))
+
+(defn query [[pred & args]]
+  (when (nil? *user*)
+    (throw (Exception. "query can only be called from within an `as` block")))
+  (when (nil? *scenario*)
+    (throw (Exception. "query can only be called from within a scenario")))
   (let [pred? (keyword (str (namespace pred) "/" (name pred) "?"))
         pred! (keyword (str (namespace pred) "/" (name pred) "!"))
-        q `[~pred? :unique ~@args #{}]
-        facts (conj facts q)]
+        q [pred? :unique args #{*user*} #{*user*}]
+        facts (conj @*scenario* q)]
     (apply-rules facts [pred! :unique])))
+
