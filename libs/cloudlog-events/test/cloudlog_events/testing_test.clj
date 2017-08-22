@@ -118,6 +118,32 @@ If a second arguent is given, it is taken as the `:writers` set."
 
 "This means only `alice` can read this fact, or anything derived from it."
 
+"Axiom's [gateway tier](gateway.html) defines rules regarding who can emit which fact.
+Concepually, the user needs to be a member of the fact's `:writers` set, according to its definition as an [interset](cloudlog.interset.html).
+In short, an interset consists of a union (`[]`) of intersections (`#{}`) of named groups, which can take two forms:
+1. a string, representing a single user (a group that consists of one user who's ID is the content of the string), and
+2. a vector representing a group whos members are determined by facts and rules.
+In the case of a vector, a vector of the form `[:some/name arg1 arg2 arg3...]` represents the group of every user `u` for which a fact `[:some/name u arg1 arg2 arg3...]`
+exists in Axiom.
+Technically, this could either be a raw fact or a derived fact. 
+However true access control will only be acheived by using derived facts for this purpose, since any user can emit any fact in Axiom."
+
+"The `emit` function checks, based on the scenario before its invocation, that the user on behalf of which the fact is emitted is indeed allowed to emit this fact.
+For example, imagine our application allows users to send private messages only to their followers.
+To send a message to someone we therefore need to identify as someone they follow.
+Now imagine `bob` and `malory` trying to send a message to `alice`, who follows `bob` but not `malory`.
+`emit` should succeed for `bob`, but throw an exception for `malory`."
+(fact
+ (scenario
+  (as "alice"
+      (emit [:tweetlog/follows "alice" "bob"]))
+  (as "bob"
+      (emit [:tweetlog/message "alice" "malory" "Hi friend!"] #{[:cloudlog-events.testing-test/follower "alice"]}))
+  (as "malory"
+      (emit [:tweetlog/message "alice" "malory" "Hi 'friend'!"] #{[:cloudlog-events.testing-test/follower "alice"]})
+      => (throws "Cannot emit fact. malory is not a member of #{[:cloudlog-events.testing-test/follower \"alice\"]}."))))
+
+
 [[:chapter {:title "query"}]]
 "`query` performs a query based on the current [scenario](#scenario), on behalf of the [current user](#as).
 Queries exercise [clauses](cloudlog.html#defclause) by providing them an input tuple, expecting output tuples in return."
@@ -304,3 +330,28 @@ we get a map telling us what names are valid so we can adjust the test (in this 
      (set/subset? #{:cloudlog-events.testing-test/followee-tweets :cloudlog-events.testing-test/follower} (:rules result))
      => true)))
 
+[[:section {:title "identity-set"}]]
+"A user's *identity set* is a union of all the groups a user is a member of.
+A user is a member of his or her singleton group (a group named after that user) and zero or more rule-based groups.
+The `identity-set` function takes a user ID, a scenario (collection of fact tuples) and an interset, 
+and returns some superset of the user's identity set (as an interset).
+This superset is tight enough around the given interset to allow comparison against it to check if the user is or is not a member of that interset."
+
+"For an interset that does not mention any rule-based groups, the returned interset is the user's singleton set."
+(fact
+ (identity-set "alice" [] #{}) => #{"alice"})
+
+"If the given interset mentiones rule-based groups, the returned set is an intersection of all the groups *of the same predicate* for which the user is a member of.
+For example, if the given interset mentions `[:cloudlog-events.testing-test/follower \"bob\"]` (a follower of `alice`),
+the returned interset will be an intersection of all the groups based on who follows the user, regardless of whether or not `bob` follows her."
+(fact
+ (let [scenario [["tweetlog/follows" "charlie" ["alice"] #{"charlie"} #{}]
+                 ["tweetlog/follows" "dave" ["alice"] #{"dave"} #{}]]]
+   (identity-set "alice" scenario #{[:cloudlog-events.testing-test/follower "bob"]})
+   => #{"alice"
+        [:cloudlog-events.testing-test/follower "charlie"]
+        [:cloudlog-events.testing-test/follower "dave"]}))
+
+"`identity-set` ignores groups that are not rule-based (groups that are not represented as vectors)."
+(fact
+ (identity-set "alice" [] #{:foo :bar "baz"}) => #{"alice"})

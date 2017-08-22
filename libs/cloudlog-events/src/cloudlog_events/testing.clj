@@ -1,7 +1,8 @@
 (ns cloudlog-events.testing
   (:require [cloudlog.core :as clg]
             [cloudlog-events.core :as ev]
-            [clojure.set :as set]))
+            [clojure.set :as set]
+            [cloudlog.interset :as interset]))
 
 (defn all-rules []
   (->> (all-ns)
@@ -79,6 +80,19 @@
           :else
           (recur (rest rules) (process-rule (first rules) index)))))
 
+(defn identity-set [user scenario s]
+  (loop [groups (interset/enum-groups s)
+         id-set #{user}]
+    (cond (empty? groups)
+          id-set
+          (vector? (first groups))
+          (let [[name & args] (first groups)]
+            (recur (rest groups)
+                   (interset/intersection id-set (set (for [res (apply-rules scenario [name user])]
+                                                        `[~name ~@res])))))
+          :else
+          (recur (rest groups) id-set))))
+
 (def ^:dynamic *scenario* nil)
 (def ^:dynamic *user* nil)
 
@@ -97,7 +111,10 @@
    (emit fact writers #{}))
   ([[name-kw key & data] writers readers]
    (when (nil? *scenario*)
-     (throw (Exception. "emit can only be called from within a scenario")))
+     (throw (Exception. "emit can only be called from within a scenario"))) 
+   (let [id-set (identity-set *user* @*scenario* writers)]
+     (when-not (interset/subset? id-set writers)
+       (throw (Exception. (str "Cannot emit fact. " *user* " is not a member of " (pr-str writers) ".")))))
    (swap! *scenario* conj [(str (symbol (namespace name-kw) (name name-kw))) key data writers readers])))
 
 (defn query [[pred & args]]
