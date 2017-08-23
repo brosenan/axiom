@@ -166,6 +166,14 @@ The values are their corresponding values in each event."
                   :identity (atom "alice")}]
         (is (= (count (my-tweets2 host "alice")) 0))))
 
+"To facilitate debugging, the atom in which the view's state is stored is exposed as the `:state` meta field in the view function."
+(fact defview-9
+      (defonce atom9 (atom nil))
+      (defview my-view9 [x]
+        [:foo/bar x y z]
+        :store-in ((constantly atom9)))
+      (is (= (-> my-view9 meta :state) atom9)))
+
 [[:section {:title "Event-Emitting Functions"}]]
 "A view provides functions that allow users to emit event for creating, updating and deleting facts."
 
@@ -406,7 +414,7 @@ The expression can rely on symbols from the fact pattern, and must result in a [
       (defonce my-atom7 (atom nil))
       (defquery my-query7 [user]
         [:tweetlog/timeline user -> author tweet]
-        :store-in my-atom7 ;; Optional
+        :store-in ((constantly my-atom7)) ;; Optional
         ))
 
 "The optional `:store-in` arguement provides an atom in which received events are stored.
@@ -488,6 +496,10 @@ This time, the value maps capture the query's *output parameters* only."
                                  :writers #{"XXYY"}
                                  :readers #{}}] -1)
       (is (= (my-query7 host7 "alice") [])))
+
+"As with [defview](#defview), the query function has a meta-field holding the atom containing the state."
+(fact defquery-7
+      (is (= (-> my-query7 meta :state) my-atom7)))
 
 [[:section {:title "Filtering and Sorting"}]]
 "Filtering and sorting work exactly as with `defview`."
