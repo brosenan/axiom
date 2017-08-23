@@ -22,9 +22,6 @@ It also takes optional keyword parameters that will be discussed later."
 (fact defview-1
       (defonce published1 (atom nil))
       (reset! published1 nil)
-      (defonce host {:pub (fn [ev]
-                            (swap! published1 conj ev))
-                     :sub (fn [key f])})
       (defview my-tweets [user]
         [:tweetlog/tweeted user tweet]))
 
@@ -35,7 +32,10 @@ It also takes optional keyword parameters that will be discussed later."
 "When called for the first time, the function will send a `:reg` event with key according to the parameters,
 and return an empty sequence with a meta field `:pending` indicating that the function should be consulted again later."
 (fact defview-3
-      (let [res (my-tweets host "alice")]
+      (let [host {:pub (fn [ev]
+                         (swap! published1 conj ev))
+                  :sub (fn [key f])}
+            res (my-tweets host "alice")]
         (is (= res []))
         (is (= (-> res meta :pending) true))
         (is (= @published1 [{:kind :reg
@@ -48,10 +48,6 @@ and return an empty sequence with a meta field `:pending` indicating that the fu
       (defonce ps2 (ax/pubsub :name))
       (defonce published2 (atom nil))
       (reset! published2 nil)
-      (defonce host2 {:sub (:sub ps2)
-                      :pub #(swap! published2 conj %)
-                      :time (constantly 12345)
-                      :identity (atom "alice")})
       (defonce my-atom2 (atom nil))
       (defview my-tweets2 [user]
         [:tweetlog/tweeted user tweet]
@@ -65,71 +61,87 @@ The second level of keys consists of the received [events](cloudlog-events.html#
 with the `:ts` and `:change` fields omitted.
 The values are the accumulated `:change` of all matching events."
 (fact defview-5
-      (reset! my-atom2 {})
-      (is (= (my-tweets2 host2 "alice") [])) ;; Make the inital call that returns an empty collection
-      ((:pub ps2)
-       {:kind :fact
-        :name "tweetlog/tweeted"
-        :key "alice"
-        :data ["hello"]
-        :ts 1000
-        :change 1
-        :readers #{}
-        :writers #{"alice"}})
-      ((:pub ps2)
-       {:kind :fact
-        :name "tweetlog/tweeted"
-        :key "alice"
-        :data ["world"]
-        :ts 2000
-        :change 1
-        :readers #{}
-        :writers #{"alice"}})
-      ((:pub ps2)
-       {:kind :fact
-        :name "tweetlog/tweeted"
-        :key "alice"
-        :data ["world"]
-        :ts 3000
-        :change 1
-        :readers #{}
-        :writers #{"alice"}})
-      (is (contains? @my-atom2 ["alice"]))
-      (is (= (get-in @my-atom2 [["alice"]
-                                {:kind :fact
-                                 :name "tweetlog/tweeted"
-                                 :key "alice"
-                                 :data ["hello"]
-                                 :readers #{}
-                                 :writers #{"alice"}}]) 1))
-      (is (= (get-in @my-atom2 [["alice"]
-                                {:kind :fact
-                                 :name "tweetlog/tweeted"
-                                 :key "alice"
-                                 :data ["world"]
-                                 :readers #{}
-                                 :writers #{"alice"}}]) 2)))
+      (let [host {:sub (:sub ps2)
+                  :pub #(swap! published2 conj %)
+                  :time (constantly 12345)
+                  :identity (atom "alice")}]
+        (reset! my-atom2 {})
+        (is (= (my-tweets2 host "alice") [])) ;; Make the inital call that returns an empty collection
+        ((:pub ps2)
+         {:kind :fact
+          :name "tweetlog/tweeted"
+          :key "alice"
+          :data ["hello"]
+          :ts 1000
+          :change 1
+          :readers #{}
+          :writers #{"alice"}})
+        ((:pub ps2)
+         {:kind :fact
+          :name "tweetlog/tweeted"
+          :key "alice"
+          :data ["world"]
+          :ts 2000
+          :change 1
+          :readers #{}
+          :writers #{"alice"}})
+        ((:pub ps2)
+         {:kind :fact
+          :name "tweetlog/tweeted"
+          :key "alice"
+          :data ["world"]
+          :ts 3000
+          :change 1
+          :readers #{}
+          :writers #{"alice"}})
+        (is (contains? @my-atom2 ["alice"]))
+        (is (= (get-in @my-atom2 [["alice"]
+                                  {:kind :fact
+                                   :name "tweetlog/tweeted"
+                                   :key "alice"
+                                   :data ["hello"]
+                                   :readers #{}
+                                   :writers #{"alice"}}]) 1))
+        (is (= (get-in @my-atom2 [["alice"]
+                                  {:kind :fact
+                                   :name "tweetlog/tweeted"
+                                   :key "alice"
+                                   :data ["world"]
+                                   :readers #{}
+                                   :writers #{"alice"}}]) 2))))
 
 "The view function returns, for a given combination of arguments, a collection of all data elements with a positive total count.
 In our case, both \"hello\" and \"world\" tweets are taken (in some order)."
 (fact defview-6
-      (is (= (count (my-tweets2 host2 "alice")) 2))
-      (is (= (-> (my-tweets2 host2 "alice")
-                 meta :pending) false)))
+      (let [host {:sub (:sub ps2)
+                  :pub #(swap! published2 conj %)
+                  :time (constantly 12345)
+                  :identity (atom "alice")}]
+        (is (= (count (my-tweets2 host "alice")) 2))
+        (is (= (-> (my-tweets2 host "alice")
+                   meta :pending) false))))
 
 "Each element in the returned collection is a *value map*, a map in which the keys correspond to the symbols in the fact pattern provided in the view definition.
 In our case these are `:user` and `:tweet`.
 The values are their corresponding values in each event."
 (fact defview-7a
-      (doseq [result (my-tweets2 host2 "alice")]
-        (is (= (:user result) "alice"))
-        (is (contains? #{"hello" "world"} (:tweet result)))))
+      (let [host {:sub (:sub ps2)
+                  :pub #(swap! published2 conj %)
+                  :time (constantly 12345)
+                  :identity (atom "alice")}]
+        (doseq [result (my-tweets2 host "alice")]
+          (is (= (:user result) "alice"))
+          (is (contains? #{"hello" "world"} (:tweet result))))))
 
 "Along with the data fields, each value map also contains the `:-readers` and `:-writers` of the corresponding events."
 (fact defview-7b
-      (doseq [result (my-tweets2 host2 "alice")]
-        (is (= (:-readers result) #{}))
-        (is (= (:-writers result) #{"alice"}))))
+      (let [host {:sub (:sub ps2)
+                  :pub #(swap! published2 conj %)
+                  :time (constantly 12345)
+                  :identity (atom "alice")}]
+        (doseq [result (my-tweets2 host "alice")]
+          (is (= (:-readers result) #{}))
+          (is (= (:-writers result) #{"alice"})))))
 
 "Elements with zero or negative count values are not shown."
 (fact defview-8
@@ -148,7 +160,11 @@ The values are their corresponding values in each event."
                                  :data ["world"]
                                  :readers #{}
                                  :writers #{"alice"}}] -1)
-      (is (= (count (my-tweets2 host2 "alice")) 0)))
+      (let [host {:sub (:sub ps2)
+                  :pub #(swap! published2 conj %)
+                  :time (constantly 12345)
+                  :identity (atom "alice")}]
+        (is (= (count (my-tweets2 host "alice")) 0))))
 
 [[:section {:title "Event-Emitting Functions"}]]
 "A view provides functions that allow users to emit event for creating, updating and deleting facts."
@@ -165,17 +181,21 @@ This is a function that takes a value map as input, and emits a corresponding ev
 Parameters already given to the view function (e.g., `:user \"alice\"` in the following example) should be omitted."
 (fact defview-ev-1a
       (reset! published2 [])
-      (let [{:keys [add]} (meta (my-tweets2 host2 "alice"))]
+      (let [host {:sub (:sub ps2)
+                  :pub #(swap! published2 conj %)
+                  :time (constantly 12345)
+                  :identity (atom "alice")}
+            {:keys [add]} (meta (my-tweets2 host "alice"))]
         (is (fn? add))
         (add {:tweet "Hola!"})
         (is (= @published2
                [{:kind :fact
-                  :name "tweetlog/tweeted"
-                  :key "alice"
-                  :data ["Hola!"]
-                  :ts 12345
-                  :change 1
-                  :writers #{"alice"}
+                 :name "tweetlog/tweeted"
+                 :key "alice"
+                 :data ["Hola!"]
+                 :ts 12345
+                 :change 1
+                 :writers #{"alice"}
                  :readers #{}}]))))
 
 "The `:readers` and `:writers` sets in newly-added facts are controlled by the optional `:readers` and `:writers` keyword arguments in the view definition.
@@ -226,9 +246,6 @@ It creates an event with all the same values, but with a new `:ts` and a `:chang
       (defonce my-atom3 (atom nil))
       (defonce published3 (atom nil))
       (reset! published3 nil)
-      (defonce host3 {:pub #(swap! published3 conj %)
-                      :sub (fn [key f])
-                      :time (constantly 23456)})
       (defview my-tweets3 [user]
         [:tweetlog/tweeted user tweet]
         :store-in my-atom3)
@@ -239,18 +256,21 @@ It creates an event with all the same values, but with a new `:ts` and a `:chang
                                  :data ["hello"]
                                  :readers #{}
                                  :writers #{"alice"}}] 3)
-      (let [valmap (first (my-tweets3 host3 "alice"))]
+      (let [host {:pub #(swap! published3 conj %)
+                  :sub (fn [key f])
+                  :time (constantly 23456)}
+            valmap (first (my-tweets3 host "alice"))]
         (is (fn? (:del! valmap)))
         ((:del! valmap))
         (is (= @published3
                [{:kind :fact
-                  :name "tweetlog/tweeted"
-                  :key "alice"
-                  :data ["hello"]
-                  :ts 23456
-                  :change -3
-                  :readers #{}
-                  :writers #{"alice"}}]))))
+                 :name "tweetlog/tweeted"
+                 :key "alice"
+                 :data ["hello"]
+                 :ts 23456
+                 :change -3
+                 :readers #{}
+                 :writers #{"alice"}}]))))
 
 "A `:swap!` function provides a way to update a value map.
 It takes a function (and optionally arguments) that is applied to the value map, and emits an [atomic update](cloudlog-events.html#atomic-updates)
@@ -259,9 +279,6 @@ event from the original state to the state reflected by the modified value map."
       (defonce my-atom4 (atom nil))
       (defonce published4 (atom nil))
       (reset! published4 nil)
-      (defonce host4 {:pub #(swap! published4 conj %)
-                      :sub (fn [key f])
-                      :time (constantly 34567)})
       (defview my-tweets4 [user]
         [:tweetlog/tweeted user tweet ts]
         :store-in my-atom4)
@@ -272,19 +289,22 @@ event from the original state to the state reflected by the modified value map."
                                  :data ["hello" 12345]
                                  :readers #{}
                                  :writers #{"alice"}}] 3)
-      (let [valmap (first (my-tweets4 host4 "alice"))]
+      (let [host {:pub #(swap! published4 conj %)
+                  :sub (fn [key f])
+                  :time (constantly 34567)}
+            valmap (first (my-tweets4 host "alice"))]
         (is (fn? (:swap! valmap)))
         ((:swap! valmap) assoc :tweet "world")
         (is (= @published4
                [{:kind :fact
-                  :name "tweetlog/tweeted"
-                  :key "alice"
-                  :removed ["hello" 12345]
-                  :data ["world" 12345]
-                  :ts 34567
-                  :change 3
-                  :readers #{}
-                  :writers #{"alice"}}]))))
+                 :name "tweetlog/tweeted"
+                 :key "alice"
+                 :removed ["hello" 12345]
+                 :data ["world" 12345]
+                 :ts 34567
+                 :change 3
+                 :readers #{}
+                 :writers #{"alice"}}]))))
 
 [[:section {:title "Filtering"}]]
 "Views can define client-side filtering for facts."
@@ -293,41 +313,40 @@ event from the original state to the state reflected by the modified value map."
 We define such filtering using an optional `:when` key in `defview`."
 (fact defview-filt
       (defonce my-atom5 (atom nil))
-      (defonce ps5 (ax/pubsub :name))
-      (defonce host5 {:sub (:sub ps5)
-                      :pub (constantly nil)})
       (defview hashtags-only [user]
         [:tweetlog/tweeted user tweet]
         :store-in my-atom5
         :when (re-matches #".*#[a-zA-Z0-9]+.*" tweet))
       (reset! my-atom5 {})
-      (is (= (hashtags-only host5 "alice") [])) ;; Initial call to view function
-      ((:pub ps5)
-       {:kind :fact
-        :name "tweetlog/tweeted"
-        :key "alice"
-        :data ["No hashtags here..."]
-        :ts 1000
-        :change 1
-        :readers #{}
-        :writers #{"alice"}})
-      ((:pub ps5)
-       {:kind :fact
-        :name "tweetlog/tweeted"
-        :key "alice"
-        :data ["This one hash #hashtags..."]
-        :ts 2000
-        :change 1
-        :readers #{}
-        :writers #{"alice"}})
-      (is (= (count (@my-atom5 ["alice"])) 1)))
+      (let [ps5 (ax/pubsub :name)
+            host {:sub (:sub ps5)
+                  :pub (constantly nil)}]
+        (is (= (hashtags-only host "alice") [])) ;; Initial call to view function
+        ((:pub ps5)
+         {:kind :fact
+          :name "tweetlog/tweeted"
+          :key "alice"
+          :data ["No hashtags here..."]
+          :ts 1000
+          :change 1
+          :readers #{}
+          :writers #{"alice"}})
+        ((:pub ps5)
+         {:kind :fact
+          :name "tweetlog/tweeted"
+          :key "alice"
+          :data ["This one hash #hashtags..."]
+          :ts 2000
+          :change 1
+          :readers #{}
+          :writers #{"alice"}})
+        (is (= (count (@my-atom5 ["alice"])) 1))))
 
 [[:section {:title "Sorting"}]]
 "The optional keyword argument `:order-by` directs the view function to sort the elements it returns according to the given expression.
 The expression can rely on symbols from the fact pattern, and must result in a [comparable expression](https://clojure.org/guides/comparators)."
 (fact defview-sort
       (defonce my-atom6 (atom nil))
-      (defonce host6 {:sub (fn [key f])})
       (defview my-sorted-tweets [user]
         [:tweetlog/tweeted user tweet timestamp]
         :store-in my-atom6
@@ -358,7 +377,8 @@ The expression can rely on symbols from the fact pattern, and must result in a [
                :data ["my third tweet" 3000]
                :readers #{}
                :writers #{"alice"}}] 1)
-      (let [tweets-in-order (for [result (my-sorted-tweets host6 "alice")]
+      (let [host {:sub (fn [key f])}
+            tweets-in-order (for [result (my-sorted-tweets host "alice")]
                               (:tweet result))]
         (is (= tweets-in-order ["my third tweet"
                                 "my second tweet"
@@ -406,7 +426,7 @@ In such a case the function returns an empty sequence with a `:pending` meta fie
         (is (= (-> result meta :pending) true)))
       (is (= @published7
              [{:kind :reg
-                :name "tweetlog/timeline!"
+               :name "tweetlog/timeline!"
                :key "SOMEUUID1"}
               {:kind :fact
                :name "tweetlog/timeline?"
@@ -472,58 +492,58 @@ This time, the value maps capture the query's *output parameters* only."
 [[:section {:title "Filtering and Sorting"}]]
 "Filtering and sorting work exactly as with `defview`."
 (fact defquery-filt
-      (defonce ps8 (ax/pubsub :name))
-      (defonce host8 {:pub (fn [ev])
-                      :sub (:sub ps8)
-                      :identity (atom "alice")
-                      :uuid (constantly "SOMEUUID")
-                      :time (constantly 12345)})
       (defonce my-atom8 (atom nil))
       (defquery tweets-by-authors-that-begin-in-b [user]
         [:tweetlog/timeline user -> author tweet]
         :store-in my-atom8
         :when (str/starts-with? author "b")
         :order-by tweet)
-      (tweets-by-authors-that-begin-in-b host8 "alice") ;; Start listenning...
-      ((:pub ps8)
-                {:kind :fact
-                 :name "tweetlog/timeline!"
-                 :key "SOMEUUID"
-                 :data ["bob" "D"]
-                 :ts 1000
-                 :change 1
-                 :writers #{"XXYY"}
-                 :readers #{}})
-      ((:pub ps8)
-                {:kind :fact
-                 :name "tweetlog/timeline!"
-                 :key "SOMEUUID"
-                 :data ["charlie" "C"] ;; Dropped
-                 :ts 2000
-                 :change 1
-                 :writers #{"XXYY"}
-                 :readers #{}})
-      ((:pub ps8)
-                {:kind :fact
-                 :name "tweetlog/timeline!"
-                 :key "SOMEUUID"
-                 :data ["boaz" "B"]
-                 :ts 3000
-                 :change 1
-                 :writers #{"XXYY"}
-                 :readers #{}})
-      ((:pub ps8)
-                {:kind :fact
-                 :name "tweetlog/timeline!"
-                 :key "SOMEUUID"
-                 :data ["bob" "A"]
-                 :ts 4000
-                 :change 1
-                 :writers #{"XXYY"}
-                 :readers #{}})
-      (let [results (tweets-by-authors-that-begin-in-b host8 "alice")]
-        (is (= (count results) 3))
-        (is (= (->> results
-                    (map :tweet))
-               ["A" "B" "D"]))))
+      (let [ps8 (ax/pubsub :name)
+            host8 {:pub (fn [ev])
+                   :sub (:sub ps8)
+                   :identity (atom "alice")
+                   :uuid (constantly "SOMEUUID")
+                   :time (constantly 12345)}]
+        (tweets-by-authors-that-begin-in-b host8 "alice") ;; Start listenning...
+        ((:pub ps8)
+         {:kind :fact
+          :name "tweetlog/timeline!"
+          :key "SOMEUUID"
+          :data ["bob" "D"]
+          :ts 1000
+          :change 1
+          :writers #{"XXYY"}
+          :readers #{}})
+        ((:pub ps8)
+         {:kind :fact
+          :name "tweetlog/timeline!"
+          :key "SOMEUUID"
+          :data ["charlie" "C"] ;; Dropped
+          :ts 2000
+          :change 1
+          :writers #{"XXYY"}
+          :readers #{}})
+        ((:pub ps8)
+         {:kind :fact
+          :name "tweetlog/timeline!"
+          :key "SOMEUUID"
+          :data ["boaz" "B"]
+          :ts 3000
+          :change 1
+          :writers #{"XXYY"}
+          :readers #{}})
+        ((:pub ps8)
+         {:kind :fact
+          :name "tweetlog/timeline!"
+          :key "SOMEUUID"
+          :data ["bob" "A"]
+          :ts 4000
+          :change 1
+          :writers #{"XXYY"}
+          :readers #{}})
+        (let [results (tweets-by-authors-that-begin-in-b host8 "alice")]
+          (is (= (count results) 3))
+          (is (= (->> results
+                      (map :tweet))
+                 ["A" "B" "D"])))))
 
