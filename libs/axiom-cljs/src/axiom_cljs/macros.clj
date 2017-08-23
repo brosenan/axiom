@@ -93,7 +93,7 @@
    (let [[in out] (split-with (partial not= '->) args)]
      [name in (rest out)]))
 
-(defmacro defquery [name args host query &
+(defmacro defquery [name args query &
                    {:keys [store-in when order-by]
                     :or {store-in `(atom nil)
                          when true
@@ -102,14 +102,17 @@
         pred-name (-> pred-name str (subs 1))]
     `(defonce ~name
        (let [id-map# (atom {})
-             state# ~store-in]
+             state# ~store-in
+             hosts# (atom #{})]
          (reset! ~store-in {})
-         ((:sub ~host) ~(str pred-name "!")
-          (fn [ev#]
-            (let [args# (@id-map# (:key ev#))
-                  [~@outputs] (:data ev#)]
-              (update-state state# ev# args# ~when))))
-         (fn ~args
+         (fn [host# ~@args]
+           (when-not (contains? @hosts# host#)
+             ((:sub host#) ~(str pred-name "!")
+              (fn [ev#]
+                (let [args# (@id-map# (:key ev#))
+                      [~@outputs] (:data ev#)]
+                  (update-state state# ev# args# ~when))))
+             (swap! hosts# conj host#))
            (cond (contains? @state# ~args)
                  (-> (->> (for [[ev# c#] (@state# ~args)
                                 :when (> c# 0)]
@@ -118,18 +121,18 @@
                           (sort ~(comparator outputs order-by)))
                      (with-meta {:pending false}))
                  :else
-                 (let [uuid# ((:uuid ~host))]
+                 (let [uuid# ((:uuid host#))]
                    (swap! id-map# assoc uuid# ~args)
-                   ((:pub ~host) {:kind :reg
+                   ((:pub host#) {:kind :reg
                                   :name ~(str pred-name "!")
                                   :key uuid#})
-                   ((:pub ~host) {:kind :fact
+                   ((:pub host#) {:kind :fact
                                   :name ~(str pred-name "?")
                                   :key uuid#
                                   :data [~@inputs]
-                                  :ts ((:time ~host))
+                                  :ts ((:time host#))
                                   :change 1
-                                  :writers #{(user ~host)}
-                                  :readers #{(user ~host)}})
+                                  :writers #{(user host#)}
+                                  :readers #{(user host#)}})
                    (-> '()
                        (with-meta {:pending true})))))))))

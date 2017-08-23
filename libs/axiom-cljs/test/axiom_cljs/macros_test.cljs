@@ -66,7 +66,7 @@ with the `:ts` and `:change` fields omitted.
 The values are the accumulated `:change` of all matching events."
 (fact defview-5
       (reset! my-atom2 {})
-      (my-tweets2 host2 "alice") => []  ;; Make the inital call that returns an empty collection
+      (is (= (my-tweets2 host2 "alice") [])) ;; Make the inital call that returns an empty collection
       ((:pub ps2)
        {:kind :fact
         :name "tweetlog/tweeted"
@@ -301,7 +301,7 @@ We define such filtering using an optional `:when` key in `defview`."
         :store-in my-atom5
         :when (re-matches #".*#[a-zA-Z0-9]+.*" tweet))
       (reset! my-atom5 {})
-      (hashtags-only host5 "alice") => [] ;; Initial call to view function
+      (is (= (hashtags-only host5 "alice") [])) ;; Initial call to view function
       ((:pub ps5)
        {:kind :fact
         :name "tweetlog/tweeted"
@@ -385,7 +385,6 @@ The expression can rely on symbols from the fact pattern, and must result in a [
                       :time (constantly 12345)})
       (defonce my-atom7 (atom nil))
       (defquery my-query7 [user]
-        host7
         [:tweetlog/timeline user -> author tweet]
         :store-in my-atom7 ;; Optional
         ))
@@ -402,7 +401,7 @@ When called, two events are emitted:
 In such a case the function returns an empty sequence with a `:pending` meta field set to `true`."
 (fact defquery-3
       (reset! my-atom7 {})
-      (let [result (my-query7 "alice")]
+      (let [result (my-query7 host7 "alice")]
         (is (= result []))
         (is (= (-> result meta :pending) true)))
       (is (= @published7
@@ -445,7 +444,7 @@ Instead, the event contains a unique ID, which is mapped by `defquery` to input 
 "With results in place, the query function returns a (non-`:pending`) list of value maps.
 This time, the value maps capture the query's *output parameters* only."
 (fact defquery-5
-      (let [result (my-query7 "alice")]
+      (let [result (my-query7 host7 "alice")]
         (is (= (-> result meta :pending) false))
         (is (= result
                [{:author "bob"
@@ -468,7 +467,7 @@ This time, the value maps capture the query's *output parameters* only."
                                  :data ["bob" "bye there"]
                                  :writers #{"XXYY"}
                                  :readers #{}}] -1)
-      (is (= (my-query7 "alice") [])))
+      (is (= (my-query7 host7 "alice") [])))
 
 [[:section {:title "Filtering and Sorting"}]]
 "Filtering and sorting work exactly as with `defview`."
@@ -481,12 +480,11 @@ This time, the value maps capture the query's *output parameters* only."
                       :time (constantly 12345)})
       (defonce my-atom8 (atom nil))
       (defquery tweets-by-authors-that-begin-in-b [user]
-        host8
         [:tweetlog/timeline user -> author tweet]
         :store-in my-atom8
         :when (str/starts-with? author "b")
         :order-by tweet)
-      (tweets-by-authors-that-begin-in-b "alice") ;; Start listenning...
+      (tweets-by-authors-that-begin-in-b host8 "alice") ;; Start listenning...
       ((:pub ps8)
                 {:kind :fact
                  :name "tweetlog/timeline!"
@@ -523,7 +521,7 @@ This time, the value maps capture the query's *output parameters* only."
                  :change 1
                  :writers #{"XXYY"}
                  :readers #{}})
-      (let [results (tweets-by-authors-that-begin-in-b "alice")]
+      (let [results (tweets-by-authors-that-begin-in-b host8 "alice")]
         (is (= (count results) 3))
         (is (= (->> results
                     (map :tweet))
