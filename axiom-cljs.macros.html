@@ -91,10 +91,9 @@
                           (swap! published1 conj ev))
                    :sub (fn [key f])})
     (defview my-tweets [user]
-      host
       [:tweetlog/tweeted user tweet])</code></pre></div><div><p>The defined view is a function with the parameters defined in the view definition.</p></div><div class="code"><pre><code class="clojure">defview-2
     (is (fn? my-tweets))</code></pre></div><div><p>When called for the first time, the function will send a <code>:reg</code> event with key according to the parameters, and return an empty sequence with a meta field <code>:pending</code> indicating that the function should be consulted again later.</p></div><div class="code"><pre><code class="clojure">defview-3
-    (let [res (my-tweets &quot;alice&quot;)]
+    (let [res (my-tweets host &quot;alice&quot;)]
       (is (= res []))
       (is (= (-&gt; res meta :pending) true))
       (is (= @published1 [{:kind :reg
@@ -110,11 +109,11 @@
                     :identity (atom &quot;alice&quot;)})
     (defonce my-atom2 (atom nil))
     (defview my-tweets2 [user]
-      host2
       [:tweetlog/tweeted user tweet]
       :store-in my-atom2)
     (is (map? @my-atom2))</code></pre></div><div><p>When events are received from the host they are placed in this map. This is a two-level map, where the first level of keys corresponds to the view argument vector, mapping a set of results to each combination of arguments. The second level of keys consists of the received <a href='cloudlog-events.html#introduction'>events</a>,  with the <code>:ts</code> and <code>:change</code> fields omitted. The values are the accumulated <code>:change</code> of all matching events.</p></div><div class="code"><pre><code class="clojure">defview-5
     (reset! my-atom2 {})
+    (is (= (my-tweets2 host2 &quot;alice&quot;) [])) ;; Make the inital call that returns an empty collection
     ((:pub ps2)
      {:kind :fact
       :name &quot;tweetlog/tweeted&quot;
@@ -157,13 +156,13 @@
                                :data [&quot;world&quot;]
                                :readers #{}
                                :writers #{&quot;alice&quot;}}]) 2))</code></pre></div><div><p>The view function returns, for a given combination of arguments, a collection of all data elements with a positive total count. In our case, both "hello" and "world" tweets are taken (in some order).</p></div><div class="code"><pre><code class="clojure">defview-6
-    (is (= (count (my-tweets2 &quot;alice&quot;)) 2))
-    (is (= (-&gt; (my-tweets2 &quot;alice&quot;)
+    (is (= (count (my-tweets2 host2 &quot;alice&quot;)) 2))
+    (is (= (-&gt; (my-tweets2 host2 &quot;alice&quot;)
                meta :pending) false))</code></pre></div><div><p>Each element in the returned collection is a <em>value map</em>, a map in which the keys correspond to the symbols in the fact pattern provided in the view definition. In our case these are <code>:user</code> and <code>:tweet</code>. The values are their corresponding values in each event.</p></div><div class="code"><pre><code class="clojure">defview-7a
-    (doseq [result (my-tweets2 &quot;alice&quot;)]
+    (doseq [result (my-tweets2 host2 &quot;alice&quot;)]
       (is (= (:user result) &quot;alice&quot;))
       (is (contains? #{&quot;hello&quot; &quot;world&quot;} (:tweet result))))</code></pre></div><div><p>Along with the data fields, each value map also contains the <code>:-readers</code> and <code>:-writers</code> of the corresponding events.</p></div><div class="code"><pre><code class="clojure">defview-7b
-    (doseq [result (my-tweets2 &quot;alice&quot;)]
+    (doseq [result (my-tweets2 host2 &quot;alice&quot;)]
       (is (= (:-readers result) #{}))
       (is (= (:-writers result) #{&quot;alice&quot;})))</code></pre></div><div><p>Elements with zero or negative count values are not shown.</p></div><div class="code"><pre><code class="clojure">defview-8
     (reset! my-atom2 {})
@@ -181,8 +180,9 @@
                                :data [&quot;world&quot;]
                                :readers #{}
                                :writers #{&quot;alice&quot;}}] -1)
-    (is (= (count (my-tweets2 &quot;alice&quot;)) 0))</code></pre></div><div><span id="event-emitting-functions"></span><h3>1.1 &nbsp;&nbsp; Event-Emitting Functions</h3></div><div><p>A view provides functions that allow users to emit event for creating, updating and deleting facts.</p></div><div><p>For <em>creating facts</em>, a sequence returned by a view function has an <code>:add</code> meta-field. This is a function that takes a value map as input, and emits a corresponding event with the following keys:</p><ol><li><code>:kind</code> is always <code>:fact</code>.</li><li><code>:name</code> is the first element in the fact pattern, converted to string.</li><li><code>:key</code> and <code>:data</code> are derived from the value map.</li><li><code>:ts</code> consults the host's <code>:time</code> function.</li><li><code>:change</code> is always 1.</li><li><code>:writers</code> defaults to the set representing the user.</li><li><code>:readers</code> defaults to the universal set.Parameters already given to the view function (e.g., <code>:user &quot;alice&quot;</code> in the following example) should be omitted.</li></ol></div><div class="code"><pre><code class="clojure">defview-ev-1a
-    (let [{:keys [add]} (meta (my-tweets2 &quot;alice&quot;))]
+    (is (= (count (my-tweets2 host2 &quot;alice&quot;)) 0))</code></pre></div><div><span id="event-emitting-functions"></span><h3>1.1 &nbsp;&nbsp; Event-Emitting Functions</h3></div><div><p>A view provides functions that allow users to emit event for creating, updating and deleting facts.</p></div><div><p>For <em>creating facts</em>, a sequence returned by a view function has an <code>:add</code> meta-field. This is a function that takes a value map as input, and emits a corresponding event with the following keys:</p><ol><li><code>:kind</code> is always <code>:fact</code>.</li><li><code>:name</code> is the first element in the fact pattern, converted to string.</li><li><code>:key</code> and <code>:data</code> are derived from the value map.</li><li><code>:ts</code> consults the host's <code>:time</code> function.</li><li><code>:change</code> is always 1.</li><li><code>:writers</code> defaults to the set representing the user.</li><li><code>:readers</code> defaults to the universal set.Parameters already given to the view function (e.g., <code>:user &quot;alice&quot;</code> in the following example) should be omitted.</li></ol></div><div class="code"><pre><code class="clojure">defview-ev-1a
+    (reset! published2 [])
+    (let [{:keys [add]} (meta (my-tweets2 host2 &quot;alice&quot;))]
       (is (fn? add))
       (add {:tweet &quot;Hola!&quot;})
       (is (= @published2
@@ -203,7 +203,6 @@
                 :identity (atom &quot;alice&quot;)
                 :time (constantly 2345)}]
       (defview my-following [follower]
-        host
         [:tweetlog/follows follower followee]
         :writers #{$user [:tweetlog/has-alias follower]}
         :readers #{[:tweetlog/has-alias followee]})
@@ -215,7 +214,7 @@
                   :change 1
                   :writers #{&quot;alice&quot;}
                   :readers #{}})
-      (let [add (-&gt; (my-following &quot;alice123&quot;)
+      (let [add (-&gt; (my-following host &quot;alice123&quot;)
                     meta :add)]
         (add {:follower &quot;alice123&quot;
               :followee &quot;charlie678&quot;}))
@@ -234,7 +233,6 @@
                     :sub (fn [key f])
                     :time (constantly 23456)})
     (defview my-tweets3 [user]
-      host3
       [:tweetlog/tweeted user tweet]
       :store-in my-atom3)
     (swap! my-atom3 assoc-in [[&quot;alice&quot;]
@@ -244,7 +242,7 @@
                                :data [&quot;hello&quot;]
                                :readers #{}
                                :writers #{&quot;alice&quot;}}] 3)
-    (let [valmap (first (my-tweets3 &quot;alice&quot;))]
+    (let [valmap (first (my-tweets3 host3 &quot;alice&quot;))]
       (is (fn? (:del! valmap)))
       ((:del! valmap))
       (is (= @published3
@@ -263,7 +261,6 @@
                     :sub (fn [key f])
                     :time (constantly 34567)})
     (defview my-tweets4 [user]
-      host4
       [:tweetlog/tweeted user tweet ts]
       :store-in my-atom4)
     (swap! my-atom4 assoc-in [[&quot;alice&quot;]
@@ -273,7 +270,7 @@
                                :data [&quot;hello&quot; 12345]
                                :readers #{}
                                :writers #{&quot;alice&quot;}}] 3)
-    (let [valmap (first (my-tweets4 &quot;alice&quot;))]
+    (let [valmap (first (my-tweets4 host4 &quot;alice&quot;))]
       (is (fn? (:swap! valmap)))
       ((:swap! valmap) assoc :tweet &quot;world&quot;)
       (is (= @published4
@@ -288,36 +285,36 @@
                 :writers #{&quot;alice&quot;}}])))</code></pre></div><div><span id="filtering"></span><h3>1.2 &nbsp;&nbsp; Filtering</h3></div><div><p>Views can define client-side filtering for facts.</p></div><div><p>Imagine we are only interested in tweets that contain a hash-tag, i.e., tweets that match the regular expression <code>#&quot;.&#42;#&#91;a-zA-Z0-9&#93;+.&#42;&quot;</code>. We define such filtering using an optional <code>:when</code> key in <code>defview</code>.</p></div><div class="code"><pre><code class="clojure">defview-filt
     (defonce my-atom5 (atom nil))
     (defonce ps5 (ax/pubsub :name))
-    (defonce host5 {:sub (:sub ps5)})
+    (defonce host5 {:sub (:sub ps5)
+                    :pub (constantly nil)})
     (defview hashtags-only [user]
-      host5
       [:tweetlog/tweeted user tweet]
       :store-in my-atom5
       :when (re-matches #&quot;.*#[a-zA-Z0-9]+.*&quot; tweet))
     (reset! my-atom5 {})
+    (is (= (hashtags-only host5 &quot;alice&quot;) [])) ;; Initial call to view function
     ((:pub ps5)
-              {:kind :fact
-               :name &quot;tweetlog/tweeted&quot;
-               :key &quot;alice&quot;
-               :data [&quot;No hashtags here...&quot;]
-               :ts 1000
-               :change 1
-               :readers #{}
-               :writers #{&quot;alice&quot;}})
+     {:kind :fact
+      :name &quot;tweetlog/tweeted&quot;
+      :key &quot;alice&quot;
+      :data [&quot;No hashtags here...&quot;]
+      :ts 1000
+      :change 1
+      :readers #{}
+      :writers #{&quot;alice&quot;}})
     ((:pub ps5)
-              {:kind :fact
-               :name &quot;tweetlog/tweeted&quot;
-               :key &quot;alice&quot;
-               :data [&quot;This one hash #hashtags...&quot;]
-               :ts 2000
-               :change 1
-               :readers #{}
-               :writers #{&quot;alice&quot;}})
+     {:kind :fact
+      :name &quot;tweetlog/tweeted&quot;
+      :key &quot;alice&quot;
+      :data [&quot;This one hash #hashtags...&quot;]
+      :ts 2000
+      :change 1
+      :readers #{}
+      :writers #{&quot;alice&quot;}})
     (is (= (count (@my-atom5 [&quot;alice&quot;])) 1))</code></pre></div><div><span id="sorting"></span><h3>1.3 &nbsp;&nbsp; Sorting</h3></div><div><p>The optional keyword argument <code>:order-by</code> directs the view function to sort the elements it returns according to the given expression. The expression can rely on symbols from the fact pattern, and must result in a <a href='https://clojure.org/guides/comparators'>comparable expression</a>.</p></div><div class="code"><pre><code class="clojure">defview-sort
     (defonce my-atom6 (atom nil))
     (defonce host6 {:sub (fn [key f])})
     (defview my-sorted-tweets [user]
-      host6
       [:tweetlog/tweeted user tweet timestamp]
       :store-in my-atom6
       :order-by (- timestamp) ;; Later tweets first
@@ -347,7 +344,7 @@
              :data [&quot;my third tweet&quot; 3000]
              :readers #{}
              :writers #{&quot;alice&quot;}}] 1)
-    (let [tweets-in-order (for [result (my-sorted-tweets &quot;alice&quot;)]
+    (let [tweets-in-order (for [result (my-sorted-tweets host6 &quot;alice&quot;)]
                             (:tweet result))]
       (is (= tweets-in-order [&quot;my third tweet&quot;
                               &quot;my second tweet&quot;
@@ -365,13 +362,12 @@
                     :time (constantly 12345)})
     (defonce my-atom7 (atom nil))
     (defquery my-query7 [user]
-      host7
       [:tweetlog/timeline user -&gt; author tweet]
       :store-in my-atom7 ;; Optional
       )</code></pre></div><div><p>The optional <code>:store-in</code> arguement provides an atom in which received events are stored. The structure is similar to that used by <code>defview</code>.</p></div><div class="code"><pre><code class="clojure">defquery-2
     (is (map? @my-atom7))</code></pre></div><div><p>As in <code>defview</code>, <code>defquery</code> defines a function. When called, two events are emitted:</p><ol><li>A <code>:reg</code> event for registering to results, and</li><li>A <code>:fact</code> event to make the query.In such a case the function returns an empty sequence with a <code>:pending</code> meta field set to <code>true</code>.</li></ol></div><div class="code"><pre><code class="clojure">defquery-3
     (reset! my-atom7 {})
-    (let [result (my-query7 &quot;alice&quot;)]
+    (let [result (my-query7 host7 &quot;alice&quot;)]
       (is (= result []))
       (is (= (-&gt; result meta :pending) true)))
     (is (= @published7
@@ -403,7 +399,7 @@
                      :data [&quot;bob&quot; &quot;hi there&quot;]
                      :writers #{&quot;XXYY&quot;}
                      :readers #{}}]) 1))</code></pre></div><div><p>With results in place, the query function returns a (non-<code>:pending</code>) list of value maps. This time, the value maps capture the query's <em>output parameters</em> only.</p></div><div class="code"><pre><code class="clojure">defquery-5
-    (let [result (my-query7 &quot;alice&quot;)]
+    (let [result (my-query7 host7 &quot;alice&quot;)]
       (is (= (-&gt; result meta :pending) false))
       (is (= result
              [{:author &quot;bob&quot;
@@ -423,7 +419,7 @@
                                :data [&quot;bob&quot; &quot;bye there&quot;]
                                :writers #{&quot;XXYY&quot;}
                                :readers #{}}] -1)
-    (is (= (my-query7 &quot;alice&quot;) []))</code></pre></div><div><span id="filtering-and-sorting"></span><h3>2.1 &nbsp;&nbsp; Filtering and Sorting</h3></div><div><p>Filtering and sorting work exactly as with <code>defview</code>.</p></div><div class="code"><pre><code class="clojure">defquery-filt
+    (is (= (my-query7 host7 &quot;alice&quot;) []))</code></pre></div><div><span id="filtering-and-sorting"></span><h3>2.1 &nbsp;&nbsp; Filtering and Sorting</h3></div><div><p>Filtering and sorting work exactly as with <code>defview</code>.</p></div><div class="code"><pre><code class="clojure">defquery-filt
     (defonce ps8 (ax/pubsub :name))
     (defonce host8 {:pub (fn [ev])
                     :sub (:sub ps8)
@@ -432,12 +428,11 @@
                     :time (constantly 12345)})
     (defonce my-atom8 (atom nil))
     (defquery tweets-by-authors-that-begin-in-b [user]
-      host8
       [:tweetlog/timeline user -&gt; author tweet]
       :store-in my-atom8
       :when (str/starts-with? author &quot;b&quot;)
       :order-by tweet)
-    (tweets-by-authors-that-begin-in-b &quot;alice&quot;) ;; Start listenning...
+    (tweets-by-authors-that-begin-in-b host8 &quot;alice&quot;) ;; Start listenning...
     ((:pub ps8)
               {:kind :fact
                :name &quot;tweetlog/timeline!&quot;
@@ -474,7 +469,7 @@
                :change 1
                :writers #{&quot;XXYY&quot;}
                :readers #{}})
-    (let [results (tweets-by-authors-that-begin-in-b &quot;alice&quot;)]
+    (let [results (tweets-by-authors-that-begin-in-b host8 &quot;alice&quot;)]
       (is (= (count results) 3))
       (is (= (-&gt;&gt; results
                   (map :tweet))
