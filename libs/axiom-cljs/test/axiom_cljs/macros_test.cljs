@@ -26,7 +26,6 @@ It also takes optional keyword parameters that will be discussed later."
                             (swap! published1 conj ev))
                      :sub (fn [key f])})
       (defview my-tweets [user]
-        host
         [:tweetlog/tweeted user tweet]))
 
 "The defined view is a function with the parameters defined in the view definition."
@@ -36,7 +35,7 @@ It also takes optional keyword parameters that will be discussed later."
 "When called for the first time, the function will send a `:reg` event with key according to the parameters,
 and return an empty sequence with a meta field `:pending` indicating that the function should be consulted again later."
 (fact defview-3
-      (let [res (my-tweets "alice")]
+      (let [res (my-tweets host "alice")]
         (is (= res []))
         (is (= (-> res meta :pending) true))
         (is (= @published1 [{:kind :reg
@@ -55,7 +54,6 @@ and return an empty sequence with a meta field `:pending` indicating that the fu
                       :identity (atom "alice")})
       (defonce my-atom2 (atom nil))
       (defview my-tweets2 [user]
-        host2
         [:tweetlog/tweeted user tweet]
         :store-in my-atom2)
       (is (map? @my-atom2)))
@@ -68,6 +66,7 @@ with the `:ts` and `:change` fields omitted.
 The values are the accumulated `:change` of all matching events."
 (fact defview-5
       (reset! my-atom2 {})
+      (my-tweets2 host2 "alice") => []  ;; Make the inital call that returns an empty collection
       ((:pub ps2)
        {:kind :fact
         :name "tweetlog/tweeted"
@@ -114,21 +113,21 @@ The values are the accumulated `:change` of all matching events."
 "The view function returns, for a given combination of arguments, a collection of all data elements with a positive total count.
 In our case, both \"hello\" and \"world\" tweets are taken (in some order)."
 (fact defview-6
-      (is (= (count (my-tweets2 "alice")) 2))
-      (is (= (-> (my-tweets2 "alice")
+      (is (= (count (my-tweets2 host2 "alice")) 2))
+      (is (= (-> (my-tweets2 host2 "alice")
                  meta :pending) false)))
 
 "Each element in the returned collection is a *value map*, a map in which the keys correspond to the symbols in the fact pattern provided in the view definition.
 In our case these are `:user` and `:tweet`.
 The values are their corresponding values in each event."
 (fact defview-7a
-      (doseq [result (my-tweets2 "alice")]
+      (doseq [result (my-tweets2 host2 "alice")]
         (is (= (:user result) "alice"))
         (is (contains? #{"hello" "world"} (:tweet result)))))
 
 "Along with the data fields, each value map also contains the `:-readers` and `:-writers` of the corresponding events."
 (fact defview-7b
-      (doseq [result (my-tweets2 "alice")]
+      (doseq [result (my-tweets2 host2 "alice")]
         (is (= (:-readers result) #{}))
         (is (= (:-writers result) #{"alice"}))))
 
@@ -149,7 +148,7 @@ The values are their corresponding values in each event."
                                  :data ["world"]
                                  :readers #{}
                                  :writers #{"alice"}}] -1)
-      (is (= (count (my-tweets2 "alice")) 0)))
+      (is (= (count (my-tweets2 host2 "alice")) 0)))
 
 [[:section {:title "Event-Emitting Functions"}]]
 "A view provides functions that allow users to emit event for creating, updating and deleting facts."
@@ -165,7 +164,8 @@ This is a function that takes a value map as input, and emits a corresponding ev
 7. `:readers` defaults to the universal set.
 Parameters already given to the view function (e.g., `:user \"alice\"` in the following example) should be omitted."
 (fact defview-ev-1a
-      (let [{:keys [add]} (meta (my-tweets2 "alice"))]
+      (reset! published2 [])
+      (let [{:keys [add]} (meta (my-tweets2 host2 "alice"))]
         (is (fn? add))
         (add {:tweet "Hola!"})
         (is (= @published2
@@ -196,7 +196,6 @@ and the `:readers` set to contain the user being followed by alias."
                   :identity (atom "alice")
                   :time (constantly 2345)}]
         (defview my-following [follower]
-          host
           [:tweetlog/follows follower followee]
           :writers #{$user [:tweetlog/has-alias follower]}
           :readers #{[:tweetlog/has-alias followee]})
@@ -208,7 +207,7 @@ and the `:readers` set to contain the user being followed by alias."
                     :change 1
                     :writers #{"alice"}
                     :readers #{}})
-        (let [add (-> (my-following "alice123")
+        (let [add (-> (my-following host "alice123")
                       meta :add)]
           (add {:follower "alice123"
                 :followee "charlie678"}))
@@ -231,7 +230,6 @@ It creates an event with all the same values, but with a new `:ts` and a `:chang
                       :sub (fn [key f])
                       :time (constantly 23456)})
       (defview my-tweets3 [user]
-        host3
         [:tweetlog/tweeted user tweet]
         :store-in my-atom3)
       (swap! my-atom3 assoc-in [["alice"]
@@ -241,7 +239,7 @@ It creates an event with all the same values, but with a new `:ts` and a `:chang
                                  :data ["hello"]
                                  :readers #{}
                                  :writers #{"alice"}}] 3)
-      (let [valmap (first (my-tweets3 "alice"))]
+      (let [valmap (first (my-tweets3 host3 "alice"))]
         (is (fn? (:del! valmap)))
         ((:del! valmap))
         (is (= @published3
@@ -265,7 +263,6 @@ event from the original state to the state reflected by the modified value map."
                       :sub (fn [key f])
                       :time (constantly 34567)})
       (defview my-tweets4 [user]
-        host4
         [:tweetlog/tweeted user tweet ts]
         :store-in my-atom4)
       (swap! my-atom4 assoc-in [["alice"]
@@ -275,7 +272,7 @@ event from the original state to the state reflected by the modified value map."
                                  :data ["hello" 12345]
                                  :readers #{}
                                  :writers #{"alice"}}] 3)
-      (let [valmap (first (my-tweets4 "alice"))]
+      (let [valmap (first (my-tweets4 host4 "alice"))]
         (is (fn? (:swap! valmap)))
         ((:swap! valmap) assoc :tweet "world")
         (is (= @published4
@@ -297,31 +294,32 @@ We define such filtering using an optional `:when` key in `defview`."
 (fact defview-filt
       (defonce my-atom5 (atom nil))
       (defonce ps5 (ax/pubsub :name))
-      (defonce host5 {:sub (:sub ps5)})
+      (defonce host5 {:sub (:sub ps5)
+                      :pub (constantly nil)})
       (defview hashtags-only [user]
-        host5
         [:tweetlog/tweeted user tweet]
         :store-in my-atom5
         :when (re-matches #".*#[a-zA-Z0-9]+.*" tweet))
       (reset! my-atom5 {})
+      (hashtags-only host5 "alice") => [] ;; Initial call to view function
       ((:pub ps5)
-                {:kind :fact
-                 :name "tweetlog/tweeted"
-                 :key "alice"
-                 :data ["No hashtags here..."]
-                 :ts 1000
-                 :change 1
-                 :readers #{}
-                 :writers #{"alice"}})
+       {:kind :fact
+        :name "tweetlog/tweeted"
+        :key "alice"
+        :data ["No hashtags here..."]
+        :ts 1000
+        :change 1
+        :readers #{}
+        :writers #{"alice"}})
       ((:pub ps5)
-                {:kind :fact
-                 :name "tweetlog/tweeted"
-                 :key "alice"
-                 :data ["This one hash #hashtags..."]
-                 :ts 2000
-                 :change 1
-                 :readers #{}
-                 :writers #{"alice"}})
+       {:kind :fact
+        :name "tweetlog/tweeted"
+        :key "alice"
+        :data ["This one hash #hashtags..."]
+        :ts 2000
+        :change 1
+        :readers #{}
+        :writers #{"alice"}})
       (is (= (count (@my-atom5 ["alice"])) 1)))
 
 [[:section {:title "Sorting"}]]
@@ -331,7 +329,6 @@ The expression can rely on symbols from the fact pattern, and must result in a [
       (defonce my-atom6 (atom nil))
       (defonce host6 {:sub (fn [key f])})
       (defview my-sorted-tweets [user]
-        host6
         [:tweetlog/tweeted user tweet timestamp]
         :store-in my-atom6
         :order-by (- timestamp) ;; Later tweets first
@@ -361,7 +358,7 @@ The expression can rely on symbols from the fact pattern, and must result in a [
                :data ["my third tweet" 3000]
                :readers #{}
                :writers #{"alice"}}] 1)
-      (let [tweets-in-order (for [result (my-sorted-tweets "alice")]
+      (let [tweets-in-order (for [result (my-sorted-tweets host6 "alice")]
                               (:tweet result))]
         (is (= tweets-in-order ["my third tweet"
                                 "my second tweet"

@@ -28,7 +28,7 @@
 (defmacro user [host]
   `@(:identity ~host))
 
-(defmacro defview [name args host fact &
+(defmacro defview [name args fact &
                    {:keys [store-in when order-by readers writers]
                     :or {store-in `(atom nil)
                          when true
@@ -37,13 +37,16 @@
                          writers #{'$user}}}]
   (let [fact-name (-> fact first str (subs 1))]
     `(defonce ~name
-       (let [state# ~store-in]
+       (let [state# ~store-in
+             hosts# (atom #{})]
          (reset! state# {})
-         ((:sub ~host) ~fact-name
-          (fn [ev#]
-            (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
-              (update-state state# ev# ~args ~when))))
-         (fn ~args
+         (fn [host# ~@args]
+           (when-not (contains? @hosts# host#)
+             ((:sub host#) ~fact-name
+              (fn [ev#]
+                (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
+                  (update-state state# ev# ~args ~when))))
+             (swap! hosts# conj host#))
            (-> (cond (contains? @state# ~args)
                      (-> (->> (for [[ev# c#] (@state# ~args)
                                     :when (> c# 0)]
@@ -52,14 +55,14 @@
                                   (-> varmap#
                                       (assoc :-readers (:readers ev#))
                                       (assoc :-writers (:writers ev#))
-                                      (assoc :del! #((:pub ~host)
+                                      (assoc :del! #((:pub host#)
                                                      (-> ev#
-                                                         (assoc :ts ((:time ~host)))
+                                                         (assoc :ts ((:time host#)))
                                                          (assoc :change (- c#)))))
                                       (assoc :swap! (fn [func# & args#]
-                                                      ((:pub ~host)
+                                                      ((:pub host#)
                                                        (-> ev#
-                                                           (assoc :ts ((:time ~host)))
+                                                           (assoc :ts ((:time host#)))
                                                            (assoc :change c#)
                                                            (assoc :removed (:data ev#))
                                                            (assoc :data
@@ -69,19 +72,19 @@
                          (ax/merge-meta {:pending false}))
                      :else
                      (do
-                       ((:pub ~host) {:kind :reg
+                       ((:pub host#) {:kind :reg
                                       :name ~fact-name
                                       :key ~(-> fact second)
                                       :get-existing true})
                        (ax/merge-meta '() {:pending true})))
                (ax/merge-meta {:add (fn [{:keys [~@(set/difference (symbols fact) (symbols args))]}]
-                                      (let [~'$user (user ~host)]
-                                        ((:pub ~host)
+                                      (let [~'$user (user host#)]
+                                        ((:pub host#)
                                          {:kind :fact
                                           :name ~fact-name
                                           :key ~(second fact)
                                           :data [~@(drop 2 fact)]
-                                          :ts ((:time ~host))
+                                          :ts ((:time host#))
                                           :change 1
                                           :writers ~writers
                                           :readers ~readers})))})))))))
