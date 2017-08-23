@@ -180,6 +180,13 @@ and all its input arguments, and returns a set of the results as tuples correspo
       ;; So although charlie follows alice, he doesn't get it.
       (query [:tweetlog/timeline "charlie" 0 3]) => #{})))
 
+"If no results are found, a map containing the keys and rules is returned (same as in [apply-rules](#apply-rules))."
+(fact
+ (scenario
+  (as "charlie"
+      (emit [:tweetlog/follows "charlie" "alice"])
+      (query [:tweetlog/timeline "charlie" 0 3]) => map?)))
+
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "all-rules"}]]
 "`all-rules` returns a sequence of all the rule and clause functions available to the current namespace, sorted topologically by their dependencies.

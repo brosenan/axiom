@@ -130,11 +130,11 @@
         pred! (keyword (str (namespace pred) "/" (name pred) "!"))
         q [pred? :unique args #{*user*} #{*user*}]
         facts (conj @*scenario* q)]
-    (->>
-     (apply-rules facts [pred! :unique])
-     (filter (fn [tuple]
-               (let [readers (-> tuple meta :readers)
-                     id-set (identity-set *user* @*scenario* readers)]
-                 (interset/subset? id-set readers))))
-     set)))
+    (let [tuples (apply-rules facts [pred! :unique])]
+      (cond (set? tuples)
+            (set (filter (fn [tuple]
+                           (let [readers (-> tuple meta :readers)
+                                 id-set (identity-set *user* @*scenario* readers)]
+                             (interset/subset? id-set readers))) tuples))
+            :else tuples))))
 
