@@ -69,7 +69,7 @@
                     index-events)]
     (cond (empty? rules)
           (let [result (->> (index index-key)
-                            (map :data)
+                            (map #(with-meta (:data %) {:readers (:readers %)}))
                             set)]
             (cond (empty? result)
                   {:keys (set (keys index))
@@ -86,10 +86,14 @@
     (cond (empty? groups)
           id-set
           (vector? (first groups))
-          (let [[name & args] (first groups)]
-            (recur (rest groups)
-                   (interset/intersection id-set (set (for [res (apply-rules scenario [name user])]
-                                                        `[~name ~@res])))))
+          (let [[name & args] (first groups)
+                results (apply-rules scenario [name user])]
+            (cond (set? results)
+                  (recur (rest groups)
+                         (interset/intersection id-set (set (for [res results]
+                                                              `[~name ~@res]))))
+                  :else
+                  (recur (rest groups) id-set)))
           :else
           (recur (rest groups) id-set))))
 
@@ -126,5 +130,11 @@
         pred! (keyword (str (namespace pred) "/" (name pred) "!"))
         q [pred? :unique args #{*user*} #{*user*}]
         facts (conj @*scenario* q)]
-    (apply-rules facts [pred! :unique])))
+    (->>
+     (apply-rules facts [pred! :unique])
+     (filter (fn [tuple]
+               (let [readers (-> tuple meta :readers)
+                     id-set (identity-set *user* @*scenario* readers)]
+                 (interset/subset? id-set readers))))
+     set)))
 

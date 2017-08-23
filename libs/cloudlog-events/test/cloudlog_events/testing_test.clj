@@ -169,6 +169,17 @@ and all its input arguments, and returns a set of the results as tuples correspo
       (emit [:tweetlog/follows "charlie" "alice"])
       (query [:tweetlog/timeline "charlie" 0 3]) => #{["alice" "hello, world" 100]})))
 
+"A query only returns results visible to the current user."
+(fact
+ (scenario
+  (as "alice"
+      ;; The following tweet is intended only for bob
+      (emit [:tweetlog/tweeted "alice" "hello, world" 100] #{"alice"} #{"bob"}))
+  (as "charlie"
+      (emit [:tweetlog/follows "charlie" "alice"])
+      ;; So although charlie follows alice, he doesn't get it.
+      (query [:tweetlog/timeline "charlie" 0 3]) => #{})))
+
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "all-rules"}]]
 "`all-rules` returns a sequence of all the rule and clause functions available to the current namespace, sorted topologically by their dependencies.
@@ -307,6 +318,16 @@ and returns a set of `:data` tuples that together with the rule name and the key
               ["tweetlog/tweeted" "bob" ["hola, mundo" 200] #{"bob"} #{}]]]
    (apply-rules facts [:cloudlog-events.testing-test/followee-tweets ["charlie" 0]]) => #{["alice" "hello, world" 100]}))
 
+"The tuples returned by `apply-rules` are annotated with a `:readers` meta-attribute, representing their `:readers` set.
+This is useful in order to later filter out tuples a certain user cannot know about."
+(fact
+ (let [facts [["tweetlog/follows" "charlie" ["alice"] #{"charlie"} #{[:foo/bar 1]}]
+              ["tweetlog/tweeted" "alice" ["hello, world" 100] #{"alice"} #{[:foo/bar 2]}]]]
+   (->>
+    (apply-rules facts [:cloudlog-events.testing-test/followee-tweets ["charlie" 0]])
+    (map #(-> % meta :readers))
+    set) => #{#{[:foo/bar 1] [:foo/bar 2]}}))
+
 "If no result is available, `apply-rules` returns a map with the following fields to help debugging the problem:
 - `:keys`: A set of all the keys that exist in the index, and
 - `:rules`: A set of all the names of the rules that were applied."
@@ -352,6 +373,13 @@ the returned interset will be an intersection of all the groups based on who fol
         [:cloudlog-events.testing-test/follower "charlie"]
         [:cloudlog-events.testing-test/follower "dave"]}))
 
+"If no results are found for a rule-based group, no results are returned."
+(fact
+ (let [scenario []]
+   (identity-set "alice" scenario #{[:cloudlog-events.testing-test/follower "bob"]})
+   => #{"alice"}))
+
 "`identity-set` ignores groups that are not rule-based (groups that are not represented as vectors)."
 (fact
  (identity-set "alice" [] #{:foo :bar "baz"}) => #{"alice"})
+
