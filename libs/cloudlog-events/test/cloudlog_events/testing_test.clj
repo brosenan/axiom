@@ -144,6 +144,66 @@ Now imagine `bob` and `malory` trying to send a message to `alice`, who follows 
       => (throws "Cannot emit fact. malory is not a member of #{[:cloudlog-events.testing-test/follower \"alice\"]}."))))
 
 
+[[:chapter {:title "apply-rules"}]]
+"`apply-rules` needs to be called from within a scenario."
+(fact
+ (apply-rules [:foo/bar 3]) => (throws "apply-rules can only be called from within a scenario"))
+
+"The `apply-rules` function takes a vector containing a rule name and a key
+and returns a set of `:data` tuples that together with the rule name and the key form facts derived from the current `*scenario*` using all available rules."
+(fact
+ (scenario
+  (as "charlie"
+      (emit [:tweetlog/follows "charlie" "alice"]))
+  (as "eve"
+      (emit [:tweetlog/follows "eve" "bob"]))
+  (as "alice"
+      (emit [:tweetlog/tweeted "alice" "hello, world" 100]))
+  (as "bob"
+      (emit [:tweetlog/tweeted "bob" "hola, mundo" 200]))
+  (apply-rules [:cloudlog-events.testing-test/followee-tweets ["charlie" 0]])) => #{["alice" "hello, world" 100]})
+
+"The tuples returned by `apply-rules` are annotated with a `:readers` meta-attribute, representing their `:readers` set.
+This is useful in order to later filter out tuples a certain user cannot know about."
+(fact
+ (scenario
+  (as "charlie"
+      (emit [:tweetlog/follows "charlie" "alice"] #{"charlie"} #{[:foo/bar 1]}))
+  (as "alice"
+      (emit [:tweetlog/tweeted "alice" "hello, world" 100] #{"alice"} #{[:foo/bar 2]}))
+  (->>
+   (apply-rules [:cloudlog-events.testing-test/followee-tweets ["charlie" 0]])
+   (map #(-> % meta :readers))
+   set)) => #{#{[:foo/bar 1] [:foo/bar 2]}})
+
+"If no result is available, `apply-rules` returns a map with the following fields to help debugging the problem:
+- `:keys`: A set of all the keys that exist in the index, and
+- `:rules`: A set of all the names of the rules that were applied."
+
+"For example, if in the above example we misspell the name of the rule and write, e.g., `followees-tweets` instead of `followee-tweets`,
+we get a map telling us what names are valid so we can adjust the test (in this case) or the rule if the mistake was done there."
+(fact
+ (scenario
+  (as "charlie"
+      (emit [:tweetlog/follows "charlie" "alice"]))
+  (as "eve"
+      (emit [:tweetlog/follows "eve" "bob"]))
+  (as "alice"
+      (emit [:tweetlog/tweeted "alice" "hello, world" 100]))
+  (as "bob"
+      (emit [:tweetlog/tweeted "bob" "hola, mundo" 200]))
+  (let [result (apply-rules [:cloudlog-events.testing-test/followees-tweets ["charlie" 0]])]
+    (:keys result) => #{[:tweetlog/follows "charlie"]
+                        [:tweetlog/follows "eve"]
+                        [:tweetlog/tweeted "alice"]
+                        [:tweetlog/tweeted "bob"]
+                        [:cloudlog-events.testing-test/followee-tweets ["charlie" 0]]
+                        [:cloudlog-events.testing-test/followee-tweets ["eve" 0]]
+                        [:cloudlog-events.testing-test/follower "alice"]
+                        [:cloudlog-events.testing-test/follower "bob"]}
+    (set/subset? #{:cloudlog-events.testing-test/followee-tweets :cloudlog-events.testing-test/follower} (:rules result))
+    => true)))
+
 [[:chapter {:title "query"}]]
 "`query` performs a query based on the current [scenario](#scenario), on behalf of the [current user](#as).
 Queries exercise [clauses](cloudlog.html#defclause) by providing them an input tuple, expecting output tuples in return."
@@ -315,78 +375,37 @@ and returns a set of events resulting from applying every relevant `:fact` event
            index-events
            (merge-indexes index))))
 
-[[:section {:title "apply-rules"}]]
-"The `apply-rules` function takes a collection of facts [represented as vectors](#to-event) and a vector containing a rule name and a key
-and returns a set of `:data` tuples that together with the rule name and the key form facts derived from given collection of raw facts using all available rules."
-(fact
- (let [facts [["tweetlog/follows" "charlie" ["alice"] #{"charlie"} #{}]
-              ["tweetlog/follows" "eve" ["bob"] #{"eve"} #{}]
-              ["tweetlog/tweeted" "alice" ["hello, world" 100] #{"alice"} #{}]
-              ["tweetlog/tweeted" "bob" ["hola, mundo" 200] #{"bob"} #{}]]]
-   (apply-rules facts [:cloudlog-events.testing-test/followee-tweets ["charlie" 0]]) => #{["alice" "hello, world" 100]}))
-
-"The tuples returned by `apply-rules` are annotated with a `:readers` meta-attribute, representing their `:readers` set.
-This is useful in order to later filter out tuples a certain user cannot know about."
-(fact
- (let [facts [["tweetlog/follows" "charlie" ["alice"] #{"charlie"} #{[:foo/bar 1]}]
-              ["tweetlog/tweeted" "alice" ["hello, world" 100] #{"alice"} #{[:foo/bar 2]}]]]
-   (->>
-    (apply-rules facts [:cloudlog-events.testing-test/followee-tweets ["charlie" 0]])
-    (map #(-> % meta :readers))
-    set) => #{#{[:foo/bar 1] [:foo/bar 2]}}))
-
-"If no result is available, `apply-rules` returns a map with the following fields to help debugging the problem:
-- `:keys`: A set of all the keys that exist in the index, and
-- `:rules`: A set of all the names of the rules that were applied."
-
-"For example, if in the above example we misspell the name of the rule and write, e.g., `followees-tweets` instead of `followee-tweets`,
-we get a map telling us what names are valid so we can adjust the test (in this case) or the rule if the mistake was done there."
-(fact
- (let [facts [["tweetlog/follows" "charlie" ["alice"] #{"charlie"} #{}]
-              ["tweetlog/follows" "eve" ["bob"] #{"eve"} #{}]
-              ["tweetlog/tweeted" "alice" ["hello, world" 100] #{"alice"} #{}]
-              ["tweetlog/tweeted" "bob" ["hola, mundo" 200] #{"bob"} #{}]]]
-   (let [result (apply-rules facts [:cloudlog-events.testing-test/followees-tweets ["charlie" 0]])]
-     (:keys result) => #{[:tweetlog/follows "charlie"]
-                         [:tweetlog/follows "eve"]
-                         [:tweetlog/tweeted "alice"]
-                         [:tweetlog/tweeted "bob"]
-                         [:cloudlog-events.testing-test/followee-tweets ["charlie" 0]]
-                         [:cloudlog-events.testing-test/followee-tweets ["eve" 0]]
-                         [:cloudlog-events.testing-test/follower "alice"]
-                         [:cloudlog-events.testing-test/follower "bob"]}
-     (set/subset? #{:cloudlog-events.testing-test/followee-tweets :cloudlog-events.testing-test/follower} (:rules result))
-     => true)))
-
 [[:section {:title "identity-set"}]]
 "A user's *identity set* is a union of all the groups a user is a member of.
 A user is a member of his or her singleton group (a group named after that user) and zero or more rule-based groups.
-The `identity-set` function takes a user ID, a scenario (collection of fact tuples) and an interset, 
-and returns some superset of the user's identity set (as an interset).
+The `identity-set` function takes a user ID and returns some superset of the user's identity set (as an interset).
 This superset is tight enough around the given interset to allow comparison against it to check if the user is or is not a member of that interset."
 
 "For an interset that does not mention any rule-based groups, the returned interset is the user's singleton set."
 (fact
- (identity-set "alice" [] #{}) => #{"alice"})
+ (identity-set "alice" #{}) => #{"alice"})
 
 "If the given interset mentiones rule-based groups, the returned set is an intersection of all the groups *of the same predicate* for which the user is a member of.
 For example, if the given interset mentions `[:cloudlog-events.testing-test/follower \"bob\"]` (a follower of `alice`),
 the returned interset will be an intersection of all the groups based on who follows the user, regardless of whether or not `bob` follows her."
 (fact
- (let [scenario [["tweetlog/follows" "charlie" ["alice"] #{"charlie"} #{}]
-                 ["tweetlog/follows" "dave" ["alice"] #{"dave"} #{}]]]
-   (identity-set "alice" scenario #{[:cloudlog-events.testing-test/follower "bob"]})
-   => #{"alice"
-        [:cloudlog-events.testing-test/follower "charlie"]
-        [:cloudlog-events.testing-test/follower "dave"]}))
+ (scenario
+  (as "charlie"
+      (emit [:tweetlog/follows "charlie" "alice"]))
+  (as "dave"
+      (emit [:tweetlog/follows "dave" "alice"]))
+  (identity-set "alice" #{[:cloudlog-events.testing-test/follower "bob"]})
+  => #{"alice"
+       [:cloudlog-events.testing-test/follower "charlie"]
+       [:cloudlog-events.testing-test/follower "dave"]}))
 
 "If no results are found for a rule-based group, no results are returned."
 (fact
- (let [scenario []]
-   (identity-set "alice" scenario #{[:cloudlog-events.testing-test/follower "bob"]})
-   => #{"alice"}))
+ (scenario
+  (identity-set "alice" #{[:cloudlog-events.testing-test/follower "bob"]})
+  => #{"alice"}))
 
 "`identity-set` ignores groups that are not rule-based (groups that are not represented as vectors)."
 (fact
- (identity-set "alice" [] #{:foo :bar "baz"}) => #{"alice"})
+ (identity-set "alice" #{:foo :bar "baz"}) => #{"alice"})
 

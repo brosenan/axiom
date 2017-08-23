@@ -62,32 +62,38 @@
        index-events
        (merge-indexes index)))
 
-(defn apply-rules [facts index-key]
-  (loop [rules (all-rules)
-         index (->> facts
-                    (map to-event)
-                    index-events)]
-    (cond (empty? rules)
-          (let [result (->> (index index-key)
-                            (map #(with-meta (:data %) {:readers (:readers %)}))
-                            set)]
-            (cond (empty? result)
-                  {:keys (set (keys index))
-                   :rules (->> (all-rules)
-                               (map #(keyword (-> % meta :ns str) (-> % meta :name)))
-                               set)}
-                  :else result))
-          :else
-          (recur (rest rules) (process-rule (first rules) index)))))
+(def ^:dynamic *scenario* nil)
+(def ^:dynamic *user* nil)
 
-(defn identity-set [user scenario s]
+(defn apply-rules [index-key]
+  (when (nil? *scenario*)
+    (throw (Exception. "apply-rules can only be called from within a scenario")))
+  (let [facts @*scenario*]
+    (loop [rules (all-rules)
+           index (->> facts
+                      (map to-event)
+                      index-events)]
+      (cond (empty? rules)
+            (let [result (->> (index index-key)
+                              (map #(with-meta (:data %) {:readers (:readers %)}))
+                              set)]
+              (cond (empty? result)
+                    {:keys (set (keys index))
+                     :rules (->> (all-rules)
+                                 (map #(keyword (-> % meta :ns str) (-> % meta :name)))
+                                 set)}
+                    :else result))
+            :else
+            (recur (rest rules) (process-rule (first rules) index))))))
+
+(defn identity-set [user s]
   (loop [groups (interset/enum-groups s)
          id-set #{user}]
     (cond (empty? groups)
           id-set
           (vector? (first groups))
           (let [[name & args] (first groups)
-                results (apply-rules scenario [name user])]
+                results (apply-rules [name user])]
             (cond (set? results)
                   (recur (rest groups)
                          (interset/intersection id-set (set (for [res results]
@@ -96,9 +102,6 @@
                   (recur (rest groups) id-set)))
           :else
           (recur (rest groups) id-set))))
-
-(def ^:dynamic *scenario* nil)
-(def ^:dynamic *user* nil)
 
 (defmacro scenario [& body]
   `(binding [*scenario* (atom [])] ~@body))
@@ -116,10 +119,14 @@
   ([[name-kw key & data] writers readers]
    (when (nil? *scenario*)
      (throw (Exception. "emit can only be called from within a scenario"))) 
-   (let [id-set (identity-set *user* @*scenario* writers)]
+   (let [id-set (identity-set *user* writers)]
      (when-not (interset/subset? id-set writers)
        (throw (Exception. (str "Cannot emit fact. " *user* " is not a member of " (pr-str writers) ".")))))
    (swap! *scenario* conj [(str (symbol (namespace name-kw) (name name-kw))) key data writers readers])))
+
+(def ^:private unique
+  (let [next-val (atom 0)]
+    (fn [] (str "unique-" (swap! next-val inc)))))
 
 (defn query [[pred & args]]
   (when (nil? *user*)
@@ -128,13 +135,13 @@
     (throw (Exception. "query can only be called from within a scenario")))
   (let [pred? (keyword (str (namespace pred) "/" (name pred) "?"))
         pred! (keyword (str (namespace pred) "/" (name pred) "!"))
-        q [pred? :unique args #{*user*} #{*user*}]
-        facts (conj @*scenario* q)]
-    (let [tuples (apply-rules facts [pred! :unique])]
+        u (unique)]
+    (emit `[~pred? ~u ~@args] #{*user*} #{*user*})
+    (let [tuples (apply-rules [pred! u])]
       (cond (set? tuples)
             (set (filter (fn [tuple]
                            (let [readers (-> tuple meta :readers)
-                                 id-set (identity-set *user* @*scenario* readers)]
+                                 id-set (identity-set *user* readers)]
                              (interset/subset? id-set readers))) tuples))
             :else tuples))))
 
