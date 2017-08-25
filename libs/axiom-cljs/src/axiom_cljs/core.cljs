@@ -72,22 +72,29 @@
 (defn wrap-feed-forward [host]
   (let [{:keys [pub sub]} host
         ps (pubsub :name)
-        limbo (atom #{})
         project #(dissoc % :readers)]
     (-> host
         (assoc :pub (fn [ev]
                       ((:pub ps) ev)
-                      (pub ev)
-                      (swap! limbo conj (project ev))))
+                      (pub ev)))
         (assoc :sub (fn [disp f]
-                      ((:sub ps) disp f)
-                      (let [f (fn [ev]
-                                (let [pev (project ev)]
-                                  (cond (contains? @limbo pev)
-                                        (swap! limbo disj pev)
-                                        :else
-                                        (f ev))))]
-                        (sub disp f)))))))
+                      ;; Limbo stores events that were feed-forwarded internally
+                      ;; but were not yet received from the server.
+                      ;; It is local to a subscriber
+                      (let [limbo (atom #{})]
+                        ;; Called upon publication by the client
+                        (let [f' (fn [ev]
+                                   (swap! limbo conj (project ev))
+                                   (f ev))]
+                          ((:sub ps) disp f'))
+                        ;; Called upon receiving event from the server
+                        (let [f' (fn [ev]
+                                  (let [pev (project ev)]
+                                    (cond (contains? @limbo pev)
+                                          (swap! limbo disj pev)
+                                          :else
+                                          (f ev))))]
+                          (sub disp f'))))))))
 
 (defn wrap-atomic-updates [host]
   (let [sub (:sub host)]
