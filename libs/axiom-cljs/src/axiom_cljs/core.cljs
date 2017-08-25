@@ -113,10 +113,24 @@
                                    :else
                                    (f ev)))))))))
 
+(defn wrap-reg [host]
+  (let [{:keys [pub]} host
+        regs (atom #{})]
+    (-> host
+        (assoc :pub
+               (fn [ev]
+                 (cond (= (:kind ev) :reg)
+                       (when-not (contains? @regs ev)
+                         (pub ev)
+                         (swap! regs conj ev))
+                       :else
+                       (pub ev)))))))
+
 (defn default-connection [atom]
   (-> js/document.location
       ws-url
       (connection :atom atom)
       update-on-dev-ver
+      wrap-reg
       wrap-feed-forward
       wrap-atomic-updates))

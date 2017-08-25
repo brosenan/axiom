@@ -312,6 +312,58 @@ and the a second time with the original value of `:change` and `:removed` remove
         (is (= @published [{:name "foo" :key "bar" :data [1 2 3] :change -1}
                            {:name "foo" :key "bar" :data [2 3 4] :change 1}]))))
 
+[[:chapter {:title "wrap-reg"}]]
+"The WebSocket protocol this library uses to communicate with the [gateway](gateway.html) uses a special event not used in other places of axiom:
+the `:reg` event.
+This event registers the connection to streams of `:fact` events, and possibly asks for all existing facts that match cerain criteria.
+The `wrap-reg` middleware is used to ensure correct semantics in situations where multiple views or queries register to the same kind of events."
+
+"Consider a situation where two views register to the same `:fact` pattern (`:name`+`:key` combination).
+Since each view has its own storage atom, they will not know about each other.
+Each will create a `:reg` event with these `:name` and `:key` and register to incoming events.
+They will also set the `:get-existing` to `true`, to receive all existing facts that match.
+Unfortunately, since `:get-existing` was sent twice, the back-end will send two copies of each event.
+These events will be received by both views and so the value stored in the atom related to these events will be double its actual value on the server."
+
+"`wrap-reg` is intended to solve this problem.
+It is a connection middleware that augments the connection's `:pub` method.
+If each `:reg` event is sent only once, the `:pub` method's behavior remains unchanged."
+(fact wrap-reg-1
+      (let [ps (ax/pubsub :name)
+            host (-> {:pub (:pub ps)}
+                     ax/wrap-reg)
+            published (atom [])]
+        ((:sub ps) "some/fact" (partial swap! published conj))
+        ((:pub host) {:kind :reg :name "some/fact" :key 1})
+        ((:pub host) {:kind :reg :name "some/fact" :key 2})
+        (is (= @published [{:kind :reg :name "some/fact" :key 1}
+                           {:kind :reg :name "some/fact" :key 2}]))))
+
+"However, if a `:reg` event repeats itself, `wrap-reg` will make sure it is only sent to the back-end once."
+(fact wrap-reg-2
+      (let [ps (ax/pubsub :name)
+            host (-> {:pub (:pub ps)}
+                     ax/wrap-reg)
+            published (atom [])]
+        ((:sub ps) "some/fact" (partial swap! published conj))
+        ((:pub host) {:kind :reg :name "some/fact" :key 1})
+        ((:pub host) {:kind :reg :name "some/fact" :key 2})
+        ((:pub host) {:kind :reg :name "some/fact" :key 1}) ;; Sent twice
+        (is (= @published [{:kind :reg :name "some/fact" :key 1}
+                           {:kind :reg :name "some/fact" :key 2}]))))
+
+"`wrap-reg` only de-duplicates `:reg` events.
+Other kinds of events (e.g., `:fact`) pass normally."
+(fact wrap-reg-3
+      (let [ps (ax/pubsub :name)
+            host (-> {:pub (:pub ps)}
+                     ax/wrap-reg)
+            published (atom [])]
+        ((:sub ps) "some/fact" (partial swap! published conj))
+        (doseq [_ (range 10)]
+          ((:pub host) {:kind :fact :name "some/fact" :key 1 :data [2]}))
+        (is (= (count @published) 10))))
+
 [[:chapter {:title "default-connection"}]]
 "`default-connection` is a high-level function intended to provide a connection-map using the default settings.
 It uses [ws-url](#ws-url) to create a WebSocket URL based on `js/document.location`,
