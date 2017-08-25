@@ -364,6 +364,42 @@ Other kinds of events (e.g., `:fact`) pass normally."
           ((:pub host) {:kind :fact :name "some/fact" :key 1 :data [2]}))
         (is (= (count @published) 10))))
 
+[[:chapter {:title "wrap-late-subs"}]]
+"One of the problems that exist in the pub/sub pattern is the problem of *late subscribers*.
+A late subscriber is a subscriber that subscribes to a topic after content has already been published on that topic.
+In our case this could be a view function that is consulted late in the process, after another view has already requested the data it was interested in.
+Because we [de-duplicate registration](#wrap-reg), the events are not re-sent to the new subscriber.
+This results in the new subscriber not having the information it needs."
+
+"`wrap-late-subs` is intended to solve this problem by persisting all incoming events, and repeating relevant ones to new subscribers.
+It is a connection middleware that augments the `:sub` method.
+If no relevant publications have been made before the call to `:sub`, the callback will receive only new events."
+(fact wrap-late-subs-1
+      (let [ps (ax/pubsub :name)
+            host (-> {:sub (:sub ps)}
+                     ax/wrap-late-subs)
+            published (atom [])]
+        ((:sub host) "some/fact" (constantly nil)) ;; First subscription that causes events to come from the server
+        ((:sub host) "some/fact" (partial swap! published conj)) ;; Our subscription
+        ((:pub ps) {:kind :fact :name "some/fact" :key 1 :data [2]})
+        ((:pub ps) {:kind :fact :name "some/fact" :key 2 :data [3]})
+        (is (= @published [{:kind :fact :name "some/fact" :key 1 :data [2]}
+                           {:kind :fact :name "some/fact" :key 2 :data [3]}]))))
+
+"`wrap-late-subs` makes sure the order between subscribing and publishing is not important.
+Even if `:sub` was called after the events have already been `:pub`lished, they will still be provided to the callback."
+(fact wrap-late-subs-2
+      (let [ps (ax/pubsub :name)
+            host (-> {:sub (:sub ps)}
+                     ax/wrap-late-subs)
+            published (atom [])]
+        ((:sub host) "some/fact" (constantly nil)) ;; First subscription that causes events to come from the server
+        ((:pub ps) {:kind :fact :name "some/fact" :key 1 :data [2]})
+        ((:pub ps) {:kind :fact :name "some/fact" :key 2 :data [3]})
+        ((:sub host) "some/fact" (partial swap! published conj)) ;; Our subscription
+        (is (= @published [{:kind :fact :name "some/fact" :key 1 :data [2]}
+                           {:kind :fact :name "some/fact" :key 2 :data [3]}]))))
+
 [[:chapter {:title "default-connection"}]]
 "`default-connection` is a high-level function intended to provide a connection-map using the default settings.
 It uses [ws-url](#ws-url) to create a WebSocket URL based on `js/document.location`,

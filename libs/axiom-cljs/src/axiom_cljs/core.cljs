@@ -126,11 +126,23 @@
                        :else
                        (pub ev)))))))
 
+(defn wrap-late-subs [host]
+  (let [{:keys [sub]} host
+        events (atom {})]
+    (-> host
+        (assoc :sub (fn [disp f]
+                          (sub disp (fn [ev]
+                                      (f ev)
+                                      (swap! events update (:name ev) (fnil conj []) ev)))
+                          (doseq [ev (@events disp)]
+                            (f ev)))))))
+
 (defn default-connection [atom]
   (-> js/document.location
       ws-url
       (connection :atom atom)
       update-on-dev-ver
       wrap-reg
+      wrap-late-subs
       wrap-feed-forward
       wrap-atomic-updates))
