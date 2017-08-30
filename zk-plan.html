@@ -62,9 +62,9 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 25 August 2017</h5>
+              <h5>Date: 30 August 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
-              <h5>Version: 0.2.3</h5></div></div>
+              <h5>Version: 0.3.1</h5></div></div>
           <hr/>
           <div class="outline">
             <div class="toc">
@@ -84,7 +84,7 @@
                 </ul>
               </nav>
           </div>
-          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>zk-plan</code> is a tool for orchestrating execution of parallel jobs. It is based on the notion of a <em>plan</em>, which is dependecy graph of Clojure functions to be executed. After <a href='#create-plan'>creating a plan</a>, <a href='#add-task'>populating it</a> and <a href='#mark-as-ready'>marking it ready for execution</a>, a cluster of <em>workers</em> start taking tasks from it. A worker will only take a task for which all dependencies are met. If a task fails it is automatically retried by another worker. Eventually, <a href='#plan-completed'>plan-completed?</a> will indicated if all tasks in a given plan have been successfully completed.</p></div><div><span id="module"></span><h2><b>2 &nbsp;&nbsp; module</b></h2></div><div><p>The content of this library is provided as a <a href='di.html'>dependency injection</a> module. The <code>zk-plan</code> resource containing the external API of this library depends on the <code>zookeeper</code> resource which is a Zookeeper connection object. <code>zookeeper</code> itself is provided by this module, but it depends on <code>zookeeper-config</code>, containing the coordinates of the Zookeeper server.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper :zk})] ;; :zk is a mock zookeeper connection object
+          <div><span id="introduction"></span><h2><b>1 &nbsp;&nbsp; Introduction</b></h2></div><div><p><code>zk-plan</code> is a tool for orchestrating execution of parallel jobs. It is based on the notion of a <em>plan</em>, which is dependecy graph of Clojure functions to be executed. After <a href='#create-plan'>creating a plan</a>, <a href='#add-task'>populating it</a> and <a href='#mark-as-ready'>marking it ready for execution</a>, a cluster of <em>workers</em> start taking tasks from it. A worker will only take a task for which all dependencies are met. If a task fails it is automatically retried by another worker. Eventually, <a href='#plan-completed'>plan-completed?</a> will indicated if all tasks in a given plan have been successfully completed.</p></div><div><span id="module"></span><h2><b>2 &nbsp;&nbsp; module</b></h2></div><div><p>The content of this library is provided as a <a href='di.html'>dependency injection</a> module. The <code>zk-plan</code> resource containing the external API of this library depends on the <code>zookeeper</code> resource which is a <a href='https://github.com/aroemers/zookeeper-loop'>derefable Zookeeper connection object</a>. <code>zookeeper</code> itself is provided by this module, but it depends on <code>zookeeper-config</code>, containing the coordinates of the Zookeeper server.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper (atom :zk)})] ;; :zk is a mock zookeeper connection object
  (module $)
  (di/startup $)
  (def zk-plan (di/do-with! $ [zk-plan] zk-plan)))</code></pre></div><div><p>The <code>zk-plan</code> resource is a map containing function comprising the external API of this library, already addressing a given connection.</p></div><div class="code"><pre><code class="clojure">(def create-plan (:create-plan zk-plan))
@@ -186,8 +186,8 @@
                  zk-plan]
               (let [{:keys [plan-completed?]} zk-plan
                     parent &quot;/stress&quot;]
-                (zk/delete-all zookeeper &quot;/stress&quot;)
-                (zk/create zookeeper parent :persistent? true)
+                (zk/delete-all @zookeeper &quot;/stress&quot;)
+                (zk/create @zookeeper parent :persistent? true)
                 (let [plan (build-stress-plan zk-plan parent)]
                   (loop []
                     (when-not (plan-completed? plan)

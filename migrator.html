@@ -62,9 +62,9 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 25 August 2017</h5>
+              <h5>Date: 30 August 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
-              <h5>Version: 0.2.3</h5></div></div>
+              <h5>Version: 0.3.1</h5></div></div>
           <hr/>
           <div class="outline">
             <div class="toc">
@@ -323,12 +323,12 @@
  (s3/module $)
  (di/startup $)</code></pre></div><div><p>Let's create the root elements we need in Zookeeper</p></div><div class="code"><pre><code class="clojure">:integ
  (di/do-with! $ [zookeeper]
- (when (zk/exists zookeeper &quot;/perms&quot;)
-   (zk/delete-all zookeeper &quot;/perms&quot;))
- (zk/create zookeeper &quot;/perms&quot; :persistent? true)
- (when (zk/exists zookeeper &quot;/my-plans&quot;)
-   (zk/delete-all zookeeper &quot;/my-plans&quot;))
- (zk/create zookeeper &quot;/my-plans&quot; :persistent? true))</code></pre></div><div><p>The next step would be to generate test data. We will start with tweets:</p></div><div class="code"><pre><code class="clojure">:integ
+ (when (zk/exists @zookeeper &quot;/perms&quot;)
+   (zk/delete-all @zookeeper &quot;/perms&quot;))
+ (zk/create @zookeeper &quot;/perms&quot; :persistent? true)
+ (when (zk/exists @zookeeper &quot;/my-plans&quot;)
+   (zk/delete-all @zookeeper &quot;/my-plans&quot;))
+ (zk/create @zookeeper &quot;/my-plans&quot; :persistent? true))</code></pre></div><div><p>The next step would be to generate test data. We will start with tweets:</p></div><div class="code"><pre><code class="clojure">:integ
  (def users [&quot;alice&quot; &quot;bob&quot; &quot;charlie&quot;])
  (def time (atom 1000))
  (di/do-with! $ [publish]
@@ -387,7 +387,7 @@
              res
              :else
              (recur (inc res))))))) =&gt; 18</code></pre></div><div><p>Finally, we shut down the injector to stop the workers.</p></div><div class="code"><pre><code class="clojure">:integ
- (di/shutdown $)</code></pre></div><div><span id="under-the-hood"></span><h2><b>7 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="zookeeper-counter-add"></span><h3>7.1 &nbsp;&nbsp; zookeeper-counter-add</h3></div><div><p><code>zookeeper-counter-add</code> depends on the <code>zookeeper</code> resource as dependency, and uses it to implement a global atomic counter.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper :zk})]
+ (di/shutdown $)</code></pre></div><div><span id="under-the-hood"></span><h2><b>7 &nbsp;&nbsp; Under the Hood</b></h2></div><div><span id="zookeeper-counter-add"></span><h3>7.1 &nbsp;&nbsp; zookeeper-counter-add</h3></div><div><p><code>zookeeper-counter-add</code> depends on the <code>zookeeper</code> resource as dependency, and uses it to implement a global atomic counter.</p></div><div class="code"><pre><code class="clojure">(let [$ (di/injector {:zookeeper (atom :zk)})]
   (module $)
   (di/startup $)
   (def zookeeper-counter-add (di/do-with! $ [zookeeper-counter-add] zookeeper-counter-add)))</code></pre></div><div><p><code>zookeeper-counter-add</code> takes a path to a counter and a number to be added. If a node corresponding to the given path does not exist, it is assumed to be equal 0, and is therefore created using the given number. The new value, which is the given number, is returned.</p></div><div class="code"><pre><code class="clojure">(zookeeper-counter-add &quot;/rules/foobar&quot; 3) =&gt; 3

@@ -62,9 +62,9 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 25 August 2017</h5>
+              <h5>Date: 30 August 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
-              <h5>Version: 0.2.3</h5></div></div>
+              <h5>Version: 0.3.1</h5></div></div>
           <hr/>
           <div class="outline">
             <div class="toc">
@@ -121,15 +121,15 @@
  (println 0)
  (di/do-with! $ [zookeeper]
             (println 1)
-            (when (zk/exists zookeeper &quot;/perms&quot;)
-              (zk/delete-all zookeeper &quot;/perms&quot;))
+            (when (zk/exists @zookeeper &quot;/perms&quot;)
+              (zk/delete-all @zookeeper &quot;/perms&quot;))
             (println 2)
-            (zk/create zookeeper &quot;/perms&quot; :persistent? true)
+            (zk/create @zookeeper &quot;/perms&quot; :persistent? true)
             (println 3)
-            (when (zk/exists zookeeper &quot;/my-plans&quot;)
-              (zk/delete-all zookeeper &quot;/my-plans&quot;))
+            (when (zk/exists @zookeeper &quot;/my-plans&quot;)
+              (zk/delete-all @zookeeper &quot;/my-plans&quot;))
             (println 4)
-            (zk/create zookeeper &quot;/my-plans&quot; :persistent? true)
+            (zk/create @zookeeper &quot;/my-plans&quot; :persistent? true)
             (println 5))</code></pre></div><div><span id="input-data"></span><h3>2.3 &nbsp;&nbsp; Input Data</h3></div><div><p>For the purpose of this test we consider a Twitter-like app for numbers. Our "users" will therefore be the numbers between 10 and 100, exclusive. Numbers follow other numbers if they literally <em>follow</em> them. Specifically, each number "follows" the ten numbers that precede it.</p></div><div><p>We do this in two phases. In the first phase all numbers follow the five preceiding numbers, and in the second phase they follow the five preceding them. This is done in a thread that waits 100 milliseconds between each publication.</p></div><div class="code"><pre><code class="clojure">:integ
  (def following-thread
  (di/do-with! $ [publish]
