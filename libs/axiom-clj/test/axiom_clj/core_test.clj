@@ -88,15 +88,15 @@ so we clear the trees that store it."
  (println 0)
  (di/do-with! $ [zookeeper]
               (println 1)
-              (when (zk/exists zookeeper "/perms")
-                (zk/delete-all zookeeper "/perms"))
+              (when (zk/exists @zookeeper "/perms")
+                (zk/delete-all @zookeeper "/perms"))
               (println 2)
-              (zk/create zookeeper "/perms" :persistent? true)
+              (zk/create @zookeeper "/perms" :persistent? true)
               (println 3)
-              (when (zk/exists zookeeper "/my-plans")
-                (zk/delete-all zookeeper "/my-plans"))
+              (when (zk/exists @zookeeper "/my-plans")
+                (zk/delete-all @zookeeper "/my-plans"))
               (println 4)
-              (zk/create zookeeper "/my-plans" :persistent? true)
+              (zk/create @zookeeper "/my-plans" :persistent? true)
               (println 5)))
 
 [[:section {:title "Input Data"}]]

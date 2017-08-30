@@ -2,7 +2,8 @@
   (:use [zookeeper :as zk])
   (:require [clojure.string :as str]
             [di.core :as di]
-            [clojure.core.async :as async]))
+            [clojure.core.async :as async]
+            [zookeeper-loop :as zkl]))
 
 (defn ^:private create-plan [zk parent]
   (zk/create-all zk (str parent "/plan-") :persistent? true :sequential? true))
@@ -163,14 +164,14 @@
 
 (defn module [$]
   (di/provide $ zookeeper [zookeeper-config]
-              (zk/connect (:url zookeeper-config)))
+              (zkl/client-loop (:url zookeeper-config)))
 
   (di/provide $ zk-plan [zookeeper]
-              {:create-plan (partial create-plan zookeeper)
-               :add-task (partial add-task zookeeper)
-               :mark-as-ready (partial mark-as-ready-internal zookeeper)
-               :worker (partial worker zookeeper)
-               :plan-completed? (partial plan-completed? zookeeper)})
+              {:create-plan (partial create-plan @zookeeper)
+               :add-task (partial add-task @zookeeper)
+               :mark-as-ready (partial mark-as-ready-internal @zookeeper)
+               :worker (partial worker @zookeeper)
+               :plan-completed? (partial plan-completed? @zookeeper)})
 
   (di/do-with $ [zk-plan zk-plan-config info]
               (let [alive (atom true)

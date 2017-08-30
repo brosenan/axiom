@@ -16,10 +16,10 @@ Eventually, [plan-completed?](#plan-completed) will indicated if all tasks in a 
 [[:chapter {:title "module"}]]
 "The content of this library is provided as a [dependency injection](di.html) module.
 The `zk-plan` resource containing the external API of this library depends on the `zookeeper` resource
-which is a Zookeeper connection object.
+which is a [derefable Zookeeper connection object](https://github.com/aroemers/zookeeper-loop).
 `zookeeper` itself is provided by this module, but it depends on `zookeeper-config`, containing the coordinates of the Zookeeper server."
 (fact
- (let [$ (di/injector {:zookeeper :zk})] ;; :zk is a mock zookeeper connection object
+ (let [$ (di/injector {:zookeeper (atom :zk)})] ;; :zk is a mock zookeeper connection object
    (module $)
    (di/startup $)
    (def zk-plan (di/do-with! $ [zk-plan] zk-plan))))
@@ -252,8 +252,8 @@ The other `M-K` tasks are built with `K` arguments each, which are randomly sele
                    zk-plan]
                 (let [{:keys [plan-completed?]} zk-plan
                       parent "/stress"]
-                  (zk/delete-all zookeeper "/stress")
-                  (zk/create zookeeper parent :persistent? true)
+                  (zk/delete-all @zookeeper "/stress")
+                  (zk/create @zookeeper parent :persistent? true)
                   (let [plan (build-stress-plan zk-plan parent)]
                     (loop []
                       (when-not (plan-completed? plan)

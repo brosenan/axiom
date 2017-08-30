@@ -12,7 +12,6 @@
             [rabbit-microservices.core :as rms]
             [zk-plan.core :as zkp]
             [dynamo.core :as dyn]
-            [zookeeper :as zk]
             [clojure.java.io :as io]
             [s3.core :as s3]
             [clojure.string :as str]))
@@ -407,12 +406,12 @@ and on `declare-service` and `assign-service` for registering itself.
 (fact
  :integ
  (di/do-with! $ [zookeeper]
-   (when (zk/exists zookeeper "/perms")
-     (zk/delete-all zookeeper "/perms"))
-   (zk/create zookeeper "/perms" :persistent? true)
-   (when (zk/exists zookeeper "/my-plans")
-     (zk/delete-all zookeeper "/my-plans"))
-   (zk/create zookeeper "/my-plans" :persistent? true)))
+   (when (zk/exists @zookeeper "/perms")
+     (zk/delete-all @zookeeper "/perms"))
+   (zk/create @zookeeper "/perms" :persistent? true)
+   (when (zk/exists @zookeeper "/my-plans")
+     (zk/delete-all @zookeeper "/my-plans"))
+   (zk/create @zookeeper "/my-plans" :persistent? true)))
 
 "The next step would be to generate test data.
 We will start with tweets:"
@@ -511,7 +510,7 @@ This means that Alice's timeline should contain 18 tweets."
 [[:chapter {:title "Under the Hood"}]]
 [[:section {:title "zookeeper-counter-add"}]]
 "`zookeeper-counter-add` depends on the `zookeeper` resource as dependency, and uses it to implement a global atomic counter."
-(let [$ (di/injector {:zookeeper :zk})]
+(let [$ (di/injector {:zookeeper (atom :zk)})]
   (module $)
   (di/startup $)
   (def zookeeper-counter-add (di/do-with! $ [zookeeper-counter-add] zookeeper-counter-add)))

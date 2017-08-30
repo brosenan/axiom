@@ -109,13 +109,13 @@
   (di/provide $ zookeeper-counter-add [zookeeper]
               (fn zookeeper-counter-add
                 ([path change retries]
-                 (let [exists (zk/exists zookeeper path)]
+                 (let [exists (zk/exists @zookeeper path)]
                    (cond exists
-                         (let [old (zkp/get-clj-data zookeeper path)
+                         (let [old (zkp/get-clj-data @zookeeper path)
                                new (+ old change)
                                new-bin (zkp/to-bytes (pr-str new))]
                            (try
-                             (zk/set-data zookeeper path new-bin (:version exists))
+                             (zk/set-data @zookeeper path new-bin (:version exists))
                              new
                              (catch Throwable e
                                (cond (> retries 1)
@@ -124,8 +124,8 @@
                                      (throw e)))))
                          :else
                          (do
-                           (zk/create-all zookeeper path :persistent? true)
-                           (zkp/set-initial-clj-data zookeeper path change)
+                           (zk/create-all @zookeeper path :persistent? true)
+                           (zkp/set-initial-clj-data @zookeeper path change)
                            change))))
                 ([path change]
                  (zookeeper-counter-add path change 3))))
