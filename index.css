@@ -86,3 +86,14 @@ a.sidebar-nav-item {
     line-height: 120%;
     font-size: 18pt;
 }
+
+.navbar {
+    display: block;
+    font-size: 18pt;
+    font-family: "Arial";
+    color: #679985;
+    padding-left: 0px;
+}
+.navbaritem {
+    display: inline;
+}

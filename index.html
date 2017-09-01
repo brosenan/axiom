@@ -4,111 +4,130 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>[:axiom] -- Define you App; Don't Implement It!</title>
-    <link href="index.css" rel="stylesheet">
+    <link href="bootstrap.css" rel="stylesheet">
     <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
   </head>
   <body>
-    <div id="header">
-      <div class="w3-row">
-	<div class="w3-col m12 header"><img src="https://brosenan.github.io/axiom/img/axiom-logo-full-size.png" alt="logo" width="70%"></div>
+    <div id="header" class="container">
+      <div class="col-md-12 container">
+	<ul class="nav nav-tabs">
+	  <li class="nav-item"><a class="nav-link" href="https://github.com/brosenan/axiom/wiki">Documentation</a></li>
+	  <li class="nav-item"><a class="nav-link" href="https://github.com/brosenan/axiom">GitHub</a></li>
+	</ul>
       </div>
-      <div class="w3-row"><span class="defn">Define</span> your app; don't <span class="implement">implement</span> it.</div>
+      <div class="container-fluid">
+	<div class="col-md-12 center-block"><img src="https://brosenan.github.io/axiom/img/axiom-logo-full-size.png" alt="logo" width="70%"
+						 class="center-block"></div>
+	<div class="container center-block" style="text-align: center;">
+	  <h2><span style="font-family: Comic Sans MS; color: #8e519f;">Define</span>
+	    your app; don't
+	    <span style="color: #679985; font-family: Courier;">implement</span>
+	    it.
+	  </h2>
+	  <button class="btn btn-primary" onclick="window.location = 'https://github.com/brosenan/axiom/wiki/Getting-Started-with-Axiom'">Get Started</button>
+	  <hr/>
+	</div>
+      </div>
     </div>
-    <div class="purple-bg abstract" id="desc">
-      <div class="w3-row"><div class="w3-col m9">
+
+    <div class="container">
+      <div class="jumbotron" id="desc">
+	<div class="container"><div class="col-md-9">
 	    <p>Axiom provides a fresh new look at web applications.
 	      Today, when building a web application, application providers are responsible for everything.
 	      They are responsible for implementing correct business logic,
 	      responsible for providing good performance, scalability and availability.
 	      They are also responsible for defining and implementing a privacy policy ensuring that private user data remains private.</p>
-	  </div><div class="w3-col m3"><img width="100%" src="illustration-traditional-app.png"></div></div>
-      <div class="w3-row"><div class="w3-col m3"><img width="100%" src="illustration-axiom.png"></div>
-	<div class="w3-col m9"><p>Axiom is a <em>web platform</em>.
+	  </div><div class="col-md-3"><img width="100%" src="illustration-traditional-app.png"></div></div>
+	<div class="container"><div class="col-md-3"><img width="100%" src="illustration-axiom.png"></div>
+	  <div class="col-md-9"><p>Axiom is a <em>web platform</em>.
 	      It is intended to be provided as a service, and handle most of the common concerns in
 	      a web application: Scalability, availability and even confidentiality of user data.
 	      Application providers upload their <em>business logic</em> to Axiom as <em>logic rules</em>,
 	      written in Clojure.  Actually, the rules are written in a Clojure DSL we call <a href="cloudlog.html">Cloudlog</a>.</p>
 	    <p>Cloudlog is a <em>purely-declarative</em> DSL, based on a purely-declarative subset of Clojure.
 	      Being purely declarative is important for two reasons:</p>
-	    <ol><li>It keeps the application developer focused on <em>defining</em> the app's business logic rather than <em>implementing</em> it; and</li>
-	      <li>It makes sure the application cannot <em>remember</em> user data.
-		This is important to make Axiom itself responsible for the confidentiality of user data.</li></ol>
-      </div></div>
-    </div>
-    <div class="explain">
-      <p>This example demonstrates how an application is defined using Axiom.
-	This is a Twitter-like application named <em>tweetlog</em>.
-	Like Twitter, its main purpose is to show user <em>timelines</em> based on <em>tweets</em> made by users they <em>follow</em>.</p>
-      <div class="w3-row"><div class="w3-col m5">
-	    <p>In this example, we use two macros: <span class="code">defrule</span> and <span class="code">defclause</span> to define
+	    <ol><li><p>It keeps the application developer focused on <em>defining</em> the app's business logic rather than <em>implementing</em> it; and</p></li>
+	      <li><p>It makes sure the application cannot <em>remember</em> user data.
+		  This is important to make Axiom itself responsible for the confidentiality of user data.</p></li>
+	    </ol>
+	</div></div>
+      </div>
+      <div class="container">
+	<p>This example demonstrates how an application is defined using Axiom.
+	  This is a Twitter-like application named <em>tweetlog</em>.
+	  Like Twitter, its main purpose is to show user <em>timelines</em> based on <em>tweets</em> made by users they <em>follow</em>.</p>
+	<div class="container"><div class="col-md-5">
+	    <p>In this example, we use two macros: <code>defrule</code> and <code>defclause</code> to define
 	      <em>rules</em> and <em>clauses</em> respectively.</p>
 	    <p><a href="cloudlog.html#defrule">Rules</a> and
-	      <a href="cloudlog.html#defclause">clauses<a/> both represent logic deductions (similar to Horn Clauses in Prolog).
+	      <a href="cloudlog.html#defclause">clauses</a> both represent logic deductions (similar to Horn Clauses in Prolog).
 	      Both rules and clauses operate on <em>facts</em>, which represent user data
-	      (<span class="code">:tweetlog/follows</span> and <span class="code">:tweetlog/tweeted</span> in our example).</p>
+	      (<code>:tweetlog/follows</code> and <code>:tweetlog/tweeted</code> in our example).</p>
 	    <p>Both rules and clauses can leverage the power of Clojure through the use of <em>guards</em>.
 	      <a href="cloudlog.html#guards">Guards</a> are pieces of Clojure code providing variable bindings and filtering through Clojure forms such as
-	      <span class="code">(for)</span>, <span class="code">(let)</span> and <span class="code">(when)</span>.
+	      <code>(for)</code>, <code>(let)</code> and <code>(when)</code>.
 	      In our example we use guards to extract user-handles mentioned in tweets.</p>
 	    <p>The key difference between rules and clauses is the fact that the logic of a clause is applied at query time,
 	      when the target query is already known, while the logic of a rule is applied at update time, as facts are added or removed.</p></div>
-	<div class="w3-col m7"><div class="code-example" width="60%"><img width="100%" src="twitter-like-example.png"></div></div>
-      </div>
-      This example is described is a demo we gave at <a href="http://2017.programmingconference.org/">&lt;Programming&gt; 2017</a>.
-      Please check out the <a href="https://youtu.be/3gLMBr2rTj8">video here</a>.
-    </div>
-    <div class="abstract purple-bg">
-      <div class="w3-row">
-	<div class="w3-col m6">
-	  Axiom uses a framework named <a href="permacode.html">Permacode</a>
-	  to store Clojure source files comprising application definitions
-	  in the form of a <a href="https://en.wikipedia.org/wiki/Merkle_tree">Merkle Tree</a>.
-	  Each version of each source file is assigned a hash code, which represents it within Axiom.
-	  Data derived from rules is placed in tables which names are prifixed by these hashes.
-	  This allows several versions of the same application to co-exist.</div>
-	<div class="w3-col m6"><img src="permacode.png" width="100%"></div>
-      </div>
-      <div class="w3-row">
-	<div class="w3-col m7"><img src="migration.png" width="100%"></div>
-	<div class="w3-col m5">
-	  <p>Since rules generate derived data, when introducing a new (version of a) rule, all derived data based on existing
-	    raw data and the new rule need to be generated.
-	    Axiom does that in bach processing, where different tables are considered one by one,
-	    but the data of each table is processed in parallel.</p>
-	  <p>This form of automatic data migration frees application developers from the need to develop
-	    one-time migration scripts to transform data.</p></div>
-      </div>
-      <div class="w3-row">
-	<div class="w3-col m5">
-	  <p>Once data migration is complete, an <a href="http://storm.apache.org/">Apache Storm</a> topology it launched to handle
-	    continous traffic.
-	    New facts are published on an AMQP topic, and Storm Spouts listen to them, and introduce them to the topology.
-	    Storm Bolts listen to these changes and cross-reference them with facts and partial rules that are stored in a database.
-	    The resulting partial rules and derived facts are stored to the database, and the derived facts are also published on AMQP topics.
-	    This allows them to be considered by other rules.</p>
+	  <div class="col-md-7"><div class="code-example" width="60%"><img width="100%" src="twitter-like-example.png"></div></div>
 	</div>
-	<div class="w3-col m7"><img src="topology.png" width="100%"></div>
+	This example is described is a demo we gave at <a href="http://2017.programmingconference.org/">&lt;Programming&gt; 2017</a>.
+	Please check out the <a href="https://youtu.be/3gLMBr2rTj8">video here</a>.
       </div>
-      <p>Clauses use a similar mechanism to rules, but their data is transient and is not stored to a database.</p>
-    </div>
-    <div class="explain">
-      Axiom is currently a work in progress.
-      For more information you are encouraged to:
-      <ul class="">
-	<li>Read our <a href="docs.html">live documentation</a>.</li>
-	<li>Read our academic papers:
-	  <ul><li><a href="http://www.cs.technion.ac.il/users/wwwb/cgi-bin/tr-get.cgi/2015/CS/CS-2015-06.pdf">Separation of Powers in the Cloud</a>
-	      (presented at <a href="http://2015.splashcon.org/track/onward2015-papers#program">Onwrad! 2015</a>):
-	      A paper introducing Cloudlog as a way to provide access control without trusting the application with it.</li>
-	    <li><a href="http://programming-journal.org/2017/1/2/">Application Embedding</a>
-	      (published at the <a href="http://programming-journal.org/">Programming Journal</a>):
-	      A paper intruducing the approach Axiom is based on.</li></ul></li>
-	<li>Watch our video talks:
-	  <ul><li><a href="https://youtu.be/Sl6hh-0ikwU">Application Embedding Talk</a> (&lt;Programming&gt; 2017)</li>
-	    <li><a href="https://youtu.be/3gLMBr2rTj8">Axiom Demo</a> (&lt;Programming&gt; 2017)</li></ul></li>
-	<li>See our <a href="https://github.com/brosenan/axiom/">code on GitHub</a></li>
-      <li><a href="https://cloudalion.org/contact-us/">Contact us</a> directly</li></ul>
+      <div class="jumbotron">
+	<div class="container">
+	  <div class="col-md-6">
+	    <p>Axiom uses a framework named <a href="permacode.html">Permacode</a>
+	      to store Clojure source files comprising application definitions
+	      in the form of a <a href="https://en.wikipedia.org/wiki/Merkle_tree">Merkle Tree</a>.
+	      Each version of each source file is assigned a hash code, which represents it within Axiom.
+	      Data derived from rules is placed in tables which names are prifixed by these hashes.
+	      This allows several versions of the same application to co-exist.</p></div>
+	  <div class="col-md-6"><img src="permacode.png" width="100%"></div>
+	</div>
+	<div class="container">
+	  <div class="col-md-7"><img src="migration.png" width="100%"></div>
+	  <div class="col-md-5">
+	    <p>Since rules generate derived data, when introducing a new (version of a) rule, all derived data based on existing
+	      raw data and the new rule need to be generated.
+	      Axiom does that in bach processing, where different tables are considered one by one,
+	      but the data of each table is processed in parallel.</p>
+	    <p>This form of automatic data migration frees application developers from the need to develop
+	      one-time migration scripts to transform data.</p></div>
+	</div>
+	<div class="container">
+	  <div class="col-md-5">
+	    <p>Once data migration is complete, an <a href="http://storm.apache.org/">Apache Storm</a> topology it launched to handle
+	      continous traffic.
+	      New facts are published on an AMQP topic, and Storm Spouts listen to them, and introduce them to the topology.
+	      Storm Bolts listen to these changes and cross-reference them with facts and partial rules that are stored in a database.
+	      The resulting partial rules and derived facts are stored to the database, and the derived facts are also published on AMQP topics.
+	      This allows them to be considered by other rules.</p>
+	  </div>
+	  <div class="col-md-7"><img src="topology.png" width="100%"></div>
+	</div>
+	<p>Clauses use a similar mechanism to rules, but their data is transient and is not stored to a database.</p>
+      </div>
+      <div class="container">
+	Axiom is currently a work in progress.
+	For more information you are encouraged to:
+	<ul class="">
+	  <li>Read our <a href="docs.html">live documentation</a>.</li>
+	  <li>Read our academic papers:
+	    <ul><li><a href="http://www.cs.technion.ac.il/users/wwwb/cgi-bin/tr-get.cgi/2015/CS/CS-2015-06.pdf">Separation of Powers in the Cloud</a>
+		(presented at <a href="http://2015.splashcon.org/track/onward2015-papers#program">Onwrad! 2015</a>):
+		A paper introducing Cloudlog as a way to provide access control without trusting the application with it.</li>
+	      <li><a href="http://programming-journal.org/2017/1/2/">Application Embedding</a>
+		(published at the <a href="http://programming-journal.org/">Programming Journal</a>):
+		A paper intruducing the approach Axiom is based on.</li></ul></li>
+	  <li>Watch our video talks:
+	    <ul><li><a href="https://youtu.be/Sl6hh-0ikwU">Application Embedding Talk</a> (&lt;Programming&gt; 2017)</li>
+	      <li><a href="https://youtu.be/3gLMBr2rTj8">Axiom Demo</a> (&lt;Programming&gt; 2017)</li></ul></li>
+	  <li>See our <a href="https://github.com/brosenan/axiom/">code on GitHub</a></li>
+	  <li><a href="https://cloudalion.org/contact-us/">Contact us</a> directly</li></ul>
+      </div>
     </div>
   </body>
 </html>
