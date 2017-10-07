@@ -464,17 +464,18 @@ We expect to see a `:div` containing a `:h2` with the user's name."
         ui (tasks-editor host)]
     (is (= (rq/query ui :div :h2) ["foo's Tasks"]))))
 
-"Now we add two tasks to the view.
-We expect to see them as `:li` elements inside a `:ul` element.
-Each `:li` element should have a key attribute that matches the timestamp of a task.
-Additionally, it should contain an `:input` box, for which the `:value` attribute contains the task,
-and a button with the caption \"Done\"."
+"Now we add two tasks to the view."
 (defn add-two-tasks [host]
   (let [{:keys [add]} (meta (tasks-view host "foo"))]
     (add {:ts 1000
           :task "One"})
     (add {:ts 2000
           :task "Two"})))
+
+"We expect to see them as `:li` elements inside a `:ul` element.
+Each `:li` element should have a key attribute that matches the timestamp of a task.
+Additionally, it should contain an `:input` box, for which the `:value` attribute contains the task,
+and a button with the caption \"Done\"."
 
 (fact test2
   (let [host (ax/mock-connection "foo")]
