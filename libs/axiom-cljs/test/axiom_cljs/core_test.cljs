@@ -459,7 +459,7 @@ Consider the following code, defining a view and a reagent component for editing
 We use [reagent-query](https://github.com/brosenan/reagent-query) for querying the generated UI.
 We start with an empty task-list.
 We expect to see a `:div` containing a `:h2` with the user's name."
-(deftest test1
+(fact test1
   (let [host (ax/mock-connection "foo")
         ui (tasks-editor host)]
     (is (= (rq/query ui :div :h2) ["foo's Tasks"]))))
@@ -476,7 +476,7 @@ and a button with the caption \"Done\"."
     (add {:ts 2000
           :task "Two"})))
 
-(deftest test2
+(fact test2
   (let [host (ax/mock-connection "foo")]
     (add-two-tasks host)
     (let [ui (tasks-editor host)]
@@ -485,7 +485,7 @@ and a button with the caption \"Done\"."
       (is (= (rq/query ui :div :ul :li :button) ["Done" "Done"])))))
 
 "The button's `:on-click` handler removes an item from the list."
-(deftest test3
+(fact test3
   (let [host (ax/mock-connection "foo")]
     (add-two-tasks host)
     (let [ui (tasks-editor host)
@@ -496,7 +496,7 @@ and a button with the caption \"Done\"."
       (is (= (rq/query (tasks-editor host) :div :ul :li :input:value) ["Two"])))))
 
 "The `:input` box's `:on-change` event updates the task."
-(deftest test4
+(fact test4
   (let [host (ax/mock-connection "foo")]
     (add-two-tasks host)
     (let [ui (tasks-editor host)
@@ -505,9 +505,8 @@ and a button with the caption \"Done\"."
       ((second updaters) (rq/mock-change-event "Three"))
       ;; The "Two" value became "Three"
       (is (= (rq/query (tasks-editor host) :div :ul :li :input:value) ["One" "Three"])))))
-
 "A \"New Task\" button creates a new, empty task."
-(deftest test5
+(fact test5
   (let [host (-> (ax/mock-connection "foo")
                  (assoc :time (constantly 555)))]
     (let [ui (tasks-editor host)]
