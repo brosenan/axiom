@@ -37,58 +37,58 @@
                          writers #{'$user}}}]
   (let [fact-name (-> fact first str (subs 1))]
     `(defonce ~name
-       (let [state# ~store-in
-             hosts# (atom #{})]
-         (reset! state# {})
+       (let [state-by-host# (atom {})]
          (-> (fn [host# ~@args]
-               (when-not (contains? @hosts# host#)
-                 ((:sub host#) ~fact-name
-                  (fn [ev#]
-                    (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
-                      (update-state state# ev# ~args ~when))))
-                 (swap! hosts# conj host#))
-               (-> (cond (contains? @state# ~args)
-                         (-> (->> (for [[ev# c#] (@state# ~args)
-                                        :when (> c# 0)]
-                                    (let [varmap# (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
-                                                    ~(symbol-map fact))]
-                                      (-> varmap#
-                                          (assoc :-readers (:readers ev#))
-                                          (assoc :-writers (:writers ev#))
-                                          (assoc :del! #((:pub host#)
-                                                         (-> ev#
-                                                             (assoc :ts ((:time host#)))
-                                                             (assoc :change (- c#)))))
-                                          (assoc :swap! (fn [func# & args#]
-                                                          ((:pub host#)
+               (when-not (contains? @state-by-host# host#)
+                 (let [state# ~store-in]
+                   (swap! state# #(or % {}))
+                   (swap! state-by-host# assoc host# state#)
+                   ((:sub host#) ~fact-name
+                    (fn [ev#]
+                      (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
+                        (update-state state# ev# ~args ~when))))))
+               (let [state# (@state-by-host# host#)]
+                 (-> (cond (contains? @state# ~args)
+                           (-> (->> (for [[ev# c#] (@state# ~args)
+                                          :when (> c# 0)]
+                                      (let [varmap# (let [~(vec (rest fact)) (cons (:key ev#) (:data ev#))]
+                                                      ~(symbol-map fact))]
+                                        (-> varmap#
+                                            (assoc :-readers (:readers ev#))
+                                            (assoc :-writers (:writers ev#))
+                                            (assoc :del! #((:pub host#)
                                                            (-> ev#
                                                                (assoc :ts ((:time host#)))
-                                                               (assoc :change c#)
-                                                               (assoc :removed (:data ev#))
-                                                               (assoc :data
-                                                                      (let [{:keys [~@(symbols (drop 2 fact))]} (apply func# varmap# args#)]
-                                                                        ~(vec (drop 2 fact)))))))))))
-                                  (sort ~(comparator fact order-by)))
-                             (ax/merge-meta {:pending false}))
-                         :else
-                         (do
-                           ((:pub host#) {:kind :reg
-                                          :name ~fact-name
-                                          :key ~(-> fact second)
-                                          :get-existing true})
-                           (ax/merge-meta '() {:pending true})))
-                   (ax/merge-meta {:add (fn [{:keys [~@(set/difference (symbols fact) (symbols args))]}]
-                                          (let [~'$user (user host#)]
-                                            ((:pub host#)
-                                             {:kind :fact
-                                              :name ~fact-name
-                                              :key ~(second fact)
-                                              :data [~@(drop 2 fact)]
-                                              :ts ((:time host#))
-                                              :change 1
-                                              :writers ~writers
-                                              :readers ~readers})))})))
-             (with-meta {:state state#}))))))
+                                                               (assoc :change (- c#)))))
+                                            (assoc :swap! (fn [func# & args#]
+                                                            ((:pub host#)
+                                                             (-> ev#
+                                                                 (assoc :ts ((:time host#)))
+                                                                 (assoc :change c#)
+                                                                 (assoc :removed (:data ev#))
+                                                                 (assoc :data
+                                                                        (let [{:keys [~@(symbols (drop 2 fact))]} (apply func# varmap# args#)]
+                                                                          ~(vec (drop 2 fact)))))))))))
+                                    (sort ~(comparator fact order-by)))
+                               (ax/merge-meta {:pending false}))
+                           :else
+                           (do
+                             ((:pub host#) {:kind :reg
+                                            :name ~fact-name
+                                            :key ~(-> fact second)
+                                            :get-existing true})
+                             (ax/merge-meta '() {:pending true})))
+                     (ax/merge-meta {:add (fn [{:keys [~@(set/difference (symbols fact) (symbols args))]}]
+                                            (let [~'$user (user host#)]
+                                              ((:pub host#)
+                                               {:kind :fact
+                                                :name ~fact-name
+                                                :key ~(second fact)
+                                                :data [~@(drop 2 fact)]
+                                                :ts ((:time host#))
+                                                :change 1
+                                                :writers ~writers
+                                                :readers ~readers})))})))))))))
 
 (defn ^:private parse-target-form [[name & args]]
    (let [[in out] (split-with (partial not= '->) args)]

@@ -4,9 +4,11 @@
             [axiom-cljs.core :as ax]
             [cljs.core.async :as async]
             [clojure.string :as str]
-            [goog.net.cookies :as cookies])
+            [goog.net.cookies :as cookies]
+            [reagent-query.core :as rq])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
-                   [axiom-cljs.tests :refer [fact]]))
+                   [axiom-cljs.tests :refer [fact]]
+                   [axiom-cljs.macros :refer [user defview defquery]]))
 
 (enable-console-print!)
 
@@ -432,3 +434,113 @@ When the dispatch function returns that dispatch value, the `:sub`scribed functi
         ((:pub ps) {:name "alice" :age 28})
         ((:pub ps) {:name "bob" :age 31})
         (is (= @val {:name "alice" :age 28}))))
+
+[[:chapter {:title "Testing Utilities"}]]
+"The `axiom-cljs` library provides some utility functions to help test client-side code.
+Consider the following code, defining a view and a reagent component for editing tasks."
+(defview tasks-view [me]
+  [:my-app/task me task ts]
+  :order-by ts)
+
+(defn tasks-editor [host]
+  (let [tasks (tasks-view host (user host))
+        {:keys [add]} (meta tasks)]
+    [:div
+     [:h2 (str (user host) "'s Tasks")]
+     [:ul (for [{:keys [ts task del! swap!]} tasks]
+            [:li {:key ts}
+             [:input {:value task
+                      :on-change #(swap! assoc :task (.-target.value %))}]
+             [:button {:on-click del!} "Done"]])]
+     [:button {:on-click #(add {:ts ((:time host))
+                                :task ""})} "Add Task"]]))
+
+"We build this code TDD-style, using the following tests.
+We use [reagent-query](https://github.com/brosenan/reagent-query) for querying the generated UI.
+We start with an empty task-list.
+We expect to see a `:div` containing a `:h2` with the user's name."
+(deftest test1
+  (let [host (ax/mock-connection "foo")
+        ui (tasks-editor host)]
+    (is (= (rq/query ui :div :h2) ["foo's Tasks"]))))
+
+"Now we add two tasks to the view.
+We expect to see them as `:li` elements inside a `:ul` element.
+Each `:li` element should have a key attribute that matches the timestamp of a task.
+Additionally, it should contain an `:input` box, for which the `:value` attribute contains the task,
+and a button with the caption \"Done\"."
+(defn add-two-tasks [host]
+  (let [{:keys [add]} (meta (tasks-view host "foo"))]
+    (add {:ts 1000
+          :task "One"})
+    (add {:ts 2000
+          :task "Two"})))
+
+(deftest test2
+  (let [host (ax/mock-connection "foo")]
+    (add-two-tasks host)
+    (let [ui (tasks-editor host)]
+      (is (= (rq/query ui :div :ul :li:key) [1000 2000]))
+      (is (= (rq/query ui :div :ul :li :input:value) ["One" "Two"]))
+      (is (= (rq/query ui :div :ul :li :button) ["Done" "Done"])))))
+
+"The button's `:on-click` handler removes an item from the list."
+(deftest test3
+  (let [host (ax/mock-connection "foo")]
+    (add-two-tasks host)
+    (let [ui (tasks-editor host)
+          deleters (rq/query ui :div :ul :li :button:on-click)]
+      ;; We click the first button
+      ((first deleters))
+      ;; We are left with "Two"
+      (is (= (rq/query (tasks-editor host) :div :ul :li :input:value) ["Two"])))))
+
+"The `:input` box's `:on-change` event updates the task."
+(deftest test4
+  (let [host (ax/mock-connection "foo")]
+    (add-two-tasks host)
+    (let [ui (tasks-editor host)
+          updaters (rq/query ui :div :ul :li :input:on-change)]
+      ;; We edit the second input box
+      ((second updaters) (rq/mock-change-event "Three"))
+      ;; The "Two" value became "Three"
+      (is (= (rq/query (tasks-editor host) :div :ul :li :input:value) ["One" "Three"])))))
+
+"A \"New Task\" button creates a new, empty task."
+(deftest test5
+  (let [host (-> (ax/mock-connection "foo")
+                 (assoc :time (constantly 555)))]
+    (let [ui (tasks-editor host)]
+      (is (= (rq/query ui :div :button) ["Add Task"]))
+      (let [add-task (first (rq/query ui :div :button:on-click))]
+        (add-task))
+      ;; A new task should appear, with empty text and timestamp of 555
+      (let [ui (tasks-editor host)]
+        (is (= (rq/query ui :div :ul :li:key) [555]))
+        (is (= (rq/query ui :div :ul :li :input:value) [""]))))))
+
+[[:section {:title "mock-connection"}]]
+"To facilitate tests, `mock-connection` allows its users to create a `host` object, similar to the one created by `default-connection` and `connection`,
+but one that does not connect to an actual server."
+
+"The `mock-connection` function takes one argument: the user identity, to be returned by the `user` macro."
+(fact mock-connection1
+      (let [host (ax/mock-connection "foo")]
+        (is (= (user host) "foo"))))
+
+"The resulting `host` map has `:pub` and `:sub` members that interact with each other: Publishing on `:pub` will be seen when subscribing on `:sub`."
+(fact mock-connection2
+      (let [host (ax/mock-connection "x")
+            {:keys [pub sub]} host
+            res (atom nil)]
+        (sub "foo" #(reset! res (:data %)))
+        (pub {:name "foo" :data 123})
+        (is (= @res 123))))
+
+"The mock host also has a `:time` function, implementing a counter."
+(fact mock-connection3
+      (let [host (ax/mock-connection "x")
+            {:keys [time]} host]
+        (is (= (time) 0))
+        (is (= (time) 1))
+        (is (= (time) 2))))

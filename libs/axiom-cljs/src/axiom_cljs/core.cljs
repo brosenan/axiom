@@ -146,3 +146,10 @@
       wrap-late-subs
       wrap-feed-forward
       wrap-atomic-updates))
+
+(defn mock-connection [user]
+  (-> (merge {:identity (atom user)
+              :time (let [counter (atom -1)]
+                      (fn [] (swap! counter inc)))}
+             (pubsub :name))
+      wrap-atomic-updates))
