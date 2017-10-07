@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 30 August 2017</h5>
+              <h5>Date: 07 October 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.3.1</h5></div></div>
           <hr/>
@@ -367,7 +367,115 @@
       ((:sub ps) &quot;alice&quot; (partial reset! val))
       ((:pub ps) {:name &quot;alice&quot; :age 28})
       ((:pub ps) {:name &quot;bob&quot; :age 31})
-      (is (= @val {:name &quot;alice&quot; :age 28})))</code></pre></div>
+      (is (= @val {:name &quot;alice&quot; :age 28})))</code></pre></div><div class="code"><pre><code class="clojure">[[:chapter {:title &quot;Testing Utilities&quot;}]]
+       &quot;The `axiom-cljs` library provides some utility functions to help test client-side code.
+Consider the following code, defining a view and a reagent component for editing tasks.&quot;
+       (defview tasks-view [me]
+         [:my-app/task me task ts]
+         :order-by ts)
+
+       (defn tasks-editor [host]
+         (let [tasks (tasks-view host (user host))
+               {:keys [add]} (meta tasks)]
+           [:div
+            [:h2 (str (user host) &quot;'s Tasks&quot;)]
+            [:ul (for [{:keys [ts task del! swap!]} tasks]
+                   [:li {:key ts}
+                    [:input {:value task
+                             :on-change #(swap! assoc :task (.-target.value %))}]
+                    [:button {:on-click del!} &quot;Done&quot;]])]
+            [:button {:on-click #(add {:ts ((:time host))
+                                       :task &quot;&quot;})} &quot;Add Task&quot;]]))
+
+       &quot;We build this code TDD-style, using the following tests.
+We use [reagent-query](https://github.com/brosenan/reagent-query) for querying the generated UI.
+We start with an empty task-list.
+We expect to see a `:div` containing a `:h2` with the user's name.&quot;
+       (deftest test1
+         (let [host (ax/mock-connection &quot;foo&quot;)
+               ui (tasks-editor host)]
+           (is (= (rq/query ui :div :h2) [&quot;foo's Tasks&quot;]))))
+
+       &quot;Now we add two tasks to the view.
+We expect to see them as `:li` elements inside a `:ul` element.
+Each `:li` element should have a key attribute that matches the timestamp of a task.
+Additionally, it should contain an `:input` box, for which the `:value` attribute contains the task,
+and a button with the caption &#92;&quot;Done&#92;&quot;.&quot;
+       (defn add-two-tasks [host]
+         (let [{:keys [add]} (meta (tasks-view host &quot;foo&quot;))]
+           (add {:ts 1000
+                 :task &quot;One&quot;})
+           (add {:ts 2000
+                 :task &quot;Two&quot;})))
+
+       (deftest test2
+         (let [host (ax/mock-connection &quot;foo&quot;)]
+           (add-two-tasks host)
+           (let [ui (tasks-editor host)]
+             (is (= (rq/query ui :div :ul :li:key) [1000 2000]))
+             (is (= (rq/query ui :div :ul :li :input:value) [&quot;One&quot; &quot;Two&quot;]))
+             (is (= (rq/query ui :div :ul :li :button) [&quot;Done&quot; &quot;Done&quot;])))))
+
+       &quot;The button's `:on-click` handler removes an item from the list.&quot;
+       (deftest test3
+         (let [host (ax/mock-connection &quot;foo&quot;)]
+           (add-two-tasks host)
+           (let [ui (tasks-editor host)
+                 deleters (rq/query ui :div :ul :li :button:on-click)]
+             ;; We click the first button
+             ((first deleters))
+             ;; We are left with &quot;Two&quot;
+             (is (= (rq/query (tasks-editor host) :div :ul :li :input:value) [&quot;Two&quot;])))))
+
+       &quot;The `:input` box's `:on-change` event updates the task.&quot;
+       (deftest test4
+         (let [host (ax/mock-connection &quot;foo&quot;)]
+           (add-two-tasks host)
+           (let [ui (tasks-editor host)
+                 updaters (rq/query ui :div :ul :li :input:on-change)]
+             ;; We edit the second input box
+             ((second updaters) (rq/mock-change-event &quot;Three&quot;))
+             ;; The &quot;Two&quot; value became &quot;Three&quot;
+             (is (= (rq/query (tasks-editor host) :div :ul :li :input:value) [&quot;One&quot; &quot;Three&quot;])))))
+
+       &quot;A &#92;&quot;New Task&#92;&quot; button creates a new, empty task.&quot;
+       (deftest test5
+         (let [host (-&gt; (ax/mock-connection &quot;foo&quot;)
+                        (assoc :time (constantly 555)))]
+           (let [ui (tasks-editor host)]
+             (is (= (rq/query ui :div :button) [&quot;Add Task&quot;]))
+             (let [add-task (first (rq/query ui :div :button:on-click))]
+               (add-task))
+             ;; A new task should appear, with empty text and timestamp of 555
+             (let [ui (tasks-editor host)]
+               (is (= (rq/query ui :div :ul :li:key) [555]))
+               (is (= (rq/query ui :div :ul :li :input:value) [&quot;&quot;]))))))
+
+       [[:section {:title &quot;mock-connection&quot;}]]
+       &quot;To facilitate tests, `mock-connection` allows its users to create a `host` object, similar to the one created by `default-connection` and `connection`,
+but one that does not connect to an actual server.&quot;
+
+       &quot;The `mock-connection` function takes one argument: the user identity, to be returned by the `user` macro.&quot;
+       (fact mock-connection1
+             (let [host (ax/mock-connection &quot;foo&quot;)]
+               (is (= (user host) &quot;foo&quot;))))
+
+       &quot;The resulting `host` map has `:pub` and `:sub` members that interact with each other: Publishing on `:pub` will be seen when subscribing on `:sub`.&quot;
+       (fact mock-connection2
+             (let [host (ax/mock-connection &quot;x&quot;)
+                   {:keys [pub sub]} host
+                   res (atom nil)]
+               (sub &quot;foo&quot; #(reset! res (:data %)))
+               (pub {:name &quot;foo&quot; :data 123})
+               (is (= @res 123))))
+
+       &quot;The mock host also has a `:time` function, implementing a counter.&quot;
+       (fact mock-connection3
+             (let [host (ax/mock-connection &quot;x&quot;)
+                   {:keys [time]} host]
+               (is (= (time) 0))
+               (is (= (time) 1))
+               (is (= (time) 2))))</code></pre></div>
         </div>
       </div>
     </div>
