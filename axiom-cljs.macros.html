@@ -62,7 +62,7 @@
           <div class="heading">
             <div>
               <h5>Author: Boaz Rosenan&nbsp;&nbsp;<a href="mailto:brosenan@gmail.com">(brosenan@gmail.com)</a></h5>
-              <h5>Date: 30 August 2017</h5>
+              <h5>Date: 07 October 2017</h5>
               <h5>Repository: <a href="https://github.com/brosenan/axiom">https://github.com/brosenan/axiom</a></h5>
               <h5>Version: 0.3.1</h5></div></div>
           <hr/>
@@ -107,6 +107,9 @@
     (defview my-tweets2 [user]
       [:tweetlog/tweeted user tweet]
       :store-in my-atom2)
+    (let [host {:pub (fn [ev])
+                :sub (fn [key f])}]
+      (my-tweets2 host &quot;foo&quot;))
     (is (map? @my-atom2))</code></pre></div><div><p>When events are received from the host they are placed in this map. This is a two-level map, where the first level of keys corresponds to the view argument vector, mapping a set of results to each combination of arguments. The second level of keys consists of the received <a href='cloudlog-events.html#introduction'>events</a>,  with the <code>:ts</code> and <code>:change</code> fields omitted. The values are the accumulated <code>:change</code> of all matching events.</p></div><div class="code"><pre><code class="clojure">defview-5
     (let [host {:sub (:sub ps2)
                 :pub #(swap! published2 conj %)
@@ -196,12 +199,12 @@
                 :pub #(swap! published2 conj %)
                 :time (constantly 12345)
                 :identity (atom &quot;alice&quot;)}]
-      (is (= (count (my-tweets2 host &quot;alice&quot;)) 0)))</code></pre></div><div><p>To facilitate debugging, the atom in which the view's state is stored is exposed as the <code>:state</code> meta field in the view function.</p></div><div class="code"><pre><code class="clojure">defview-9
-    (defonce atom9 (atom nil))
-    (defview my-view9 [x]
-      [:foo/bar x y z]
-      :store-in ((constantly atom9)))
-    (is (= (-&gt; my-view9 meta :state) atom9))</code></pre></div><div><span id="event-emitting-functions"></span><h3>1.1 &nbsp;&nbsp; Event-Emitting Functions</h3></div><div><p>A view provides functions that allow users to emit event for creating, updating and deleting facts.</p></div><div><p>For <em>creating facts</em>, a sequence returned by a view function has an <code>:add</code> meta-field. This is a function that takes a value map as input, and emits a corresponding event with the following keys:</p><ol><li><code>:kind</code> is always <code>:fact</code>.</li><li><code>:name</code> is the first element in the fact pattern, converted to string.</li><li><code>:key</code> and <code>:data</code> are derived from the value map.</li><li><code>:ts</code> consults the host's <code>:time</code> function.</li><li><code>:change</code> is always 1.</li><li><code>:writers</code> defaults to the set representing the user.</li><li><code>:readers</code> defaults to the universal set.Parameters already given to the view function (e.g., <code>:user &quot;alice&quot;</code> in the following example) should be omitted.</li></ol></div><div class="code"><pre><code class="clojure">defview-ev-1a
+      (is (= (count (my-tweets2 host &quot;alice&quot;)) 0)))</code></pre></div><div><p>To facilitate debugging, the atom in which the view's state is stored is exposed as the <code>:state</code> meta field in the view function.</p></div><div class="code"><pre><code class="clojure">(fact defview-9
+             (defonce atom9 (atom nil))
+             (defview my-view9 [x]
+               [:foo/bar x y z]
+               :store-in ((constantly atom9)))
+             (is (= (-&gt; my-view9 meta :state) atom9)))</code></pre></div><div><span id="event-emitting-functions"></span><h3>1.1 &nbsp;&nbsp; Event-Emitting Functions</h3></div><div><p>A view provides functions that allow users to emit event for creating, updating and deleting facts.</p></div><div><p>For <em>creating facts</em>, a sequence returned by a view function has an <code>:add</code> meta-field. This is a function that takes a value map as input, and emits a corresponding event with the following keys:</p><ol><li><code>:kind</code> is always <code>:fact</code>.</li><li><code>:name</code> is the first element in the fact pattern, converted to string.</li><li><code>:key</code> and <code>:data</code> are derived from the value map.</li><li><code>:ts</code> consults the host's <code>:time</code> function.</li><li><code>:change</code> is always 1.</li><li><code>:writers</code> defaults to the set representing the user.</li><li><code>:readers</code> defaults to the universal set.Parameters already given to the view function (e.g., <code>:user &quot;alice&quot;</code> in the following example) should be omitted.</li></ol></div><div class="code"><pre><code class="clojure">defview-ev-1a
     (reset! published2 [])
     (let [host {:sub (:sub ps2)
                 :pub #(swap! published2 conj %)
