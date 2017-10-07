@@ -385,12 +385,12 @@
                                 :task &quot;&quot;})} &quot;Add Task&quot;]]))</code></pre></div><div><p>We build this code TDD-style, using the following tests. We use <a href='https://github.com/brosenan/reagent-query'>reagent-query</a> for querying the generated UI. We start with an empty task-list. We expect to see a <code>:div</code> containing a <code>:h2</code> with the user's name.</p></div><div class="code"><pre><code class="clojure">test1
 (let [host (ax/mock-connection &quot;foo&quot;)
       ui (tasks-editor host)]
-  (is (= (rq/query ui :div :h2) [&quot;foo's Tasks&quot;])))</code></pre></div><div><p>Now we add two tasks to the view. We expect to see them as <code>:li</code> elements inside a <code>:ul</code> element. Each <code>:li</code> element should have a key attribute that matches the timestamp of a task. Additionally, it should contain an <code>:input</code> box, for which the <code>:value</code> attribute contains the task, and a button with the caption "Done".</p></div><div class="code"><pre><code class="clojure">(defn add-two-tasks [host]
+  (is (= (rq/query ui :div :h2) [&quot;foo's Tasks&quot;])))</code></pre></div><div><p>Now we add two tasks to the view.</p></div><div class="code"><pre><code class="clojure">(defn add-two-tasks [host]
   (let [{:keys [add]} (meta (tasks-view host &quot;foo&quot;))]
     (add {:ts 1000
           :task &quot;One&quot;})
     (add {:ts 2000
-          :task &quot;Two&quot;})))</code></pre></div><div class="code"><pre><code class="clojure">test2
+          :task &quot;Two&quot;})))</code></pre></div><div><p>We expect to see them as <code>:li</code> elements inside a <code>:ul</code> element. Each <code>:li</code> element should have a key attribute that matches the timestamp of a task. Additionally, it should contain an <code>:input</code> box, for which the <code>:value</code> attribute contains the task, and a button with the caption "Done".</p></div><div class="code"><pre><code class="clojure">test2
 (let [host (ax/mock-connection &quot;foo&quot;)]
   (add-two-tasks host)
   (let [ui (tasks-editor host)]
