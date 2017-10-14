@@ -150,6 +150,27 @@
 (defn mock-connection [user]
   (-> (merge {:identity (atom user)
               :time (let [counter (atom -1)]
-                      (fn [] (swap! counter inc)))}
+                      (fn [] (swap! counter inc)))
+              :uuid (let [counter (atom -1)]
+                      (fn [] (str "UUID-" (swap! counter inc))))}
              (pubsub :name))
       wrap-atomic-updates))
+
+(defn query-mock [host kw]
+  (let [questions (atom {})
+        question (str (namespace kw) "/" (name kw) "?")
+        answer (str (namespace kw) "/" (name kw) "!")]
+    ((:sub host) question (fn [{:keys [key data]}]
+                            (swap! questions assoc data key)))
+    (fn [inputs outputs]
+      (let [uuid (@questions inputs)]
+        (when (nil? uuid)
+          (throw (js/Error (str "Query " kw " was never executed with inputs " (pr-str inputs)))))
+        ((:pub host) {:kind :fact
+                      :name answer
+                      :key uuid
+                      :data outputs
+                      :ts ((:time host))
+                      :change 1
+                      :readers #{@(:identity host)}
+                      :writers #{@(:identity host)}})))))

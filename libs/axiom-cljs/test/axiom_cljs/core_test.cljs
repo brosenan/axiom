@@ -544,3 +544,48 @@ but one that does not connect to an actual server."
         (is (= (time) 0))
         (is (= (time) 1))
         (is (= (time) 2))))
+
+[[:section {:title "query-mock"}]]
+"A query involves both a question and answers.
+To mock the platform's part in a query, we need to:
+1. Register to receive questions,
+2. Validate the question we received against the expected one, and
+3. Provide an answer."
+
+"`query-mock` takes a (mock) host map and a keyword containing the name of the query we wish to mock.
+It returns an _answer_ function, one that takes the expected inputs and provided outputs for a query."
+
+"Consider the following query, with two inputs and two outputs:"
+(defquery foo-query [x y]
+  [:something/foo x y -> z w])
+
+"In a production scenario, the query function is called at least twice:
+Once during the initial creation of the UI, when the results are not yet known,
+and another time (or times), as results start poring in from the platform."
+
+"A test will mimic this behavior by calling the query function twice, either directly (as we do here),
+or indirectly, by calling the component function.
+The overall sequence of a typical test is the following:
+1. Create a query mock function associated with the query.
+2. Call the UI component function (which calls the query function), expecting empty result.
+3. Call the query mock function with one or more results, and
+4. Call the UI component function once again to see the effect of the results."
+
+"In the following code we replace the component function with calling the view function directly."
+(fact query-mock1
+      (let [host (ax/mock-connection "x")
+            foo-mock (ax/query-mock host :something/foo)]
+        ;; It is initially empty
+        (is (= (foo-query host 1 2) []))
+        ;; Let's add a result
+        (foo-mock [1 2] [3 4])
+        ;; Now we should see one result
+        (is (= (foo-query host 1 2) [{:z 3 :w 4}]))))
+
+"If the given inputs do not match a query that was made, an exception is thrown."
+(fact query-mock2
+      (let [host (ax/mock-connection "x")
+            foo-mock (ax/query-mock host :something/foo)]
+        ;; We call foo-mock with [1 2] without having this question asked before
+        (is (thrown-with-msg? js/Error #"Query :something.foo was never executed with inputs .1 2."
+                              (foo-mock [1 2] [3 4])))))
