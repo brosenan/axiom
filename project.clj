@@ -24,9 +24,9 @@
                                   [im.chit/hara.string.prose "2.4.8"]]}}
   :publish {:theme  "bolton"
             :template {:site   "axiom"
-                       :author "Boaz Rosenan"
-                       :email  "brosenan@gmail.com"
-                       :url "https://github.com/brosenan/axiom"}
+                       :author "Temporarily Removed"
+                       :email  "temporarily@removed.com"
+                       :url "https://github.com/temporarily/removed"}
             :output "docs"
             :files {"docs"
                     {:template "docs.html"}
@@ -54,6 +54,10 @@
                     {:input "libs/cloudlog-events/test/cloudlog_events/testing_test.clj"
                      :title "cloudlog-events.testing"
                      :subtitle "Test Utilities"}
+                    "cloudlog-events.cache"
+                    {:input "libs/cloudlog-events/test/cloudlog_events/cache_test.clj"
+                     :title "cloudlog-events.cache"
+                     :subtitle "Caching Event Processors"}
                     "zk-plan"
                     {:input "libs/zk-plan/test/zk_plan/core_test.clj"
                      :title "zk-plan.core"
